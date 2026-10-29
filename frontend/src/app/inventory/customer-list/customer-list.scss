@@ -1,0 +1,6 @@
+.loading { display: flex; justify-content: center; padding: 32px; }
+.full-width { width: 100%; }
+.badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge.active { background: #e8f5e9; color: #1b5e20; }
+.badge.inactive { background: #ffebee; color: #b71c1c; }
+mat-form-field { margin-bottom: 16px; min-width: 300px; }

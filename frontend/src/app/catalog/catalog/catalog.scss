@@ -1,0 +1,17 @@
+.catalog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cart-info { display: flex; align-items: center; gap: 12px; }
+.cart-total { font-weight: bold; }
+.search-field { width: 100%; max-width: 400px; margin-bottom: 16px; }
+.loading { display: flex; justify-content: center; padding: 40px; }
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+.product-card { display: flex; flex-direction: column; }
+.product-card mat-card-content { flex: 1; }
+.product-card.out-of-stock { opacity: 0.65; }
+.description { color: #666; font-size: 14px; min-height: 40px; }
+.price-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.price { font-size: 1.2rem; font-weight: bold; color: #3f51b5; }
+.in-stock { color: #388e3c; font-size: 13px; font-weight: 500; }
+.out-of-stock-label { color: #d32f2f; font-size: 13px; }
+.cart-qty { font-size: 12px; color: #f57c00; margin-top: 4px; }
+.empty-state { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; padding: 40px; color: #999; }
+.empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; }

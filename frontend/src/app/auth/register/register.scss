@@ -1,0 +1,17 @@
+.register-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 24px 0;
+}
+.register-card {
+  width: 440px;
+  padding: 16px;
+}
+.full-width { width: 100%; margin-bottom: 12px; }
+.half-width { width: calc(50% - 6px); margin-bottom: 12px; }
+.name-row { display: flex; gap: 12px; }
+.error-msg { color: red; margin-bottom: 8px; font-size: 14px; }
+.success-msg { color: green; margin-bottom: 8px; font-size: 14px; }

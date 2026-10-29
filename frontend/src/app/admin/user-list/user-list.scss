@@ -1,0 +1,8 @@
+.loading { display: flex; justify-content: center; padding: 32px; }
+.full-width { width: 100%; }
+mat-form-field { margin-bottom: 16px; min-width: 300px; }
+.role-badge { padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.role-ADMIN { background: #ede7f6; color: #4527a0; }
+.role-MANAGER { background: #e3f2fd; color: #0d47a1; }
+.role-WORKER { background: #e8f5e9; color: #1b5e20; }
+.role-CUSTOMER { background: #fff8e1; color: #e65100; }

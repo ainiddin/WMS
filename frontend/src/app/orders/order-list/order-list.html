@@ -1,0 +1,78 @@
+<div class="page-header">
+  <h2>Orders</h2>
+</div>
+
+<div class="filters-row">
+  <mat-form-field appearance="outline">
+    <mat-label>Status</mat-label>
+    <mat-select [(ngModel)]="filterStatus" (selectionChange)="load()">
+      <mat-option value="">All</mat-option>
+      <mat-option value="PENDING">Pending</mat-option>
+      <mat-option value="APPROVED">Approved</mat-option>
+      <mat-option value="SHIPPED">Shipped</mat-option>
+      <mat-option value="REJECTED">Rejected</mat-option>
+      <mat-option value="CANCELLED">Cancelled</mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>
+
+<div *ngIf="loading" class="loading">
+  <mat-spinner diameter="40"></mat-spinner>
+</div>
+
+<table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2 full-width" *ngIf="!loading">
+  <ng-container matColumnDef="code">
+    <th mat-header-cell *matHeaderCellDef>Order #</th>
+    <td mat-cell *matCellDef="let o">{{ o.code }}</td>
+  </ng-container>
+  <ng-container matColumnDef="customer_name">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Customer</th>
+    <td mat-cell *matCellDef="let o">{{ o.customer_name }}</td>
+  </ng-container>
+  <ng-container matColumnDef="status">
+    <th mat-header-cell *matHeaderCellDef>Status</th>
+    <td mat-cell *matCellDef="let o">
+      <span [class]="'status-badge status-' + o.status">{{ o.status }}</span>
+    </td>
+  </ng-container>
+  <ng-container matColumnDef="total_amount">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Total</th>
+    <td mat-cell *matCellDef="let o">{{ o.total_amount | currency:'KZT':'symbol':'1.2-2' }}</td>
+  </ng-container>
+  <ng-container matColumnDef="created_at">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+    <td mat-cell *matCellDef="let o">{{ o.created_at | date:'mediumDate' }}</td>
+  </ng-container>
+  <ng-container matColumnDef="actions">
+    <th mat-header-cell *matHeaderCellDef>Actions</th>
+    <td mat-cell *matCellDef="let o">
+      <button mat-icon-button matTooltip="View details" (click)="viewDetail(o)">
+        <mat-icon>visibility</mat-icon>
+      </button>
+      <!-- Manager actions on PENDING -->
+      <ng-container *ngIf="isManager() && o.status === 'PENDING'">
+        <button mat-icon-button color="primary" matTooltip="Approve" (click)="approve(o)">
+          <mat-icon>check_circle</mat-icon>
+        </button>
+        <button mat-icon-button color="warn" matTooltip="Reject" (click)="reject(o)">
+          <mat-icon>cancel</mat-icon>
+        </button>
+      </ng-container>
+      <!-- Worker actions on APPROVED -->
+      <button mat-icon-button color="accent" matTooltip="Ship" (click)="ship(o)"
+        *ngIf="isWorker() && o.status === 'APPROVED'">
+        <mat-icon>local_shipping</mat-icon>
+      </button>
+      <!-- Customer cancel PENDING -->
+      <button mat-icon-button color="warn" matTooltip="Cancel" (click)="cancel(o)"
+        *ngIf="isCustomer() && o.status === 'PENDING'">
+        <mat-icon>cancel</mat-icon>
+      </button>
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+</table>
+
+<mat-paginator [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons></mat-paginator>

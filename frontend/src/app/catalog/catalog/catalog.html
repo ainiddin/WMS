@@ -1,0 +1,53 @@
+<div class="catalog-header">
+  <h2>Product Catalog</h2>
+  <div class="cart-info" *ngIf="cart.itemCount() > 0">
+    <mat-icon [matBadge]="cart.itemCount()" matBadgeColor="warn">shopping_cart</mat-icon>
+    <span class="cart-total">{{ cart.total() | currency:'KZT':'symbol':'1.2-2' }}</span>
+    <button mat-raised-button color="accent" (click)="checkout()" [disabled]="checkingOut">
+      <mat-icon>shopping_bag</mat-icon>
+      {{ checkingOut ? 'Placing order...' : 'Checkout' }}
+    </button>
+  </div>
+</div>
+
+<mat-form-field appearance="outline" class="search-field">
+  <mat-label>Search products</mat-label>
+  <input matInput [(ngModel)]="search" (input)="applySearch()" placeholder="Name, code...">
+  <mat-icon matSuffix>search</mat-icon>
+</mat-form-field>
+
+<div *ngIf="loading" class="loading">
+  <mat-spinner diameter="48"></mat-spinner>
+</div>
+
+<div class="product-grid" *ngIf="!loading">
+  <mat-card *ngFor="let p of filteredProducts" class="product-card" [class.out-of-stock]="!p.quantity || p.quantity <= 0">
+    <mat-card-header>
+      <mat-card-title>{{ p.product_name }}</mat-card-title>
+      <mat-card-subtitle>{{ p.code }}</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <p class="description">{{ p.description || 'No description available.' }}</p>
+      <div class="price-row">
+        <span class="price">{{ p.unit_price | currency:'KZT':'symbol':'1.2-2' }}</span>
+        <span [class]="p.quantity > 0 ? 'in-stock' : 'out-of-stock-label'">
+          {{ p.quantity > 0 ? 'In Stock (' + p.quantity + ')' : 'Out of Stock' }}
+        </span>
+      </div>
+      <div *ngIf="isInCart(p.id)" class="cart-qty">
+        In cart: {{ getCartQty(p.id) }}
+      </div>
+    </mat-card-content>
+    <mat-card-actions>
+      <button mat-raised-button color="primary" (click)="addToCart(p)" [disabled]="!p.quantity || p.quantity <= 0">
+        <mat-icon>add_shopping_cart</mat-icon>
+        {{ isInCart(p.id) ? 'Add More' : 'Add to Cart' }}
+      </button>
+    </mat-card-actions>
+  </mat-card>
+
+  <div *ngIf="filteredProducts.length === 0" class="empty-state">
+    <mat-icon>search_off</mat-icon>
+    <p>No products found.</p>
+  </div>
+</div>

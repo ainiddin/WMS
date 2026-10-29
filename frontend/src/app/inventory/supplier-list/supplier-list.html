@@ -1,0 +1,54 @@
+<div class="page-header">
+  <h2>Suppliers</h2>
+  <button mat-raised-button color="primary" *ngIf="canManage()" (click)="openAddDialog()">
+    <mat-icon>add</mat-icon> Add Supplier
+  </button>
+</div>
+
+<mat-form-field appearance="outline">
+  <mat-label>Search</mat-label>
+  <input matInput [(ngModel)]="search" (input)="applyFilter()" placeholder="Name, code...">
+  <mat-icon matSuffix>search</mat-icon>
+</mat-form-field>
+
+<div *ngIf="loading" class="loading">
+  <mat-spinner diameter="40"></mat-spinner>
+</div>
+
+<table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2 full-width" *ngIf="!loading">
+  <ng-container matColumnDef="code">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Code</th>
+    <td mat-cell *matCellDef="let s">{{ s.code }}</td>
+  </ng-container>
+  <ng-container matColumnDef="supplier_name">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+    <td mat-cell *matCellDef="let s">{{ s.supplier_name }}</td>
+  </ng-container>
+  <ng-container matColumnDef="phone">
+    <th mat-header-cell *matHeaderCellDef>Phone</th>
+    <td mat-cell *matCellDef="let s">{{ s.phone }}</td>
+  </ng-container>
+  <ng-container matColumnDef="email">
+    <th mat-header-cell *matHeaderCellDef>Email</th>
+    <td mat-cell *matCellDef="let s">{{ s.email }}</td>
+  </ng-container>
+  <ng-container matColumnDef="is_active">
+    <th mat-header-cell *matHeaderCellDef>Status</th>
+    <td mat-cell *matCellDef="let s">
+      <span [class]="s.is_active ? 'badge active' : 'badge inactive'">{{ s.is_active ? 'Active' : 'Inactive' }}</span>
+    </td>
+  </ng-container>
+  <ng-container matColumnDef="actions">
+    <th mat-header-cell *matHeaderCellDef></th>
+    <td mat-cell *matCellDef="let s">
+      <button mat-icon-button color="primary" (click)="openEditDialog(s)" *ngIf="canManage()" matTooltip="Edit">
+        <mat-icon>edit</mat-icon>
+      </button>
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+</table>
+
+<mat-paginator [pageSizeOptions]="[10, 20, 50]" showFirstLastButtons></mat-paginator>

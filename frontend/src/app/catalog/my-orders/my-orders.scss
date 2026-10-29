@@ -1,0 +1,8 @@
+.loading { display: flex; justify-content: center; padding: 32px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; padding: 48px; color: #9e9e9e; }
+.empty-state mat-icon { font-size: 56px; width: 56px; height: 56px; margin-bottom: 12px; }
+.order-items { padding: 8px 0; }
+.order-item { display: flex; gap: 16px; padding: 6px 0; border-bottom: 1px solid #eee; }
+.item-name { flex: 1; }
+.item-qty { color: #666; }
+.item-price { font-weight: 600; min-width: 100px; text-align: right; }

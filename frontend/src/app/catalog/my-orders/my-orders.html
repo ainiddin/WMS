@@ -1,0 +1,44 @@
+<div class="page-header">
+  <h2>My Orders</h2>
+</div>
+
+<div *ngIf="loading" class="loading">
+  <mat-spinner diameter="40"></mat-spinner>
+</div>
+
+<div *ngIf="!loading && orders.length === 0" class="empty-state">
+  <mat-icon>receipt_long</mat-icon>
+  <p>No orders yet. Go to <strong>Catalog</strong> to place an order.</p>
+</div>
+
+<mat-accordion *ngIf="!loading && orders.length > 0">
+  <mat-expansion-panel *ngFor="let order of orders">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        Order {{ order.code }}
+      </mat-panel-title>
+      <mat-panel-description>
+        <span [class]="'status-badge status-' + order.status">{{ order.status }}</span>
+        &nbsp;&nbsp;{{ order.total_amount | currency:'KZT':'symbol':'1.2-2' }}
+        &nbsp;&nbsp;{{ order.created_at | date:'mediumDate' }}
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+
+    <div class="order-items">
+      <div *ngFor="let item of order.items" class="order-item">
+        <span class="item-name">{{ item.product_name }}</span>
+        <span class="item-qty">x{{ item.quantity }}</span>
+        <span class="item-price">{{ item.total_price | currency:'KZT':'symbol':'1.2-2' }}</span>
+      </div>
+    </div>
+
+    <mat-action-row>
+      <button mat-button (click)="viewDetail(order)">
+        <mat-icon>visibility</mat-icon> Details
+      </button>
+      <button mat-button color="warn" (click)="cancel(order)" *ngIf="order.status === 'PENDING'">
+        <mat-icon>cancel</mat-icon> Cancel
+      </button>
+    </mat-action-row>
+  </mat-expansion-panel>
+</mat-accordion>

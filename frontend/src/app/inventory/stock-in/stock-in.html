@@ -1,0 +1,51 @@
+<div class="page-header">
+  <h2>Stock IN</h2>
+</div>
+
+<mat-card class="stock-in-card">
+  <mat-card-header>
+    <mat-card-title>Record Incoming Stock</mat-card-title>
+    <mat-card-subtitle>Register new product arrivals to the warehouse</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    <div *ngIf="loading" class="loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" *ngIf="!loading">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Product</mat-label>
+        <mat-select formControlName="product">
+          <mat-option *ngFor="let p of products" [value]="p.id">
+            {{ p.code }} – {{ p.product_name }} (Stock: {{ p.quantity }})
+          </mat-option>
+        </mat-select>
+        <mat-error>Please select a product</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Quantity</mat-label>
+        <input matInput type="number" formControlName="quantity" min="1">
+        <mat-error *ngIf="form.get('quantity')?.hasError('min')">Quantity must be at least 1</mat-error>
+        <mat-error *ngIf="form.get('quantity')?.hasError('required')">Quantity is required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Note (optional)</mat-label>
+        <textarea matInput formControlName="note" rows="3" placeholder="Delivery note, supplier ref..."></textarea>
+      </mat-form-field>
+
+      <div *ngIf="successMsg" class="success-msg">
+        <mat-icon>check_circle</mat-icon> {{ successMsg }}
+      </div>
+      <div *ngIf="errorMsg" class="error-msg">
+        <mat-icon>error</mat-icon> {{ errorMsg }}
+      </div>
+
+      <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || submitting">
+        <mat-icon>add_box</mat-icon>
+        {{ submitting ? 'Recording...' : 'Record Stock IN' }}
+      </button>
+    </form>
+  </mat-card-content>
+</mat-card>

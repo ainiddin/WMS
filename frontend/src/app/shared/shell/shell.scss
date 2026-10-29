@@ -1,0 +1,8 @@
+.sidenav-container { height: 100vh; }
+.sidenav { width: 240px; background: #1a237e; color: white; }
+.brand { display: flex; align-items: center; gap: 8px; padding: 20px 16px; font-size: 18px; font-weight: bold; }
+.spacer { flex: 1; }
+.username { margin-right: 8px; }
+.content { padding: 24px; }
+.active-link { background: rgba(255,255,255,0.15) !important; }
+mat-nav-list a { color: white !important; }

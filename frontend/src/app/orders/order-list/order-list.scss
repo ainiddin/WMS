@@ -1,0 +1,4 @@
+.loading { display: flex; justify-content: center; padding: 32px; }
+.full-width { width: 100%; }
+.filters-row { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+.filters-row mat-form-field { min-width: 200px; }

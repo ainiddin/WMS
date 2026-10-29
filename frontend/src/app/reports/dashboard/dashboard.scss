@@ -1,0 +1,5 @@
+.loading-spinner { display: flex; justify-content: center; padding: 40px; }
+.stat-card mat-icon { font-size: 36px; width: 36px; height: 36px; margin-bottom: 8px; }
+.stat-card.warn mat-icon { color: #ff9800; }
+.stat-card.info mat-icon { color: #2196f3; }
+.stat-card.success mat-icon { color: #4caf50; }
