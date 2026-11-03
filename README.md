@@ -17,10 +17,54 @@
 
 ---
 
-## Prerequisites
+## Quick start with Docker (recommended)
 
-- Python 3.11+
-- Node.js 20+
+The only requirement is [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose v2).
+
+From the project root (the folder with `docker-compose.yml`):
+
+```bash
+docker compose up --build -d
+```
+
+This builds and starts three containers:
+
+| Container | What it does | URL on host |
+|---|---|---|
+| `wms_postgres` | PostgreSQL 16 with database `wms_db` (data kept in volume `postgres_data`) | `localhost:5433` |
+| `wms_backend` | Django API, runs `migrate` + `seed.py` automatically on start | http://localhost:8000/api/ |
+| `wms_frontend` | Angular production build served by nginx | **http://localhost:4200** |
+
+Open **http://localhost:4200** and log in with one of the demo users below (password `wms1234!`).
+
+> The frontend is served on port **4200** (not 80) because it calls the API at
+> `http://localhost:8000/api` and the backend CORS whitelist only allows
+> `http://localhost:4200`.
+
+Useful commands:
+
+```bash
+docker compose logs -f backend      # follow backend logs
+docker compose ps                   # container status
+docker compose down                 # stop containers (DB data is kept)
+docker compose down -v              # stop and wipe the database volume
+docker compose up --build -d        # rebuild after code changes
+docker compose exec backend python manage.py createsuperuser
+```
+
+Connect to the database from pgAdmin/DBeaver: host `localhost`, port `5433`, user `postgres`, password `postgres`, database `wms_db`.
+
+> **WSL users:** if `docker` is not found inside WSL, enable
+> *Settings → Resources → WSL integration* in Docker Desktop.
+
+---
+
+## Manual setup (without Docker)
+
+### Prerequisites
+
+- Python 3.12+ (required by Django 6)
+- Node.js 20.19+ / 22.12+
 - PostgreSQL 16
 
 ---
