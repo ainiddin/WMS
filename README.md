@@ -103,6 +103,8 @@ frontend/src/
 
 ## Deploy (Render)
 
+**Live:** https://keyfive-wms.onrender.com · API docs: https://keyfive-wms.onrender.com/docs
+
 `render.yaml` describes everything: one Docker web service (FastAPI serves the API **and** the built React site)
 plus a free PostgreSQL database, region Frankfurt.
 

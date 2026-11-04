@@ -88,7 +88,7 @@ def _mount_frontend(dist: Path) -> None:
         return
     app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
 
-    @app.get("/{path:path}", include_in_schema=False)
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def spa(path: str):
         if path.startswith("api/"):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
