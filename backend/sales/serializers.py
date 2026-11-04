@@ -36,5 +36,11 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class OrderCreateSerializer(serializers.Serializer):
-    items = OrderItemCreateSerializer(many=True)
+    items = OrderItemCreateSerializer(many=True, allow_empty=False)
     comment = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_items(self, items):
+        product_ids = [item['product'] for item in items]
+        if len(product_ids) != len(set(product_ids)):
+            raise serializers.ValidationError('Each product may appear only once per order.')
+        return items

@@ -71,7 +71,7 @@ class RestockReportView(APIView):
             )
             .order_by('code')
         )
-        fmt = request.query_params.get('format')
+        fmt = request.query_params.get('export')
         if fmt == 'xlsx':
             return _export_restock_xlsx(list(products))
         return Response(list(products))
@@ -89,7 +89,7 @@ class MonthlyUsageView(APIView):
             .annotate(total=Sum('quantity'))
             .order_by('month', 'product__code')
         )
-        fmt = request.query_params.get('format')
+        fmt = request.query_params.get('export')
         if fmt == 'xlsx':
             return _export_monthly_xlsx(list(data))
         return Response(list(data))

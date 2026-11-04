@@ -83,13 +83,13 @@ export class ApiService {
   }
   getRestockReport(format?: string): Observable<any> {
     if (format === 'xlsx') {
-      return this.http.get(`${BASE}/reports/restock/?format=xlsx`, { responseType: 'blob' as 'json' });
+      return this.http.get(`${BASE}/reports/restock/?export=xlsx`, { responseType: 'blob' as 'json' });
     }
     return this.http.get(`${BASE}/reports/restock/`);
   }
   getMonthlyUsage(format?: string): Observable<any> {
     if (format === 'xlsx') {
-      return this.http.get(`${BASE}/reports/monthly-usage/?format=xlsx`, { responseType: 'blob' as 'json' });
+      return this.http.get(`${BASE}/reports/monthly-usage/?export=xlsx`, { responseType: 'blob' as 'json' });
     }
     return this.http.get(`${BASE}/reports/monthly-usage/`);
   }

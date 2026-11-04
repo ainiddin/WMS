@@ -35,16 +35,19 @@ class OrderListCreateView(generics.ListCreateAPIView):
         except Exception:
             return Response({'detail': 'No customer profile.'}, status=400)
 
+        product_ids = [item_data['product'] for item_data in data['items']]
+        products = Product.objects.in_bulk(product_ids)
+        for product_id in product_ids:
+            if product_id not in products or not products[product_id].is_active:
+                return Response({'detail': f'Product {product_id} not found.'}, status=400)
+
         with transaction.atomic():
             order = Order.objects.create(
                 customer=customer,
                 comment=data.get('comment', ''),
             )
             for item_data in data['items']:
-                try:
-                    product = Product.objects.get(pk=item_data['product'], is_active=True)
-                except Product.DoesNotExist:
-                    return Response({'detail': f"Product {item_data['product']} not found."}, status=400)
+                product = products[item_data['product']]
                 OrderItem.objects.create(
                     order=order,
                     product=product,
@@ -114,30 +117,34 @@ class OrderShipView(APIView):
 
     def post(self, request, pk):
         try:
-            order = Order.objects.prefetch_related('items__product').select_related('customer').get(pk=pk)
-        except Order.DoesNotExist:
-            return Response({'detail': 'Not found.'}, status=404)
-        if order.status != Order.APPROVED:
-            return Response({'detail': f'Order is {order.status}, not APPROVED.'}, status=400)
-        try:
             employee = request.user.employee
         except Exception:
             return Response({'detail': 'No employee profile.'}, status=400)
 
-        with transaction.atomic():
-            for item in order.items.all():
-                record_movement(
-                    product=item.product,
-                    employee=employee,
-                    movement_type='OUT',
-                    quantity=item.quantity,
-                    customer=order.customer,
-                    order=order,
-                    note=f'Order {order.code}',
-                )
-            order.status = Order.SHIPPED
-            order.shipped_at = timezone.now()
-            order.save()
+        try:
+            with transaction.atomic():
+                try:
+                    # Lock the order row so two concurrent requests cannot ship it twice
+                    order = Order.objects.select_for_update().select_related('customer').get(pk=pk)
+                except Order.DoesNotExist:
+                    return Response({'detail': 'Not found.'}, status=404)
+                if order.status != Order.APPROVED:
+                    return Response({'detail': f'Order is {order.status}, not APPROVED.'}, status=400)
+                for item in order.items.select_related('product'):
+                    record_movement(
+                        product=item.product,
+                        employee=employee,
+                        movement_type='OUT',
+                        quantity=item.quantity,
+                        customer=order.customer,
+                        order=order,
+                        note=f'Order {order.code}',
+                    )
+                order.status = Order.SHIPPED
+                order.shipped_at = timezone.now()
+                order.save()
+        except ValueError as e:
+            return Response({'detail': str(e)}, status=400)
         return Response(OrderSerializer(order).data)
 
 
