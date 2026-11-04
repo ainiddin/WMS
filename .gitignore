@@ -1,30 +1,18 @@
 # Python
 __pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg-info/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Secrets: only .env.example goes to GitHub
+.env
+
+# Node
+node_modules/
 dist/
-build/
-*.egg
-.eggs/
 
-# Django
-backend/.env
-backend/db.sqlite3
-backend/media/
-backend/staticfiles/
-
-# Node / Angular
-frontend/node_modules/
-frontend/dist/
-frontend/.angular/cache/
-
-# IDEs
+# IDE / OS
 .idea/
 .vscode/
-*.swp
-*.swo
 .DS_Store
 Thumbs.db

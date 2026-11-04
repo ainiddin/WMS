@@ -1,204 +1,136 @@
-# KeyFive WMS — Warehouse Management System
+# KeyFive WMS
 
-**Course:** Basics of Information Systems · KBTU · Autumn 2026  
-**Team:** Ainiddin Yessirkep, Aibar Naimankhan, Ayaulym Boshay, Ryskulbekova Diana, Alua Korganbek
+Warehouse Management System for an online household-goods shop — course **Basics of Information Systems**, KBTU, autumn 2026.
 
----
+- `backend/` — FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL
+- `frontend/` — React + TypeScript + Vite + MUI
+- `sql/` — schema, queries and tests from Task 9 (reference)
 
-## Tech Stack
+## Requirements
 
-| Layer | Technology |
-|---|---|
-| Database | PostgreSQL 16 |
-| Backend | Django 6 + Django REST Framework |
-| Auth | JWT (djangorestframework-simplejwt) |
-| Frontend | Angular 21 + Angular Material |
-| Charts | Chart.js + ng2-charts |
+- Python 3.12+ (tested on 3.14)
+- PostgreSQL 16 or 17
+- Node.js 20+ (for the frontend)
 
----
-
-## Quick start with Docker (recommended)
-
-The only requirement is [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose v2).
-
-From the project root (the folder with `docker-compose.yml`):
-
-```bash
-docker compose up --build -d
-```
-
-This builds and starts three containers:
-
-| Container | What it does | URL on host |
-|---|---|---|
-| `wms_postgres` | PostgreSQL 16 with database `wms_db` (data kept in volume `postgres_data`) | `localhost:5433` |
-| `wms_backend` | Django API, runs `migrate` + `seed.py` automatically on start | http://localhost:8000/api/ |
-| `wms_frontend` | Angular production build served by nginx | **http://localhost:4200** |
-
-Open **http://localhost:4200** and log in with one of the demo users below (password `wms1234!`).
-
-> The frontend is served on port **4200** (not 80) because it calls the API at
-> `http://localhost:8000/api` and the backend CORS whitelist only allows
-> `http://localhost:4200`.
-
-Useful commands:
-
-```bash
-docker compose logs -f backend      # follow backend logs
-docker compose ps                   # container status
-docker compose down                 # stop containers (DB data is kept)
-docker compose down -v              # stop and wipe the database volume
-docker compose up --build -d        # rebuild after code changes
-docker compose exec backend python manage.py createsuperuser
-```
-
-Connect to the database from pgAdmin/DBeaver: host `localhost`, port `5433`, user `postgres`, password `postgres`, database `wms_db`.
-
-> **WSL users:** if `docker` is not found inside WSL, enable
-> *Settings → Resources → WSL integration* in Docker Desktop.
-
----
-
-## Manual setup (without Docker)
-
-### Prerequisites
-
-- Python 3.12+ (required by Django 6)
-- Node.js 20.19+ / 22.12+
-- PostgreSQL 16
-
----
-
-## Setup
-
-### 1. Create the database
-
-Open psql or pgAdmin and run:
-```sql
-CREATE DATABASE wms_db;
-```
-
-### 2. Backend
+## Backend: first run
 
 ```bash
 cd backend
-
-# Copy environment file and edit DB credentials if needed
-copy .env.example .env
-
-# Install dependencies
+python -m venv .venv
+.venv\Scripts\activate          # Windows  (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
 
-# Run migrations
-python manage.py migrate
+# 1. Database
+psql -U postgres -c "CREATE DATABASE keyfive_wms"
+psql -U postgres -c "CREATE DATABASE wms_test"      # only for pytest
 
-# Seed demo data
-python seed.py
+# 2. Settings: copy and fill in JWT_SECRET, ADMIN_PASSWORD, DEMO_PASSWORD
+copy .env.example .env          # macOS/Linux: cp .env.example .env
 
-# Start backend (port 8000)
-python manage.py runserver
+# 3. Tables
+alembic upgrade head
+
+# 4. Data (choose one)
+python -m app.seed                   # only the first admin
+python -m app.seed --demo            # + demo shop with one year of history
+python -m app.seed --demo --reset    # wipe everything and recreate the demo
+
+# 5. Run
+uvicorn app.main:app --reload
 ```
 
-**Default demo users** (password `wms1234!`):
+- API: http://localhost:8000 · Swagger: **http://localhost:8000/docs** (button *Authorize* → email + password)
+- The first admin `Admin001@wms.kz` is created automatically on start; its password is `ADMIN_PASSWORD` from `.env`.
 
-| Username | Role |
+### Tests
+
+```bash
+cd backend
+pytest -q
+```
+
+Tests use the separate `wms_test` database (`TEST_DATABASE_URL`) and wipe it on every test.
+
+### Demo users (`--demo`, password = `DEMO_PASSWORD`)
+
+| Role | Logins |
 |---|---|
-| `admin` | Admin |
-| `manager` | Manager |
-| `worker` | Worker |
-| `customer` | Customer |
+| Admin | `Admin001@wms.kz` (password = `ADMIN_PASSWORD`) |
+| Manager | `dauren@wms.kz`, `aigerim@wms.kz`, `nurlan@wms.kz` — one team each |
+| Worker | Team Dauren: `arman@`, `dana@`, `yerlan@` · Team Aigerim: `madina@`, `timur@` · Team Nurlan: `asel@`, `bekzat@` (all `@wms.kz`) |
+| Customer | `aliya@mail.kz`, `ruslan@mail.kz`, `saule@mail.kz` … (12 in total) |
+| Pending staff | `ayan@wms.kz` (Worker), `dilnaz@wms.kz` (Manager) — waiting for admin approval |
 
-### 3. Frontend
+The demo year is simulated through the real services (orders → approve → ship, daily restock), so stock always
+matches the history (`/api/reports/reconciliation/`). At the end some products are below minimum and some orders
+wait in the PENDING / APPROVED queues.
+
+## Frontend: first run
+
+The backend must be running on port 8000 (Vite forwards `/api` to it).
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start dev server (port 4200)
-npm start
+npm run dev            # http://localhost:5173
 ```
 
-Open **http://localhost:4200**
+- `npm run build` — type-check + production build into `dist/`
+- `npm run dev:https` — HTTPS on the local network (`https://<laptop-ip>:5173`), needed for the camera barcode
+  scanner on a phone. Accept the self-signed certificate warning once. Typing the barcode always works too.
 
----
+Print barcode labels for the demo products: **Products → Barcode labels** (PDF, EAN-13).
 
-## Role-based navigation
+### Pages by role
 
-| Role | Start page | Key features |
-|---|---|---|
-| Admin | Dashboard | All features + User management |
-| Manager | Dashboard | Products, Suppliers, Orders (approve/reject), Reports, Export |
-| Worker | Orders | Stock IN, Ship orders, Movement history |
-| Customer | Catalog | Browse products, add to cart, place orders, track status |
+| Role | Pages |
+|---|---|
+| Visitor / Customer | Home, Catalog (search, category, price, in stock), Product, Cart, Checkout, My orders, Profile |
+| Worker | My performance, Leaderboard, Stock, Stock IN (scanner), Orders to ship (scan → Ship), Movement history |
+| Manager | + Dashboard, Team performance, Orders (approve / reject), Products, Categories, Suppliers, Customers, Restock list, Reports + Excel/PDF |
+| Admin | + Performance of all teams, Pending approvals (role + team), Users (role, team, block) |
 
----
-
-## Project Structure
-
-```
-keyfive-wms/
-├── backend/
-│   ├── accounts/       # User model, JWT auth, roles
-│   ├── inventory/      # Supplier, Product, Employee, Customer, StockMovement
-│   ├── sales/          # Order, OrderItem, order workflow
-│   ├── reports/        # Dashboard, reports, Excel export
-│   ├── config/         # Django settings, URLs
-│   ├── seed.py         # Demo data
-│   └── requirements.txt
-├── frontend/
-│   └── src/app/
-│       ├── core/       # AuthService, ApiService, interceptor, guards
-│       ├── auth/       # Login, Register
-│       ├── shared/     # Shell layout, 403/404
-│       ├── catalog/    # Customer: catalog, cart, orders
-│       ├── inventory/  # Products, Suppliers, Stock IN, Movements
-│       ├── orders/     # Order management
-│       ├── reports/    # Dashboard, reports
-│       └── admin/      # User management
-└── README.md
-```
-
----
-
-## Order Workflow
+The React route guards only hide pages; every permission is checked again by FastAPI.
 
 ```
-Customer creates order (PENDING)
-        ↓
-Manager approves (APPROVED) or rejects (REJECTED)
-        ↓
-Worker ships (SHIPPED) — stock decremented atomically
-        ↓
-Either party can cancel PENDING/APPROVED → CANCELLED
+frontend/src/
+├── api/          axios client (JWT + automatic refresh), endpoint functions, response types
+├── auth/         AuthContext, ProtectedRoute
+├── cart/         cart in localStorage
+├── components/   layouts, barcode scanner, charts, shared UI
+└── pages/        auth, customer, staff (warehouse + performance), manager, admin
 ```
 
----
-
-## API Endpoints
+## Backend structure
 
 ```
-POST  /api/auth/register/           Customer sign up
-POST  /api/auth/login/              JWT login
-POST  /api/auth/refresh/            Token refresh
-GET   /api/auth/me/                 Current user
-
-GET/POST  /api/suppliers/
-GET/POST  /api/products/
-GET       /api/products/by-barcode/<code>/
-GET/POST  /api/movements/
-POST      /api/movements/in/
-
-GET/POST  /api/orders/
-POST      /api/orders/<id>/approve/
-POST      /api/orders/<id>/reject/
-POST      /api/orders/<id>/ship/
-POST      /api/orders/<id>/cancel/
-
-GET  /api/dashboard/
-GET  /api/reports/restock/          ?format=xlsx
-GET  /api/reports/monthly-usage/    ?format=xlsx
-GET  /api/reports/top-customers/
-GET  /api/reports/reconciliation/
+backend/app/
+├── main.py            app, CORS, DB error handler, routers, first-admin on startup
+├── core/              config (.env), security (JWT, bcrypt), deps (get_db, current user, require_role)
+├── db/session.py      engine, session, Base
+├── models/            9 tables: users, categories, suppliers, products, employees, customers,
+│                      orders, order_items, stock_movements (all CHECK / UNIQUE / RESTRICT rules)
+├── schemas/           Pydantic request / response models
+├── services/          movement_service (record_movement), order_service, user_service,
+│                      report_service, performance_service, export_service
+├── routers/           auth, admin, catalog, customers, movements, orders, reports, performance
+└── seed.py            first admin + demo data
 ```
+
+### Main rules (enforced in PostgreSQL and in the API)
+
+1. `quantity >= 0` for products, `> 0` for movements and order lines.
+2. OUT always has a customer, IN never (`chk_customer_for_out`).
+3. Rows with history cannot be deleted (`ON DELETE RESTRICT` → HTTP 409); use `is_active = false`.
+4. Approve checks that every line fits in stock.
+5. Ship is one transaction: OUT for every line + SHIPPED; any shortage rolls everything back.
+6. Order line price is frozen at order time; 7. the total is calculated by the server.
+8. Only `ACTIVE` accounts can log in (checked on every request, so blocking works at once).
+9. A Worker always has a Manager (`chk_employees_manager`); a team = Manager + his Workers.
+
+Codes like `P001`, `O0001`, `M0001` are PostgreSQL generated columns built from the integer id, so they never collide.
+
+### Leaderboard
+
+Points = orders shipped × 10 + orders approved × 2 + stock IN × 1 (constants in `services/performance_service.py`).
+Periods: last 7 / 30 / 90 / 365 days (`?period=week|month|quarter|year`).
