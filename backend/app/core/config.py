@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +29,18 @@ class Settings(BaseSettings):
 
     # Used to group dates into days/weeks/months for charts.
     APP_TIMEZONE: str = "Asia/Almaty"
+
+    # Production: folder with the built React app (frontend/dist). FastAPI then serves the site and the API together.
+    FRONTEND_DIST: str | None = None
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def use_psycopg_driver(cls, url: str) -> str:
+        """Hosting providers (Render, Heroku...) give postgres:// or postgresql:// URLs; SQLAlchemy needs the driver."""
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix):]
+        return url
 
 
 @lru_cache

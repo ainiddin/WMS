@@ -3,6 +3,7 @@
     python -m app.seed            # only the first Admin (from .env), safe to run any time
     python -m app.seed --demo     # + demo shop: categories, products, 3 teams, customers, one year of history
     python -m app.seed --demo --reset   # wipe all data first
+    python -m app.seed --demo-if-empty  # demo data only into an empty database (used on deploy)
 
 The year of history is simulated event by event through the real services (create -> approve -> ship, daily
 restock), so every rule is respected and the reconciliation report is clean.
@@ -341,6 +342,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="KeyFive WMS seed")
     parser.add_argument("--demo", action="store_true", help="add demo shop data with one year of history")
     parser.add_argument("--reset", action="store_true", help="delete ALL data before seeding")
+    parser.add_argument("--demo-if-empty", action="store_true",
+                        help="add demo data only if there are no products yet (safe on every deploy)")
     args = parser.parse_args()
 
     with SessionLocal() as db:
@@ -352,6 +355,13 @@ def main() -> None:
         print(f"First admin {settings.ADMIN_EMAIL} created" if admin else "Admin already exists")
         if args.demo:
             seed_demo(db)
+        elif args.demo_if_empty:
+            if db.scalar(select(Product.id).limit(1)) is not None:
+                print("Data already exists, demo seed skipped")
+            elif not settings.DEMO_PASSWORD:
+                print("DEMO_PASSWORD is not set, demo seed skipped")
+            else:
+                seed_demo(db)
 
 
 if __name__ == "__main__":

@@ -1,9 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
@@ -76,3 +78,26 @@ def health():
     with SessionLocal() as db:
         db.execute(text("SELECT 1"))
     return {"status": "ok", "database": "ok"}
+
+
+def _mount_frontend(dist: Path) -> None:
+    """Production: serve the built React app from the same origin as the API (no CORS, one service)."""
+    index = dist / "index.html"
+    if not index.is_file():
+        log.error("FRONTEND_DIST=%s has no index.html; the site will not be served", dist)
+        return
+    app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path.startswith("api/"):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+        file = (dist / path).resolve()
+        # Real files (favicon.svg...) are sent as they are; every other path is a React route -> index.html.
+        if path and file.is_file() and file.is_relative_to(dist.resolve()):
+            return FileResponse(file)
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
+
+
+if settings.FRONTEND_DIST:
+    _mount_frontend(Path(settings.FRONTEND_DIST))

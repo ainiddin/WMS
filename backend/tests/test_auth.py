@@ -109,3 +109,10 @@ def test_refresh_token(client):
     # An access token cannot be used as a refresh token.
     r = client.post("/api/auth/refresh/", json={"refresh_token": tokens["access_token"]})
     assert r.status_code == 401
+
+
+def test_hosting_database_url_gets_psycopg_driver():
+    from app.core.config import Settings
+
+    for url in ("postgres://u:p@host:5432/db", "postgresql://u:p@host:5432/db"):
+        assert Settings(DATABASE_URL=url).DATABASE_URL == "postgresql+psycopg://u:p@host:5432/db"

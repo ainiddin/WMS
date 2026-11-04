@@ -101,6 +101,23 @@ frontend/src/
 └── pages/        auth, customer, staff (warehouse + performance), manager, admin
 ```
 
+## Deploy (Render)
+
+`render.yaml` describes everything: one Docker web service (FastAPI serves the API **and** the built React site)
+plus a free PostgreSQL database, region Frankfurt.
+
+1. render.com → sign in with GitHub → **New → Blueprint** → choose `ainiddin/WMS`.
+2. Fill the two secret values Render asks for: `ADMIN_PASSWORD` and `DEMO_PASSWORD`. `JWT_SECRET` is generated.
+3. **Apply**. The first build takes ~5 min. On start the container runs `alembic upgrade head`, creates the first
+   admin and (because `SEED_DEMO=true`) fills an empty database with the demo shop.
+4. Every push to `main` redeploys automatically.
+
+Free plan limits: the service sleeps after 15 min without visits (the first request then takes ~1 min), and the
+free database expires after 30 days — create a new one and the demo seed runs again.
+
+Run the same image locally: `docker build -t keyfive-wms .` and
+`docker run -p 8000:8000 -e DATABASE_URL=... -e JWT_SECRET=... -e ADMIN_PASSWORD=... keyfive-wms`.
+
 ## Backend structure
 
 ```
