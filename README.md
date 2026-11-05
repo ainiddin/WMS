@@ -149,6 +149,8 @@ backend/app/
 6. Order line price is frozen at order time; 7. the total is calculated by the server.
 8. Only `ACTIVE` accounts can log in (checked on every request, so blocking works at once).
 9. A Worker always has a Manager (`chk_employees_manager`); a team = Manager + his Workers.
+10. Brute-force protection (`core/rate_limit.py`, sliding window): 5 failed logins per email or 20 per IP in 15 min →
+    HTTP 429 with `Retry-After`, even for the right password; 10 sign ups per IP per hour. Limits are in `config.py`.
 
 Codes like `P001`, `O0001`, `M0001` are PostgreSQL generated columns built from the integer id, so they never collide.
 

@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_DAYS: int = 7
     BCRYPT_ROUNDS: int = 12
 
+    # Brute-force protection (sliding window, see core/rate_limit.py). Login counts only failed attempts.
+    RATE_LIMIT_ENABLED: bool = True
+    LOGIN_WINDOW_SECONDS: int = 15 * 60
+    LOGIN_MAX_FAILS_PER_EMAIL: int = 5
+    LOGIN_MAX_FAILS_PER_IP: int = 20
+    SIGNUP_WINDOW_SECONDS: int = 60 * 60
+    SIGNUP_MAX_PER_IP: int = 10
+
     # First admin, created on startup if no ADMIN exists. The password must live only in .env.
     ADMIN_EMAIL: str = "Admin001@wms.kz"
     ADMIN_PASSWORD: str | None = None
