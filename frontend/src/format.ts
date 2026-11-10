@@ -35,3 +35,14 @@ export const roleLabel: Record<string, string> = {
   WORKER: 'Worker',
   CUSTOMER: 'Customer',
 }
+
+export const PHONE_HINT = '+7 7XX XXX XX XX'
+
+/** Same rule as the backend: a Kazakhstan number, 10 digits after +7 / 8, starting with 7. Empty = no error. */
+export function phoneError(value: string): string | null {
+  if (!value.trim()) return null
+  let digits = value.replace(/\D/g, '')
+  if (digits.length === 11 && (digits[0] === '7' || digits[0] === '8')) digits = digits.slice(1)
+  if (/[^\d\s()+-]/.test(value) || digits.length !== 10 || digits[0] !== '7') return `Enter a Kazakhstan number: ${PHONE_HINT}`
+  return null
+}

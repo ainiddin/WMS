@@ -9,6 +9,7 @@ from app.core.security import hash_password
 from app.models import Customer, Employee, Role, User, UserStatus
 from app.models.common import utcnow
 from app.schemas.auth import CustomerRegister, StaffRegister
+from app.services import email_service
 
 
 def _ensure_email_free(db: Session, email: str) -> None:
@@ -16,8 +17,14 @@ def _ensure_email_free(db: Session, email: str) -> None:
         raise HTTPException(status.HTTP_409_CONFLICT, "This email is already registered")
 
 
+def send_signup_code(db: Session, email: str) -> None:
+    _ensure_email_free(db, email)
+    email_service.send_code(db, email)
+
+
 def register_customer(db: Session, data: CustomerRegister) -> User:
     _ensure_email_free(db, data.email)
+    email_service.check_code(db, data.email, data.code)
     user = User(
         email=data.email,
         password_hash=hash_password(data.password),
@@ -34,6 +41,7 @@ def register_customer(db: Session, data: CustomerRegister) -> User:
 
 def register_staff(db: Session, data: StaffRegister) -> User:
     _ensure_email_free(db, data.email)
+    email_service.check_code(db, data.email, data.code)
     user = User(
         email=data.email,
         password_hash=hash_password(data.password),

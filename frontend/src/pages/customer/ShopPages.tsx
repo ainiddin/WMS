@@ -31,7 +31,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { MAX_LINE_QUANTITY, useCart } from '@/cart/CartContext'
 import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
-import { formatMoney } from '@/format'
+import { formatMoney, PHONE_HINT, phoneError } from '@/format'
 import { categoryLook, ProductCard, ProductPicture } from './ProductCard'
 
 function useCategories() {
@@ -568,10 +568,17 @@ export function ProfilePage() {
               }}
             >
               <TextField label="Full name" required value={values.full_name} onChange={set('full_name')} />
-              <TextField label="Phone" value={values.phone} onChange={set('phone')} />
+              <TextField
+                label="Phone"
+                value={values.phone}
+                onChange={set('phone')}
+                placeholder={PHONE_HINT}
+                error={!!phoneError(values.phone)}
+                helperText={phoneError(values.phone)}
+              />
               <TextField label="Default delivery address" multiline minRows={2} value={values.address} onChange={set('address')} />
               <Box>
-                <Button type="submit" variant="contained" disabled={save.isPending || !form}>
+                <Button type="submit" variant="contained" disabled={save.isPending || !form || !!phoneError(values.phone)}>
                   Save
                 </Button>
               </Box>

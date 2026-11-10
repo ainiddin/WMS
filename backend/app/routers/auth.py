@@ -8,7 +8,16 @@ from sqlalchemy import select
 from app.core.deps import DB, CurrentUser
 from app.core.security import create_token, decode_token, verify_password
 from app.models import User, UserStatus
-from app.schemas.auth import CustomerRegister, RefreshRequest, StaffRegister, StaffRegistered, TokenPair, UserOut
+from app.schemas.auth import (
+    CustomerRegister,
+    RefreshRequest,
+    SendCodeRequest,
+    StaffRegister,
+    StaffRegistered,
+    TokenPair,
+    UserOut,
+)
+from app.schemas.common import Message
 from app.services import user_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -26,6 +35,14 @@ def _tokens(user: User) -> TokenPair:
         refresh_token=create_token(user.id, user.role, "refresh"),
         user=UserOut.from_user(user),
     )
+
+
+@router.post("/send-code/", response_model=Message)
+def send_code(data: SendCodeRequest, db: DB):
+    """Step 1 of any sign up: a 6-digit code is emailed. It proves that the address exists and is the user's."""
+    user_service.send_signup_code(db, data.email)
+    db.commit()
+    return Message(detail=f"A code was sent to {data.email}")
 
 
 @router.post("/register/", response_model=TokenPair, status_code=status.HTTP_201_CREATED)

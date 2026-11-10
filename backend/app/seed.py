@@ -46,10 +46,10 @@ from app.services.user_service import ensure_first_admin
 CATEGORIES = ["Kitchen", "Cleaning", "Bathroom", "Laundry", "Home textile"]
 
 SUPPLIERS = [
-    ("Almaty HomeGoods LLP", "+7 727 355 1020", "sales@homegoods.kz"),
-    ("Steppe Clean Supply", "+7 717 244 8890", "orders@steppeclean.kz"),
-    ("Astana Textile Co", "+7 717 270 4455", "info@astanatextile.kz"),
-    ("Caspian Kitchenware", "+7 729 230 7711", "b2b@caspiankitchen.kz"),
+    ("Almaty HomeGoods LLP", "+7 727 355 10 20", "sales@homegoods.kz"),
+    ("Steppe Clean Supply", "+7 717 244 88 90", "orders@steppeclean.kz"),
+    ("Astana Textile Co", "+7 717 270 44 55", "info@astanatextile.kz"),
+    ("Caspian Kitchenware", "+7 729 230 77 11", "b2b@caspiankitchen.kz"),
 ]
 
 # name, category, supplier index, price KZT, min_quantity, description
@@ -83,39 +83,39 @@ PRODUCTS = [
 
 # (full name, email, phone); a worker list per manager = one team. Activity = how busy the team is.
 TEAMS = [
-    (("Dauren Abenov", "dauren@wms.kz", "+7 701 111 2233"), 1.3, [
-        ("Arman Seitkali", "arman@wms.kz", "+7 702 120 3301"),
-        ("Dana Yesenova", "dana@wms.kz", "+7 702 120 3302"),
-        ("Yerlan Mukhamedov", "yerlan@wms.kz", "+7 702 120 3303"),
+    (("Dauren Abenov", "dauren@wms.kz", "+7 701 111 22 33"), 1.3, [
+        ("Arman Seitkali", "arman@wms.kz", "+7 702 120 33 01"),
+        ("Dana Yesenova", "dana@wms.kz", "+7 702 120 33 02"),
+        ("Yerlan Mukhamedov", "yerlan@wms.kz", "+7 702 120 33 03"),
     ]),
-    (("Aigerim Sadykova", "aigerim@wms.kz", "+7 701 222 3344"), 1.0, [
-        ("Madina Ospanova", "madina@wms.kz", "+7 705 330 1101"),
-        ("Timur Bekov", "timur@wms.kz", "+7 705 330 1102"),
+    (("Aigerim Sadykova", "aigerim@wms.kz", "+7 701 222 33 44"), 1.0, [
+        ("Madina Ospanova", "madina@wms.kz", "+7 705 330 11 01"),
+        ("Timur Bekov", "timur@wms.kz", "+7 705 330 11 02"),
     ]),
-    (("Nurlan Tokhtarov", "nurlan@wms.kz", "+7 701 333 4455"), 0.8, [
-        ("Asel Nurlanovna", "asel@wms.kz", "+7 707 440 5501"),
-        ("Bekzat Zhumabay", "bekzat@wms.kz", "+7 707 440 5502"),
+    (("Nurlan Tokhtarov", "nurlan@wms.kz", "+7 701 333 44 55"), 0.8, [
+        ("Asel Nurlanovna", "asel@wms.kz", "+7 707 440 55 01"),
+        ("Bekzat Zhumabay", "bekzat@wms.kz", "+7 707 440 55 02"),
     ]),
 ]
 
 CUSTOMERS = [
-    ("Aliya Karimova", "aliya@mail.kz", "+7 777 501 0001", "Almaty, Abay ave 52, apt 14"),
-    ("Ruslan Ibraimov", "ruslan@mail.kz", "+7 777 501 0002", "Almaty, Dostyk ave 105, apt 3"),
-    ("Saule Akhmetova", "saule@mail.kz", "+7 777 501 0003", "Astana, Kabanbay batyr 11, apt 87"),
-    ("Daniyar Kassymov", "daniyar@mail.kz", "+7 777 501 0004", "Almaty, Satpayev st 30, apt 9"),
-    ("Gulnara Bekova", "gulnara@mail.kz", "+7 777 501 0005", "Almaty, Tole bi st 190, apt 41"),
-    ("Askar Omarov", "askar@mail.kz", "+7 777 501 0006", "Astana, Mangilik El 20, apt 112"),
-    ("Zhanna Serikova", "zhanna@mail.kz", "+7 777 501 0007", "Almaty, Rozybakiev st 247, apt 6"),
-    ("Marat Duisenov", "marat@mail.kz", "+7 777 501 0008", "Shymkent, Tauke khan ave 8, apt 25"),
-    ("Kamila Abdrakhmanova", "kamila@mail.kz", "+7 777 501 0009", "Almaty, Zharokov st 15, apt 70"),
-    ("Yerzhan Tulegenov", "yerzhan@mail.kz", "+7 777 501 0010", "Karaganda, Bukhar zhyrau 48, apt 2"),
-    ("Assel Mukanova", "assel.m@mail.kz", "+7 777 501 0011", "Almaty, Nauryzbay batyr 89, apt 31"),
-    ("Timur Zhakupov", "timur.z@mail.kz", "+7 777 501 0012", "Astana, Turan ave 37, apt 54"),
+    ("Aliya Karimova", "aliya@mail.kz", "+7 777 501 00 01", "Almaty, Abay ave 52, apt 14"),
+    ("Ruslan Ibraimov", "ruslan@mail.kz", "+7 777 501 00 02", "Almaty, Dostyk ave 105, apt 3"),
+    ("Saule Akhmetova", "saule@mail.kz", "+7 777 501 00 03", "Astana, Kabanbay batyr 11, apt 87"),
+    ("Daniyar Kassymov", "daniyar@mail.kz", "+7 777 501 00 04", "Almaty, Satpayev st 30, apt 9"),
+    ("Gulnara Bekova", "gulnara@mail.kz", "+7 777 501 00 05", "Almaty, Tole bi st 190, apt 41"),
+    ("Askar Omarov", "askar@mail.kz", "+7 777 501 00 06", "Astana, Mangilik El 20, apt 112"),
+    ("Zhanna Serikova", "zhanna@mail.kz", "+7 777 501 00 07", "Almaty, Rozybakiev st 247, apt 6"),
+    ("Marat Duisenov", "marat@mail.kz", "+7 777 501 00 08", "Shymkent, Tauke khan ave 8, apt 25"),
+    ("Kamila Abdrakhmanova", "kamila@mail.kz", "+7 777 501 00 09", "Almaty, Zharokov st 15, apt 70"),
+    ("Yerzhan Tulegenov", "yerzhan@mail.kz", "+7 777 501 00 10", "Karaganda, Bukhar zhyrau 48, apt 2"),
+    ("Assel Mukanova", "assel.m@mail.kz", "+7 777 501 00 11", "Almaty, Nauryzbay batyr 89, apt 31"),
+    ("Timur Zhakupov", "timur.z@mail.kz", "+7 777 501 00 12", "Astana, Turan ave 37, apt 54"),
 ]
 
 PENDING_STAFF = [
-    ("Ayan Kudaibergen", "ayan@wms.kz", "+7 708 550 6601", Role.WORKER),
-    ("Dilnaz Sultanova", "dilnaz@wms.kz", "+7 708 550 6602", Role.MANAGER),
+    ("Ayan Kudaibergen", "ayan@wms.kz", "+7 708 550 66 01", Role.WORKER),
+    ("Dilnaz Sultanova", "dilnaz@wms.kz", "+7 708 550 66 02", Role.MANAGER),
 ]
 
 

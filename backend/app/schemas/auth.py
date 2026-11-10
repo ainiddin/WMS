@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.schemas.common import Name, ORMModel, Password, Phone
 
@@ -10,8 +10,19 @@ def _normalize_email(value: str) -> str:
     return value.strip().lower()
 
 
+# 6-digit code from the confirmation email (POST /api/auth/send-code/).
+EmailCode = Annotated[str, Field(pattern=r"^\d{6}$")]
+
+
+class SendCodeRequest(BaseModel):
+    email: EmailStr
+
+    _email = field_validator("email")(_normalize_email)
+
+
 class CustomerRegister(BaseModel):
     email: EmailStr
+    code: EmailCode
     password: Password
     full_name: Name
     phone: Phone | None = None
@@ -22,6 +33,7 @@ class CustomerRegister(BaseModel):
 
 class StaffRegister(BaseModel):
     email: EmailStr
+    code: EmailCode
     password: Password
     full_name: Name
     phone: Phone | None = None

@@ -25,6 +25,18 @@ class Settings(BaseSettings):
     # Password for all demo users created by `python -m app.seed --demo`.
     DEMO_PASSWORD: str | None = None
 
+    # Sign-up email codes. Delivery: Brevo HTTP API if BREVO_API_KEY is set, else SMTP if SMTP_HOST is set,
+    # else the code is only written to the server log (local development).
+    EMAIL_CODE_MINUTES: int = 10
+    EMAIL_CODE_RESEND_SECONDS: int = 60
+    EMAIL_CODE_MAX_ATTEMPTS: int = 5
+    EMAIL_FROM: str = "KeyFive WMS <no-reply@keyfive.kz>"
+    BREVO_API_KEY: str | None = None
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     # Used to group dates into days/weeks/months for charts.

@@ -12,12 +12,95 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link as RouterLink, Navigate, useLocation, useNavigate } from 'react-router'
 import { errorMessage, statusOf } from '@/api/client'
 import { authApi } from '@/api/endpoints'
 import { homePath, useAuth } from '@/auth/AuthContext'
 import { ThemeToggle } from '@/components/Layout'
+import { PHONE_HINT, phoneError } from '@/format'
+
+const RESEND_SECONDS = 60
+
+/** "Send code" button + code input. The emailed code proves that the address exists and belongs to the user. */
+function EmailCodeField({ email, code, onCode }: { email: string; code: string; onCode: (code: string) => void }) {
+  const [sentTo, setSentTo] = useState<string | null>(null)
+  const [wait, setWait] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (wait <= 0) return
+    const timer = setTimeout(() => setWait((w) => w - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [wait])
+
+  const normalized = email.trim().toLowerCase()
+  const sent = sentTo === normalized // editing the email after sending asks for a new code
+  const send = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await authApi.sendCode(normalized)
+      setSentTo(normalized)
+      setWait(RESEND_SECONDS)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Stack spacing={1}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+        <TextField
+          label="Code from email"
+          required
+          disabled={!sent}
+          value={code}
+          onChange={(e) => onCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          autoComplete="one-time-code"
+          sx={{ flex: 1 }}
+          helperText={sent ? `Sent to ${sentTo}. Check the spam folder too.` : 'We email a 6-digit code to confirm the address'}
+          slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 6 } }}
+        />
+        <Button
+          variant="outlined"
+          onClick={send}
+          disabled={busy || !/^\S+@\S+\.\S+$/.test(normalized) || (sent && wait > 0)}
+          sx={{ height: 56, minWidth: 120, whiteSpace: 'nowrap' }}
+        >
+          {sent ? (wait > 0 ? `Resend (${wait})` : 'Resend') : 'Send code'}
+        </Button>
+      </Stack>
+      {error && <Alert severity="error">{error}</Alert>}
+    </Stack>
+  )
+}
+
+function PhoneField({ value, onChange }: { value: string; onChange: React.ChangeEventHandler<HTMLInputElement> }) {
+  const error = phoneError(value)
+  return (
+    <TextField
+      label="Phone"
+      type="tel"
+      value={value}
+      onChange={onChange}
+      autoComplete="tel"
+      placeholder={PHONE_HINT}
+      error={!!error}
+      helperText={error ?? 'Optional'}
+    />
+  )
+}
+
+/** Checks shared by both sign-up forms. Returns an error message or null. */
+function signUpError(form: { code: string; phone: string; password: string; confirm: string }) {
+  if (!/^\d{6}$/.test(form.code)) return 'Enter the 6-digit code from the email'
+  if (form.password !== form.confirm) return 'Passwords do not match'
+  return phoneError(form.phone)
+}
 
 function AuthCard({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
   return (
@@ -129,7 +212,7 @@ export function LoginPage() {
 export function SignUpPage() {
   const { acceptTokens } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ full_name: '', email: '', phone: '', address: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ full_name: '', email: '', code: '', phone: '', address: '', password: '', confirm: '' })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -137,12 +220,14 @@ export function SignUpPage() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (form.password !== form.confirm) return setError('Passwords do not match')
+    const invalid = signUpError(form)
+    if (invalid) return setError(invalid)
     setBusy(true)
     setError(null)
     try {
       const pair = await authApi.register({
         email: form.email,
+        code: form.code,
         password: form.password,
         full_name: form.full_name,
         phone: form.phone || undefined,
@@ -163,7 +248,8 @@ export function SignUpPage() {
         {error && <Alert severity="error">{error}</Alert>}
         <TextField label="Full name" required value={form.full_name} onChange={set('full_name')} autoComplete="name" />
         <TextField label="Email" type="email" required value={form.email} onChange={set('email')} autoComplete="email" />
-        <TextField label="Phone" value={form.phone} onChange={set('phone')} autoComplete="tel" placeholder="+7 777 000 0000" />
+        <EmailCodeField email={form.email} code={form.code} onCode={(code) => setForm((f) => ({ ...f, code }))} />
+        <PhoneField value={form.phone} onChange={set('phone')} />
         <TextField
           label="Delivery address"
           value={form.address}
@@ -201,6 +287,7 @@ export function StaffSignUpPage() {
   const [form, setForm] = useState({
     full_name: '',
     email: '',
+    code: '',
     phone: '',
     password: '',
     confirm: '',
@@ -213,12 +300,14 @@ export function StaffSignUpPage() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (form.password !== form.confirm) return setError('Passwords do not match')
+    const invalid = signUpError(form)
+    if (invalid) return setError(invalid)
     setBusy(true)
     setError(null)
     try {
       await authApi.registerStaff({
         email: form.email,
+        code: form.code,
         password: form.password,
         full_name: form.full_name,
         phone: form.phone || undefined,
@@ -241,7 +330,8 @@ export function StaffSignUpPage() {
         {error && <Alert severity="error">{error}</Alert>}
         <TextField label="Full name" required value={form.full_name} onChange={set('full_name')} autoComplete="name" />
         <TextField label="Work email" type="email" required value={form.email} onChange={set('email')} autoComplete="email" />
-        <TextField label="Phone" value={form.phone} onChange={set('phone')} autoComplete="tel" />
+        <EmailCodeField email={form.email} code={form.code} onCode={(code) => setForm((f) => ({ ...f, code }))} />
+        <PhoneField value={form.phone} onChange={set('phone')} />
         <TextField select label="I am joining as" value={form.requested_role} onChange={set('requested_role')}>
           <MenuItem value="WORKER">Worker</MenuItem>
           <MenuItem value="MANAGER">Manager</MenuItem>

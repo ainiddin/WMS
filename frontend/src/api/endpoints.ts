@@ -39,10 +39,20 @@ export const authApi = {
     const form = new URLSearchParams({ username: email, password })
     return post<TokenPair>('/auth/login/', form)
   },
-  register: (data: { email: string; password: string; full_name: string; phone?: string; address?: string }) =>
+  /** Step 1 of sign up: emails a 6-digit code that proves the address exists. */
+  sendCode: (email: string) => post<{ detail: string }>('/auth/send-code/', { email }),
+  register: (data: {
+    email: string
+    code: string
+    password: string
+    full_name: string
+    phone?: string
+    address?: string
+  }) =>
     post<TokenPair>('/auth/register/', data),
   registerStaff: (data: {
     email: string
+    code: string
     password: string
     full_name: string
     phone?: string

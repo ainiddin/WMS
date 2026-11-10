@@ -13,6 +13,8 @@ os.environ["ADMIN_PASSWORD"] = "admin-test-pass"
 os.environ["BCRYPT_ROUNDS"] = "4"  # fast hashing, tests only
 os.environ["JWT_SECRET"] = "test-secret-" + "x" * 40
 
+import re  # noqa: E402
+
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
@@ -40,6 +42,28 @@ def clean_db():
     yield
 
 
+# Emails "sent" during a test: {address: [text, ...]}. Real delivery is never used in tests.
+OUTBOX: dict[str, list[str]] = {}
+
+
+@pytest.fixture(autouse=True)
+def outbox(monkeypatch):
+    OUTBOX.clear()
+    monkeypatch.setattr("app.services.email_service.send_email",
+                        lambda to, subject, text: OUTBOX.setdefault(to, []).append(text))
+    return OUTBOX
+
+
+def last_code(email: str) -> str:
+    return re.search(r"code: (\d{6})", OUTBOX[email][-1]).group(1)
+
+
+def signup_code(client, email: str) -> str:
+    r = client.post("/api/auth/send-code/", json={"email": email})
+    assert r.status_code == 200, r.text
+    return last_code(email)
+
+
 @pytest.fixture
 def db():
     with SessionLocal() as session:
@@ -64,7 +88,7 @@ class Api:
     def staff(self, email: str, role: str, manager_id: int | None = None) -> tuple[dict, int]:
         """Register + approve a staff member. Returns (auth headers, employee id)."""
         r = self.c.post("/api/auth/register-staff/", json={
-            "email": email, "password": PASSWORD, "full_name": email.split("@")[0].title() + " Test",
+            "email": email, "code": signup_code(self.c, email), "password": PASSWORD, "full_name": email.split("@")[0].title() + " Test",
             "requested_role": role,
         })
         assert r.status_code == 201, r.text
@@ -76,7 +100,7 @@ class Api:
 
     def customer(self, email: str) -> dict:
         r = self.c.post("/api/auth/register/", json={
-            "email": email, "password": PASSWORD, "full_name": "Customer " + email.split("@")[0],
+            "email": email, "code": signup_code(self.c, email), "password": PASSWORD, "full_name": "Customer " + email.split("@")[0],
             "address": "Almaty, Abay 1",
         })
         assert r.status_code == 201, r.text
