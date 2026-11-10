@@ -1,6 +1,7 @@
 """Sign-up email confirmation: a 6-digit code proves that the address exists and belongs to the user."""
 
 import logging
+import re
 import secrets
 import smtplib
 from datetime import timedelta
@@ -62,12 +63,58 @@ def has_mail_server(domain: str) -> bool:
     return any(str(r.exchange) != "." for r in answer)  # "." = null MX: the domain says it takes no mail
 
 
+# Popular mail domains, most used first. An address one or two typos away from one of them is almost always a mistake.
+KNOWN_DOMAINS = [
+    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com", "icloud.com",
+    "me.com", "aol.com", "gmx.com", "mail.com", "proton.me", "protonmail.com", "zoho.com",
+    "mail.ru", "inbox.ru", "list.ru", "bk.ru", "internet.ru", "yandex.ru", "yandex.kz", "ya.ru", "rambler.ru",
+    "mail.kz", "inbox.kz", "kbtu.kz", "wms.kz",
+]
+
+
+def _typo_distance(a: str, b: str) -> int:
+    """Number of single-letter edits (insert, delete, replace, swap two neighbours) from a to b."""
+    prev2, prev = [], list(range(len(b) + 1))
+    for i in range(1, len(a) + 1):
+        cur = [i] + [0] * len(b)
+        for j in range(1, len(b) + 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] != b[j - 1]))
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                cur[j] = min(cur[j], prev2[j - 2] + 1)
+        prev2, prev = prev, cur
+    return prev[-1]
+
+
+def suggest_domain(domain: str) -> str | None:
+    """gmial.com -> gmail.com. None if the domain is known or not close to any known one."""
+    if domain in KNOWN_DOMAINS:
+        return None
+    if domain.split(".")[0] == "gmail":  # gmail.ru, gmail.kz: Gmail only exists as gmail.com
+        return "gmail.com"
+    best = min(KNOWN_DOMAINS, key=lambda known: _typo_distance(domain, known))
+    limit = 2 if len(best) >= 9 else 1  # short domains (bk.ru, me.com) are too close to each other for 2
+    return best if _typo_distance(domain, best) <= limit else None
+
+
+# Gmail's own rule for usernames: 6-30 letters, digits and single dots ("+anything" after it is an alias).
+_GMAIL_NAME = re.compile(r"^(?=.{6,30}$)[a-z0-9]+(\.[a-z0-9]+)*$")
+
+
 def ensure_domain_accepts_mail(email: str) -> None:
-    """Rejects addresses whose domain has no mail server, e.g. user@sfas.com.
+    """Rejects typos of popular domains (user@gmial.com), impossible Gmail names (ab@gmail.com)
+    and domains without a mail server (user@sfas.com).
 
     Whether the mailbox itself exists can only be proven by the code.
     """
-    if not has_mail_server(email.rsplit("@", 1)[1]):
+    local, domain = email.rsplit("@", 1)
+    if suggestion := suggest_domain(domain):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Check the email: did you mean {local}@{suggestion}?")
+    if domain == "gmail.com" and not _GMAIL_NAME.match(local.split("+")[0]):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Not a possible Gmail address: the name has 6-30 Latin letters, digits and dots",
+        )
+    if not has_mail_server(domain):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "This email domain does not accept mail, check the address")
 
 

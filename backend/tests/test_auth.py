@@ -170,6 +170,25 @@ def test_send_code_refuses_domain_without_mail_server(client, monkeypatch):
     assert "safdsf@sfas.com" not in OUTBOX
 
 
+def test_send_code_catches_typos_in_popular_domains(client):
+    for typo in ("gmial.com", "gmail.con", "gmai.com", "gmaill.com", "gmail.co", "gmail.ru", "mail.rk", "yandx.ru"):
+        r = client.post("/api/auth/send-code/", json={"email": f"aliya.n@{typo}"})
+        assert r.status_code == 400, typo
+        assert "did you mean aliya.n@" in r.json()["detail"]
+    r = client.post("/api/auth/send-code/", json={"email": "aliya.n@gmial.com"})
+    assert r.json()["detail"] == "Check the email: did you mean aliya.n@gmail.com?"
+    for ok in ("gmail.com", "gmx.com", "mail.kz", "kbtu.kz", "company.kz"):
+        assert client.post("/api/auth/send-code/", json={"email": f"aliya.n@{ok}"}).status_code == 200, ok
+
+
+def test_send_code_checks_gmail_name_rules(client):
+    for bad in ("abc", "ivan_petrov", "ivan..petrov", ".ivanpetrov", "ivanpetrov.", "a" * 31):
+        r = client.post("/api/auth/send-code/", json={"email": f"{bad}@gmail.com"})
+        assert r.status_code in (400, 422), bad  # 422: not an email at all (e.g. two dots in a row)
+    for ok in ("ivan.petrov", "esirkepainiddin200631", "esirkepainiddin200631+test"):
+        assert client.post("/api/auth/send-code/", json={"email": f"{ok}@gmail.com"}).status_code == 200, ok
+
+
 def test_phone_is_checked_and_normalized(client):
     email = "p@mail.kz"
     code = signup_code(client, email)
