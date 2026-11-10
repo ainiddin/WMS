@@ -51,6 +51,8 @@ def outbox(monkeypatch):
     OUTBOX.clear()
     monkeypatch.setattr("app.services.email_service.send_email",
                         lambda to, subject, text: OUTBOX.setdefault(to, []).append(text))
+    # No DNS lookups in tests: every domain "accepts mail".
+    monkeypatch.setattr("app.services.email_service.has_mail_server", lambda domain: True)
     return OUTBOX
 
 

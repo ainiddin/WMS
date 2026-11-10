@@ -162,6 +162,14 @@ def test_send_code_refuses_registered_email(client):
     assert "admin001@wms.kz" not in OUTBOX
 
 
+def test_send_code_refuses_domain_without_mail_server(client, monkeypatch):
+    monkeypatch.setattr("app.services.email_service.has_mail_server", lambda domain: domain != "sfas.com")
+    r = client.post("/api/auth/send-code/", json={"email": "safdsf@sfas.com"})
+    assert r.status_code == 400
+    assert "does not accept mail" in r.json()["detail"]
+    assert "safdsf@sfas.com" not in OUTBOX
+
+
 def test_phone_is_checked_and_normalized(client):
     email = "p@mail.kz"
     code = signup_code(client, email)

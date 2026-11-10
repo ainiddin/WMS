@@ -7,6 +7,8 @@ from datetime import timedelta
 from email.message import EmailMessage
 from email.utils import parseaddr
 
+import dns.exception
+import dns.resolver
 import httpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -44,8 +46,34 @@ def send_email(to: str, subject: str, text: str) -> None:
         log.warning("Email delivery is not configured. Email to %s: %s\n%s", to, subject, text)
 
 
+# Public DNS (Google, Cloudflare): local networks may hide MX records, e.g. the KBTU network does for kbtu.kz.
+_resolver = dns.resolver.Resolver(configure=False)
+_resolver.nameservers = ["8.8.8.8", "1.1.1.1"]
+
+
+def has_mail_server(domain: str) -> bool:
+    """True if the domain has an MX record. Unknown (DNS timeout) counts as True so a slow DNS never blocks sign up."""
+    try:
+        answer = _resolver.resolve(domain, "MX", lifetime=5)
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+        return False
+    except dns.exception.DNSException:
+        return True
+    return any(str(r.exchange) != "." for r in answer)  # "." = null MX: the domain says it takes no mail
+
+
+def ensure_domain_accepts_mail(email: str) -> None:
+    """Rejects addresses whose domain has no mail server, e.g. user@sfas.com.
+
+    Whether the mailbox itself exists can only be proven by the code.
+    """
+    if not has_mail_server(email.rsplit("@", 1)[1]):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This email domain does not accept mail, check the address")
+
+
 def send_code(db: Session, email: str) -> None:
     """Creates (or replaces) the code for this email and sends it. The caller commits."""
+    ensure_domain_accepts_mail(email)
     now = utcnow()
     row = db.get(EmailVerification, email)
     if row and (wait := settings.EMAIL_CODE_RESEND_SECONDS - (now - row.sent_at).total_seconds()) > 0:
