@@ -69,6 +69,9 @@ def test_signups_are_limited_per_ip(client, monkeypatch):
 
 
 def test_one_ip_cannot_mail_codes_to_many_addresses(client):
+    # Refused requests send nothing and are not counted.
+    for _ in range(settings.SEND_CODE_MAX_PER_IP + 1):
+        assert client.post("/api/auth/send-code/", json={"email": "admin001@wms.kz"}).status_code == 409
     for i in range(settings.SEND_CODE_MAX_PER_IP):
         assert client.post("/api/auth/send-code/", json={"email": f"target{i}@mail.kz"}).status_code == 200
     r = client.post("/api/auth/send-code/", json={"email": "one-more@mail.kz"})

@@ -41,9 +41,11 @@ def _tokens(user: User) -> TokenPair:
 @router.post("/send-code/", response_model=Message)
 def send_code(data: SendCodeRequest, db: DB, request: Request):
     """Step 1 of any sign up: a 6-digit code is emailed. It proves that the address exists and is the user's."""
-    rate_limit.check_send_code(rate_limit.client_ip(request))
+    ip = rate_limit.client_ip(request)
+    rate_limit.check_send_code(ip)
     user_service.send_signup_code(db, data.email)
     db.commit()
+    rate_limit.code_sent(ip)
     return Message(detail=f"A code was sent to {data.email}")
 
 

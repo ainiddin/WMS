@@ -115,21 +115,28 @@ def login_succeeded(email: str) -> None:
     login_fails_by_email.reset(email)
 
 
-def _check_and_hit(limiter: SlidingWindowLimiter, ip: str) -> None:
+def _check(limiter: SlidingWindowLimiter, ip: str) -> None:
     if not settings.RATE_LIMIT_ENABLED:
         return
     wait = limiter.retry_after(ip)
     if wait:
         raise _too_many(wait)
-    limiter.hit(ip)
 
 
 def check_signup(ip: str) -> None:
     """Count a sign up attempt from this IP; raise 429 over the limit (stops mass account creation)."""
-    _check_and_hit(signups_by_ip, ip)
+    _check(signups_by_ip, ip)
+    if settings.RATE_LIMIT_ENABLED:
+        signups_by_ip.hit(ip)
 
 
 def check_send_code(ip: str) -> None:
-    """Count a sign-up code email from this IP; raise 429 over the limit. The per-email resend cooldown does not
-    stop one client from mailing codes to many different addresses (spam, mail-provider quota)."""
-    _check_and_hit(codes_sent_by_ip, ip)
+    """Raise 429 if this IP has had too many sign-up code emails sent. The per-email resend cooldown does not stop
+    one client from mailing codes to many different addresses (spam, mail-provider quota). Call BEFORE sending."""
+    _check(codes_sent_by_ip, ip)
+
+
+def code_sent(ip: str) -> None:
+    """Count only emails really sent: a request refused for a typo or a taken address costs nothing."""
+    if settings.RATE_LIMIT_ENABLED:
+        codes_sent_by_ip.hit(ip)
