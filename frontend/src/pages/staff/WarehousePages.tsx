@@ -1,7 +1,9 @@
+import AddIcon from '@mui/icons-material/Add'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined'
 import MoveToInboxOutlinedIcon from '@mui/icons-material/MoveToInboxOutlined'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
+import RemoveIcon from '@mui/icons-material/Remove'
 import SearchIcon from '@mui/icons-material/Search'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import {
@@ -18,6 +20,7 @@ import {
   DialogTitle,
   FormControlLabel,
   Grid,
+  IconButton,
   InputAdornment,
   LinearProgress,
   List,
@@ -34,6 +37,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
@@ -44,7 +48,7 @@ import { useSearchParams } from 'react-router'
 import { errorMessage } from '@/api/client'
 import { useAuth } from '@/auth/AuthContext'
 import { catalogApi, movementsApi, ordersApi, type MovementFilters } from '@/api/endpoints'
-import type { MovementType, Order, ProductStaff } from '@/api/types'
+import type { MovementType, Order, OrderItem, ProductStaff } from '@/api/types'
 import { BarcodeField } from '@/components/BarcodeScanner'
 import { EmptyState, PageHeader, QueryState, Section } from '@/components/common'
 import { useNotify } from '@/components/Notify'
@@ -308,11 +312,15 @@ export function StockInPage() {
 }
 
 // ---------------- Orders to ship ----------------
+/**
+ * Picking: every unit is counted. The first unit of a line must be scanned (proves the right product is in hand);
+ * after that the rest can be scanned again, added with +, or typed in. Lines without a barcode are counted by hand.
+ * Shipping is possible only when every line has exactly the ordered quantity.
+ */
 function ShipDialog({ order, onClose }: { order: Order; onClose: () => void }) {
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('sm'))
-  const [picked, setPicked] = useState<Set<number>>(new Set())
-  const [skipScan, setSkipScan] = useState(false)
+  const [picked, setPicked] = useState<Record<number, number>>({})
   const [scanMessage, setScanMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const queryClient = useQueryClient()
   const notify = useNotify()
@@ -331,18 +339,33 @@ function ShipDialog({ order, onClose }: { order: Order; onClose: () => void }) {
     onError: notify.error,
   })
 
-  // Scanning a line marks it as picked; a wrong product is reported at once.
+  const count = (id: number) => picked[id] ?? 0
+  // + and typing unlock only after the first scan; a product without a barcode cannot be scanned at all.
+  const unlocked = (item: OrderItem) => !item.barcode || count(item.id) > 0
+  const setCount = (item: OrderItem, n: number) => {
+    const min = item.barcode ? 1 : 0 // a scanned line keeps at least the scanned unit
+    setPicked((prev) => ({ ...prev, [item.id]: Math.max(min, Math.min(item.quantity, n)) }))
+  }
+
+  // Each scan = one unit of that product.
   const onScan = (code: string) => {
     const item = order.items.find((i) => i.barcode === code)
     if (!item) {
-      setScanMessage({ ok: false, text: `Barcode ${code} is not in this order` })
+      setScanMessage({ ok: false, text: `Barcode ${code} is not in this order — wrong product` })
       return
     }
-    setPicked((prev) => new Set(prev).add(item.id))
-    setScanMessage({ ok: true, text: `${item.product_name} × ${item.quantity} picked` })
+    if (count(item.id) >= item.quantity) {
+      setScanMessage({ ok: false, text: `All ${item.quantity} × ${item.product_name} are already picked — put this one back` })
+      return
+    }
+    const n = count(item.id) + 1
+    setPicked((prev) => ({ ...prev, [item.id]: n }))
+    setScanMessage({ ok: true, text: `${item.product_name}: ${n} of ${item.quantity}` })
   }
 
-  const allPicked = order.items.every((i) => picked.has(i.id))
+  const totalUnits = order.items.reduce((sum, i) => sum + i.quantity, 0)
+  const pickedUnits = order.items.reduce((sum, i) => sum + count(i.id), 0)
+  const allPicked = order.items.every((i) => count(i.id) === i.quantity)
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm" fullScreen={phone}>
@@ -350,38 +373,78 @@ function ShipDialog({ order, onClose }: { order: Order; onClose: () => void }) {
       <DialogContent>
         <Stack spacing={2}>
           <OrderMeta order={order} staff />
-          <BarcodeField onSubmit={onScan} label="Scan each product" autoFocus disabled={skipScan} />
+          <BarcodeField onSubmit={onScan} label="Scan every unit" autoFocus />
           {scanMessage && <Alert severity={scanMessage.ok ? 'success' : 'error'}>{scanMessage.text}</Alert>}
+          <Box>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">
+                Picked
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {pickedUnits} of {totalUnits} units
+              </Typography>
+            </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={(pickedUnits / totalUnits) * 100}
+              color={allPicked ? 'success' : 'primary'}
+              sx={{ height: 6, borderRadius: 3 }}
+            />
+          </Box>
           <List dense disablePadding>
             {order.items.map((item) => {
-              const done = skipScan || picked.has(item.id)
+              const n = count(item.id)
+              const done = n === item.quantity
+              const open = unlocked(item)
               return (
-                <ListItem
-                  key={item.id}
-                  divider
-                  secondaryAction={
-                    !skipScan && (
-                      <Button size="small" onClick={() => setPicked((p) => new Set(p).add(item.id))} disabled={done}>
-                        Mark
-                      </Button>
-                    )
-                  }
-                >
+                <ListItem key={item.id} divider sx={{ gap: 1, flexWrap: 'wrap', py: 1 }}>
                   <ListItemIcon sx={{ minWidth: 36 }}>
                     {done ? <CheckCircleIcon color="success" /> : <RadioButtonUncheckedIcon color="disabled" />}
                   </ListItemIcon>
                   <ListItemText
+                    sx={{ flex: '1 1 180px' }}
                     primary={`${item.quantity} × ${item.product_name}`}
-                    secondary={`${item.product_code} · ${item.barcode ?? 'no barcode'} · in stock ${item.available_quantity}`}
+                    secondary={
+                      item.barcode
+                        ? `${item.product_code} · ${item.barcode}${open ? '' : ' · scan it first'}`
+                        : `${item.product_code} · no barcode: count by hand`
+                    }
                   />
+                  <Tooltip title={open ? '' : 'Scan the barcode first'}>
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                      <IconButton
+                        size="small"
+                        aria-label="One less"
+                        disabled={!open || n <= (item.barcode ? 1 : 0)}
+                        onClick={() => setCount(item, n - 1)}
+                      >
+                        <RemoveIcon fontSize="small" />
+                      </IconButton>
+                      <TextField
+                        size="small"
+                        value={n}
+                        disabled={!open}
+                        onChange={(e) => setCount(item, Number(e.target.value.replace(/\D/g, '') || 0))}
+                        sx={{ width: 64 }}
+                        slotProps={{ htmlInput: { inputMode: 'numeric', 'aria-label': `Picked ${item.product_name}`, style: { textAlign: 'center' } } }}
+                      />
+                      <IconButton
+                        size="small"
+                        aria-label="One more"
+                        disabled={!open || done}
+                        onClick={() => setCount(item, n + 1)}
+                      >
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 28 }}>
+                        / {item.quantity}
+                      </Typography>
+                    </Stack>
+                  </Tooltip>
                 </ListItem>
               )
             })}
           </List>
-          <FormControlLabel
-            control={<Switch checked={skipScan} onChange={(e) => setSkipScan(e.target.checked)} />}
-            label="Skip scanning (pick list checked by hand)"
-          />
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -389,7 +452,7 @@ function ShipDialog({ order, onClose }: { order: Order; onClose: () => void }) {
         <Button
           variant="contained"
           startIcon={<LocalShippingOutlinedIcon />}
-          disabled={!(allPicked || skipScan) || ship.isPending}
+          disabled={!allPicked || ship.isPending}
           onClick={() => ship.mutate()}
         >
           Ship (OUT)
