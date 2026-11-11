@@ -19,6 +19,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from app.core import rate_limit  # noqa: E402
 from app.db.session import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -36,6 +37,8 @@ def schema():
 
 @pytest.fixture(autouse=True)
 def clean_db():
+    for limiter in rate_limit.ALL_LIMITERS:  # every test starts with empty brute-force counters
+        limiter.clear()
     tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
     with engine.begin() as conn:
         conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))

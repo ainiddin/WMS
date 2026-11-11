@@ -1,10 +1,11 @@
 from typing import Annotated
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
+from app.core import rate_limit
 from app.core.deps import DB, CurrentUser
 from app.core.security import create_token, decode_token, verify_password
 from app.models import User, UserStatus
@@ -38,36 +39,46 @@ def _tokens(user: User) -> TokenPair:
 
 
 @router.post("/send-code/", response_model=Message)
-def send_code(data: SendCodeRequest, db: DB):
+def send_code(data: SendCodeRequest, db: DB, request: Request):
     """Step 1 of any sign up: a 6-digit code is emailed. It proves that the address exists and is the user's."""
+    ip = rate_limit.client_ip(request)
+    rate_limit.check_send_code(ip)
     user_service.send_signup_code(db, data.email)
     db.commit()
+    rate_limit.code_sent(ip)
     return Message(detail=f"A code was sent to {data.email}")
 
 
 @router.post("/register/", response_model=TokenPair, status_code=status.HTTP_201_CREATED)
-def register_customer(data: CustomerRegister, db: DB):
+def register_customer(data: CustomerRegister, db: DB, request: Request):
     """Customer sign up: the account is ACTIVE at once and tokens are returned (no separate login needed)."""
+    rate_limit.check_signup(rate_limit.client_ip(request))
     user = user_service.register_customer(db, data)
     db.commit()
     return _tokens(user)
 
 
 @router.post("/register-staff/", response_model=StaffRegistered, status_code=status.HTTP_201_CREATED)
-def register_staff(data: StaffRegister, db: DB):
+def register_staff(data: StaffRegister, db: DB, request: Request):
     """Manager / Worker sign up. Status is PENDING: login is possible only after an Admin approves."""
+    rate_limit.check_signup(rate_limit.client_ip(request))
     user = user_service.register_staff(db, data)
     db.commit()
     return StaffRegistered(detail=STATUS_MESSAGES[UserStatus.PENDING], user=UserOut.from_user(user))
 
 
 @router.post("/login/", response_model=TokenPair)
-def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DB):
-    """OAuth2 form: `username` = email. Only ACTIVE accounts receive a token (rule 8)."""
+def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DB, request: Request):
+    """OAuth2 form: `username` = email. Only ACTIVE accounts receive a token (rule 8).
+    Too many failed attempts for this email or IP -> 429 for a while, even with the right password."""
     email = form.username.strip().lower()
+    ip = rate_limit.client_ip(request)
+    rate_limit.check_login(ip, email)
     user = db.scalars(select(User).where(User.email == email)).one_or_none()
     if user is None or not verify_password(form.password, user.password_hash):
+        rate_limit.login_failed(ip, email)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password")
+    rate_limit.login_succeeded(email)
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status.HTTP_403_FORBIDDEN, STATUS_MESSAGES[UserStatus(user.status)])
     return _tokens(user)
