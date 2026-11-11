@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     LOGIN_MAX_FAILS_PER_IP: int = 20
     SIGNUP_WINDOW_SECONDS: int = 60 * 60
     SIGNUP_MAX_PER_IP: int = 10
+    SEND_CODE_MAX_PER_IP: int = 10  # emails with a sign-up code per IP per SIGNUP_WINDOW_SECONDS
 
     # First admin, created on startup if no ADMIN exists. The password must live only in .env.
     ADMIN_EMAIL: str = "Admin001@wms.kz"

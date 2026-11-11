@@ -77,8 +77,9 @@ class SlidingWindowLimiter:
 login_fails_by_email = SlidingWindowLimiter(settings.LOGIN_MAX_FAILS_PER_EMAIL, settings.LOGIN_WINDOW_SECONDS)
 login_fails_by_ip = SlidingWindowLimiter(settings.LOGIN_MAX_FAILS_PER_IP, settings.LOGIN_WINDOW_SECONDS)
 signups_by_ip = SlidingWindowLimiter(settings.SIGNUP_MAX_PER_IP, settings.SIGNUP_WINDOW_SECONDS)
+codes_sent_by_ip = SlidingWindowLimiter(settings.SEND_CODE_MAX_PER_IP, settings.SIGNUP_WINDOW_SECONDS)
 
-ALL_LIMITERS = (login_fails_by_email, login_fails_by_ip, signups_by_ip)
+ALL_LIMITERS = (login_fails_by_email, login_fails_by_ip, signups_by_ip, codes_sent_by_ip)
 
 
 def client_ip(request: Request) -> str:
@@ -114,11 +115,21 @@ def login_succeeded(email: str) -> None:
     login_fails_by_email.reset(email)
 
 
-def check_signup(ip: str) -> None:
-    """Count a sign up attempt from this IP; raise 429 over the limit (stops mass account creation)."""
+def _check_and_hit(limiter: SlidingWindowLimiter, ip: str) -> None:
     if not settings.RATE_LIMIT_ENABLED:
         return
-    wait = signups_by_ip.retry_after(ip)
+    wait = limiter.retry_after(ip)
     if wait:
         raise _too_many(wait)
-    signups_by_ip.hit(ip)
+    limiter.hit(ip)
+
+
+def check_signup(ip: str) -> None:
+    """Count a sign up attempt from this IP; raise 429 over the limit (stops mass account creation)."""
+    _check_and_hit(signups_by_ip, ip)
+
+
+def check_send_code(ip: str) -> None:
+    """Count a sign-up code email from this IP; raise 429 over the limit. The per-email resend cooldown does not
+    stop one client from mailing codes to many different addresses (spam, mail-provider quota)."""
+    _check_and_hit(codes_sent_by_ip, ip)

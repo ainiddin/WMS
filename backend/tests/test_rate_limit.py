@@ -1,6 +1,7 @@
+from app.core import rate_limit
 from app.core.config import settings
 from app.core.rate_limit import SlidingWindowLimiter
-from tests.conftest import ADMIN, PASSWORD
+from tests.conftest import ADMIN, OUTBOX, PASSWORD, signup_code
 
 
 def login(client, email, password):
@@ -52,13 +53,25 @@ def test_one_ip_cannot_spray_many_accounts(client, api):
     assert login(client, "victim@mail.kz", PASSWORD).status_code == 429
 
 
-def test_signups_are_limited_per_ip(client):
+def test_signups_are_limited_per_ip(client, monkeypatch):
+    monkeypatch.setattr(rate_limit.codes_sent_by_ip, "limit", 100)  # test only the sign-up limit here
     for i in range(settings.SIGNUP_MAX_PER_IP):
         r = client.post("/api/auth/register/", json={
-            "email": f"spam{i}@mail.kz", "password": PASSWORD, "full_name": "Spam", "address": "Almaty",
+            "email": f"spam{i}@mail.kz", "code": signup_code(client, f"spam{i}@mail.kz"), "password": PASSWORD,
+            "full_name": "Spam", "address": "Almaty",
         })
         assert r.status_code == 201, r.text
     r = client.post("/api/auth/register-staff/", json={
-        "email": "spam-staff@wms.kz", "password": PASSWORD, "full_name": "Spam", "requested_role": "WORKER",
+        "email": "spam-staff@wms.kz", "code": signup_code(client, "spam-staff@wms.kz"), "password": PASSWORD,
+        "full_name": "Spam", "requested_role": "WORKER",
     })
     assert r.status_code == 429
+
+
+def test_one_ip_cannot_mail_codes_to_many_addresses(client):
+    for i in range(settings.SEND_CODE_MAX_PER_IP):
+        assert client.post("/api/auth/send-code/", json={"email": f"target{i}@mail.kz"}).status_code == 200
+    r = client.post("/api/auth/send-code/", json={"email": "one-more@mail.kz"})
+    assert r.status_code == 429
+    assert int(r.headers["Retry-After"]) > 0
+    assert "one-more@mail.kz" not in OUTBOX  # nothing was sent
