@@ -166,7 +166,34 @@ export interface Order {
   customer: PersonShort
   approved_by: PersonShort | null
   shipped_by: PersonShort | null
+  /** The Worker who should pick it (least loaded at approval); any Worker may still ship it. */
+  assigned_to: PersonShort | null
+  assigned_at: string | null
   items: OrderItem[]
+  /** Only for PENDING orders: what is missing and the expected wait. */
+  waiting: WaitingLine[] | null
+  eta_min_days: number | null
+  eta_max_days: number | null
+}
+
+export interface WaitingLine {
+  product_id: number
+  product_code: string
+  product_name: string
+  missing: number
+}
+
+export interface StockCheck {
+  waiting: WaitingLine[]
+  eta_min_days: number | null
+  eta_max_days: number | null
+}
+
+export interface WorkerLoad {
+  worker: PersonShort
+  team_name: string
+  open_orders: number
+  open_units: number
 }
 
 // ---- Customer account ----

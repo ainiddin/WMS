@@ -169,7 +169,7 @@ def orders_report(db: Session, status: str | None = None, days: int | None = Non
         {
             "id": o.id, "code": o.code, "created_at": fmt(o.created_at), "customer": o.customer.full_name,
             "status": o.status, "items": len(o.items), "total_amount": float(o.total_amount),
-            "approved_by": o.approved_by.full_name if o.approved_by else "",
+            "approved_by": o.approved_by.full_name if o.approved_by else ("System" if o.approved_at else ""),
             "shipped_by": o.shipped_by.full_name if o.shipped_by else "", "shipped_at": fmt(o.shipped_at),
         }
         for o in db.scalars(stmt).all()

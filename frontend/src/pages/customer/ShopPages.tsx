@@ -31,6 +31,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { MAX_LINE_QUANTITY, useCart } from '@/cart/CartContext'
 import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
+import { WaitingNotice } from '@/components/OrderParts'
 import { formatMoney, PHONE_HINT, phoneError } from '@/format'
 import { TopUpDialog, useAccount } from './AccountPage'
 import { categoryLook, ProductCard, ProductPicture } from './ProductCard'
@@ -435,6 +436,13 @@ export function CheckoutPage() {
   const navigate = useNavigate()
   const notify = useNotify()
 
+  const items = lines.map((l) => ({ product_id: l.product.id, quantity: l.quantity }))
+  // Before paying: does anything have to wait for a delivery, and how long?
+  const stock = useQuery({
+    queryKey: ['orders', 'check', items],
+    queryFn: () => ordersApi.check(items),
+    enabled: items.length > 0,
+  })
   const balance = account.data?.balance ?? 0
   const missing = Math.max(0, total - balance)
   const shownAddress = address ?? profile.data?.address ?? ''
@@ -442,7 +450,7 @@ export function CheckoutPage() {
   const placeOrder = useMutation({
     mutationFn: () =>
       ordersApi.create({
-        items: lines.map((l) => ({ product_id: l.product.id, quantity: l.quantity })),
+        items,
         delivery_address: shownAddress.trim() || undefined,
         comment: comment.trim() || undefined,
       }),
@@ -450,7 +458,11 @@ export function CheckoutPage() {
       clear()
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['account'] })
-      notify.success(`Order ${order.code} placed and paid: ${formatMoney(order.total_amount)}`)
+      notify.success(
+        order.status === 'PENDING'
+          ? `Order ${order.code} paid. It waits for stock; we confirm it automatically when the goods arrive.`
+          : `Order ${order.code} placed and paid: ${formatMoney(order.total_amount)}`,
+      )
       navigate('/my-orders', { replace: true, state: { highlight: order.id } })
     },
     onError: notify.error,
@@ -534,6 +546,16 @@ export function CheckoutPage() {
                   {account.data ? formatMoney(balance) : '…'}
                 </Typography>
               </Stack>
+              {!!stock.data?.waiting.length && (
+                <Box sx={{ mt: 2 }}>
+                  <WaitingNotice
+                    waiting={stock.data.waiting}
+                    etaMin={stock.data.eta_min_days}
+                    etaMax={stock.data.eta_max_days}
+                    footer="You can still order: it is confirmed as soon as the goods arrive. You can cancel any time before shipping and get the money back."
+                  />
+                </Box>
+              )}
               {account.data && missing > 0 && (
                 <Alert
                   severity="warning"

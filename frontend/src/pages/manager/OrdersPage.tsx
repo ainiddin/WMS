@@ -1,7 +1,7 @@
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
+import ShuffleIcon from '@mui/icons-material/Shuffle'
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -22,17 +22,77 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { ordersApi } from '@/api/endpoints'
 import type { Order, OrderStatus } from '@/api/types'
-import { ConfirmDialog, EmptyState, OrderStatusChip, PageHeader, QueryState } from '@/components/common'
+import { ConfirmDialog, EmptyState, OrderStatusChip, PageHeader, QueryState, Section } from '@/components/common'
 import { useNotify } from '@/components/Notify'
-import { hasShortage, OrderItemsTable, OrderMeta, OrderProgress } from '@/components/OrderParts'
+import { formatEta, OrderItemsTable, OrderMeta, OrderProgress, WaitingNotice } from '@/components/OrderParts'
 import { formatDateTime, formatMoney } from '@/format'
 
-const TABS: (OrderStatus | 'ALL')[] = ['PENDING', 'APPROVED', 'SHIPPED', 'REJECTED', 'CANCELLED', 'ALL']
+const TABS: (OrderStatus | 'ALL')[] = ['APPROVED', 'PENDING', 'SHIPPED', 'REJECTED', 'CANCELLED', 'ALL']
+const TAB_LABEL: Record<OrderStatus | 'ALL', string> = {
+  APPROVED: 'To ship',
+  PENDING: 'Waiting for stock',
+  SHIPPED: 'Shipped',
+  REJECTED: 'Rejected',
+  CANCELLED: 'Cancelled',
+  ALL: 'All',
+}
+
+/** Open work of every Worker. New orders go to the least loaded one; Rebalance spreads all open orders again. */
+function WorkloadCard() {
+  const workload = useQuery({ queryKey: ['orders', 'workload'], queryFn: ordersApi.workload, refetchInterval: 30_000 })
+  const queryClient = useQueryClient()
+  const notify = useNotify()
+  const rebalance = useMutation({
+    mutationFn: ordersApi.rebalance,
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+      notify.success(r.moved ? `${r.moved} orders moved to other Workers` : 'Already balanced: nothing to move')
+    },
+    onError: notify.error,
+  })
+  const rows = workload.data ?? []
+  const max = Math.max(1, ...rows.map((r) => r.open_units))
+
+  return (
+    <Section
+      title="Worker workload (open orders)"
+      action={
+        <Button size="small" startIcon={<ShuffleIcon />} onClick={() => rebalance.mutate()} disabled={rebalance.isPending}>
+          Rebalance
+        </Button>
+      }
+    >
+      <QueryState isLoading={workload.isLoading} error={workload.error}>
+        {rows.length ? (
+          <Stack spacing={1}>
+            {rows.map((r) => (
+              <Stack key={r.worker.id} direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ width: { xs: 110, sm: 170 }, flexShrink: 0 }} noWrap>
+                  {r.worker.full_name}
+                </Typography>
+                <Box sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: 'action.hover', overflow: 'hidden' }}>
+                  <Box sx={{ width: `${(r.open_units / max) * 100}%`, height: '100%', bgcolor: 'primary.main' }} />
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ width: 120, textAlign: 'right', flexShrink: 0 }}>
+                  {r.open_orders} {r.open_orders === 1 ? 'order' : 'orders'} · {r.open_units} {r.open_units === 1 ? 'unit' : 'units'}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            No active Workers: approved orders wait in a common queue until a Worker is approved.
+          </Typography>
+        )}
+      </QueryState>
+    </Section>
+  )
+}
 
 function useOrderAction() {
   const queryClient = useQueryClient()
@@ -56,7 +116,7 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
   const [cancelling, setCancelling] = useState(false)
-  const short = hasShortage(order)
+  const open = order.status === 'PENDING' || order.status === 'APPROVED'
 
   const act = (fn: () => Promise<Order>, done: string) => {
     setBusy(true)
@@ -72,10 +132,15 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
         <Stack spacing={2.5}>
           <OrderProgress order={order} />
           <OrderMeta order={order} staff />
-          {order.status === 'PENDING' && short && (
-            <Alert severity="warning">Some lines are larger than the current stock — the order cannot be approved yet.</Alert>
+          {order.waiting && (
+            <WaitingNotice
+              waiting={order.waiting}
+              etaMin={order.eta_min_days}
+              etaMax={order.eta_max_days}
+              footer="The system approves it and gives it to a Worker as soon as the goods arrive (stock IN). No action needed."
+            />
           )}
-          <OrderItemsTable order={order} showStock={order.status === 'PENDING' || order.status === 'APPROVED'} />
+          <OrderItemsTable order={order} showStock={open} />
           {rejecting && (
             <TextField
               label="Reason (shown to the customer)"
@@ -88,13 +153,13 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
         </Stack>
       </DialogContent>
       <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
-        {order.status === 'APPROVED' && (
+        {open && (
           <Button color="error" onClick={() => setCancelling(true)} disabled={busy} sx={{ mr: 'auto' }}>
             Cancel order
           </Button>
         )}
         <Button onClick={onClose}>Close</Button>
-        {order.status === 'PENDING' &&
+        {open &&
           (rejecting ? (
             <Button color="error" variant="contained" disabled={busy} onClick={() => act(() => ordersApi.reject(order.id, reason), 'rejected')}>
               Confirm reject
@@ -104,22 +169,24 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
               <Button color="error" variant="outlined" startIcon={<CloseIcon />} onClick={() => setRejecting(true)} disabled={busy}>
                 Reject
               </Button>
-              <Button
-                color="success"
-                variant="contained"
-                startIcon={<CheckIcon />}
-                disabled={busy || short}
-                onClick={() => act(() => ordersApi.approve(order.id), 'approved')}
-              >
-                Approve
-              </Button>
+              {order.status === 'PENDING' && !order.waiting && (
+                <Button
+                  color="success"
+                  variant="contained"
+                  startIcon={<CheckIcon />}
+                  disabled={busy}
+                  onClick={() => act(() => ordersApi.approve(order.id), 'approved')}
+                >
+                  Approve now
+                </Button>
+              )}
             </>
           ))}
       </DialogActions>
       <ConfirmDialog
         open={cancelling}
         title={`Cancel order ${order.code}?`}
-        text="The order was approved but not shipped yet. Stock is not changed."
+        text="The order is not shipped yet, so stock is not changed. The money goes back to the customer's account."
         confirmLabel="Cancel order"
         color="error"
         loading={busy}
@@ -132,7 +199,7 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
 
 export function OrdersPage() {
   const [params, setParams] = useSearchParams()
-  const tab = (params.get('status') as OrderStatus | 'ALL' | null) ?? 'PENDING'
+  const tab = (params.get('status') as OrderStatus | 'ALL' | null) ?? 'APPROVED'
   const status = tab === 'ALL' ? undefined : tab
   const orders = useQuery({
     queryKey: ['orders', status ?? 'ALL'],
@@ -144,7 +211,13 @@ export function OrdersPage() {
 
   return (
     <>
-      <PageHeader title="Orders" subtitle="Approve or reject new orders. Workers ship approved ones." />
+      <PageHeader
+        title="Orders"
+        subtitle="Orders are approved and given to the least loaded Worker automatically. You handle the exceptions."
+      />
+      <Box sx={{ mb: 3 }}>
+        <WorkloadCard />
+      </Box>
       <Card>
         <Tabs
           value={tab}
@@ -154,7 +227,7 @@ export function OrdersPage() {
           sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}
         >
           {TABS.map((t) => (
-            <Tab key={t} value={t} label={t === 'ALL' ? 'All' : t.charAt(0) + t.slice(1).toLowerCase()} />
+            <Tab key={t} value={t} label={TAB_LABEL[t]} />
           ))}
         </Tabs>
         <CardContent>
@@ -170,7 +243,7 @@ export function OrdersPage() {
                       <TableCell align="right">Lines</TableCell>
                       <TableCell align="right">Total</TableCell>
                       <TableCell>Status</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Handled by</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Worker</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -186,16 +259,16 @@ export function OrdersPage() {
                         <TableCell>
                           <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
                             <OrderStatusChip status={o.status} />
-                            {o.status === 'PENDING' && hasShortage(o) && (
-                              <Typography variant="caption" color="warning.main">
-                                short
+                            {o.status === 'PENDING' && formatEta(o.eta_min_days, o.eta_max_days) && (
+                              <Typography variant="caption" color="warning.main" sx={{ whiteSpace: 'nowrap' }}>
+                                {formatEta(o.eta_min_days, o.eta_max_days)}
                               </Typography>
                             )}
                           </Stack>
                         </TableCell>
                         <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                           <Box component="span" sx={{ color: 'text.secondary' }}>
-                            {[o.approved_by?.full_name, o.shipped_by?.full_name].filter(Boolean).join(' → ') || '—'}
+                            {(o.status === 'SHIPPED' ? o.shipped_by : o.assigned_to)?.full_name ?? '—'}
                           </Box>
                         </TableCell>
                       </TableRow>

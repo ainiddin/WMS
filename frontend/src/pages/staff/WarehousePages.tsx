@@ -42,6 +42,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
 import { errorMessage } from '@/api/client'
+import { useAuth } from '@/auth/AuthContext'
 import { catalogApi, movementsApi, ordersApi, type MovementFilters } from '@/api/endpoints'
 import type { MovementType, Order, ProductStaff } from '@/api/types'
 import { BarcodeField } from '@/components/BarcodeScanner'
@@ -398,50 +399,91 @@ function ShipDialog({ order, onClose }: { order: Order; onClose: () => void }) {
   )
 }
 
+function ShipCard({ order, onShip, mine }: { order: Order; onShip: () => void; mine: boolean }) {
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent>
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1 }}>
+          <Typography variant="h6">{order.code}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            approved {formatDateTime(order.approved_at)}
+          </Typography>
+        </Stack>
+        <OrderMeta order={order} staff />
+        <Box sx={{ mt: 1.5 }}>
+          <OrderItemsTable order={order} showStock />
+        </Box>
+        <Button
+          fullWidth
+          variant={mine ? 'contained' : 'outlined'}
+          size="large"
+          startIcon={<LocalShippingOutlinedIcon />}
+          sx={{ mt: 2 }}
+          onClick={onShip}
+        >
+          {mine ? 'Pick & ship' : 'Take over & ship'}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function OrdersToShipPage() {
+  const { user } = useAuth()
   const orders = useQuery({ queryKey: ['orders', 'APPROVED'], queryFn: () => ordersApi.list('APPROVED'), refetchInterval: 20_000 })
   const [shipping, setShipping] = useState<Order | null>(null)
+  const isWorker = user?.role === 'WORKER'
+  const mine = (orders.data ?? []).filter((o) => isWorker && o.assigned_to?.id === user?.employee_id)
+  const others = (orders.data ?? []).filter((o) => !mine.includes(o))
+  const units = (list: Order[]) => list.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.quantity, 0), 0)
+
+  const grid = (list: Order[], isMine: boolean) => (
+    <Grid container spacing={2}>
+      {list.map((order) => (
+        <Grid key={order.id} size={{ xs: 12, lg: 6 }}>
+          <ShipCard order={order} mine={isMine} onShip={() => setShipping(order)} />
+        </Grid>
+      ))}
+    </Grid>
+  )
 
   return (
     <>
-      <PageHeader title="Orders to ship" subtitle="Approved orders, oldest first. Shipping creates OUT movements for every line." />
+      <PageHeader
+        title="Orders to ship"
+        subtitle="The system gives every new order to the Worker with the least open work. Oldest first."
+      />
       <QueryState isLoading={orders.isLoading} error={orders.error}>
-        {orders.data?.length ? (
-          <Grid container spacing={2}>
-            {orders.data.map((order) => (
-              <Grid key={order.id} size={{ xs: 12, lg: 6 }}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="h6">{order.code}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        approved {formatDateTime(order.approved_at)}
-                      </Typography>
-                    </Stack>
-                    <OrderMeta order={order} staff />
-                    <Box sx={{ mt: 1.5 }}>
-                      <OrderItemsTable order={order} showStock />
-                    </Box>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      size="large"
-                      startIcon={<LocalShippingOutlinedIcon />}
-                      sx={{ mt: 2 }}
-                      onClick={() => setShipping(order)}
-                    >
-                      Pick & ship
-                    </Button>
-                  </CardContent>
+        <Stack spacing={3}>
+          {isWorker && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>
+                Assigned to you · {mine.length} orders, {units(mine)} units
+              </Typography>
+              {mine.length ? (
+                grid(mine, true)
+              ) : (
+                <Card>
+                  <EmptyState title="Nothing assigned to you" text="New orders appear here automatically." />
                 </Card>
-              </Grid>
-            ))}
-          </Grid>
-        ) : (
-          <Card>
-            <EmptyState title="Nothing to ship" text="Approved orders will appear here." />
-          </Card>
-        )}
+              )}
+            </Box>
+          )}
+          {(!isWorker || others.length > 0) && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>
+                {isWorker ? "Other Workers' orders (take over if a colleague is away)" : 'All approved orders'}
+              </Typography>
+              {others.length ? (
+                grid(others, !isWorker)
+              ) : (
+                <Card>
+                  <EmptyState title="Nothing to ship" text="Approved orders will appear here." />
+                </Card>
+              )}
+            </Box>
+          )}
+        </Stack>
       </QueryState>
       {shipping && <ShipDialog order={shipping} onClose={() => setShipping(null)} />}
     </>

@@ -14,6 +14,7 @@ import heapq
 import itertools
 import random
 import sys
+from collections import Counter
 from datetime import UTC, datetime, time, timedelta
 from decimal import ROUND_CEILING, Decimal
 
@@ -148,7 +149,8 @@ class Simulation:
         self.managers = db.scalars(select(Employee).where(Employee.role == Role.MANAGER).order_by(Employee.id)).all()
         self.workers = db.scalars(select(Employee).where(Employee.role == Role.WORKER).order_by(Employee.id)).all()
         self.activity = {m.id: a for m, (_, a, _) in zip(self.managers, TEAMS)}
-        self.stats = {"orders": 0, "shipped": 0, "rejected": 0, "cancelled": 0, "stock_in": 0}
+        self.stats = Counter(orders=0, shipped=0, rejected=0, cancelled=0, stock_in=0, waited_for_stock=0,
+                             approved_after_waiting=0)
 
     def schedule(self, at: datetime, kind: str, payload=None) -> None:
         if at <= self.now:
@@ -171,6 +173,7 @@ class Simulation:
             needed = ((total - account.balance) / 5000).to_integral_value(ROUND_CEILING) * 5000
             amount = max(needed, Decimal(self.rng.choice([10_000, 20_000, 30_000, 50_000, 100_000])))
             account_service.top_up(self.db, customer, amount, at - timedelta(minutes=self.rng.randint(3, 40)))
+        self.stats["orders"] += 1
         return order_service.create_order(self.db, customer, OrderCreate(items=items, comment=comment), at=at)
 
     def local(self, day, hour: float) -> datetime:
@@ -204,41 +207,55 @@ class Simulation:
 
     def finish(self) -> None:
         """Leave something to show at the defense: products below minimum and orders in every queue."""
-        manager = self.managers[0]
         # Bulk purchases in the last hours took a few products below their minimum -> Restock list.
         for p in self.rng.sample(self.products, 4):
-            qty = p.quantity - self.rng.randint(max(1, p.min_quantity // 3), max(1, p.min_quantity - 1))
+            free = p.quantity - order_service.reserved_units(self.db, [p.id]).get(p.id, 0)
+            qty = free - self.rng.randint(max(1, p.min_quantity // 3), max(1, p.min_quantity - 1))
             if qty <= 0:
                 continue
             at = self.now - timedelta(hours=self.rng.uniform(4, 6))
             customer = self.rng.choice(self.customers)
             order = self.create_order(customer, [OrderItemIn(product_id=p.id, quantity=qty)], at,
                                       comment="Bulk purchase for an office")
-            order_service.approve_order(self.db, order, manager, at + timedelta(hours=1))
-            order_service.ship_order(self.db, order, self.team_worker(manager.id), at + timedelta(hours=2))
-            self.stats["orders"] += 1
-            self.stats["shipped"] += 1
-        # Two approved orders wait for a Worker, a few new ones wait for a Manager.
-        in_stock = [p for p in self.products if p.quantity >= 5]
-        for i in range(5):
+            if order.status == OrderStatus.APPROVED:
+                self.ship(order, at + timedelta(hours=2), self.db.get(Employee, order.assigned_to_id))
+        # A few fresh orders: approved by the system and waiting in the Workers' queues.
+        in_stock = [p for p in self.products if p.quantity >= 8]
+        for i in range(6):
             at = self.now - timedelta(hours=3 - i * 0.5)
             items = [OrderItemIn(product_id=p.id, quantity=self.rng.randint(1, 2))
                      for p in self.rng.sample(in_stock, self.rng.randint(1, 3))]
-            order = self.create_order(self.rng.choice(self.customers), items, at)
-            if i < 2:
-                order_service.approve_order(self.db, order, manager, at + timedelta(minutes=40))
-            self.stats["orders"] += 1
+            self.create_order(self.rng.choice(self.customers), items, at)
+        # Two customers ordered more than there is: their orders wait for a delivery (shows the expected wait).
+        for p in self.rng.sample(self.products, 2):
+            at = self.now - timedelta(hours=self.rng.uniform(1, 2))
+            self.create_order(self.rng.choice(self.customers),
+                              [OrderItemIn(product_id=p.id, quantity=p.quantity + self.rng.randint(3, 8))], at,
+                              comment="Need them for a new flat")
 
     def stock_in(self, product: Product, qty: int, at: datetime) -> None:
         worker = self.team_worker()
         record_movement(self.db, product_id=product.id, movement_type=MovementType.IN, quantity=qty,
                         employee_id=worker.id, note="Supplier delivery", at=at)
         self.stats["stock_in"] += 1
+        # Orders that waited for this product are approved by the system and given to Workers.
+        for order in order_service.approve_waiting(self.db, [product.id], at):
+            self.stats["approved_after_waiting"] += 1
+            self.schedule_ship(order, at)
+
+    def schedule_ship(self, order: Order, at: datetime) -> None:
+        self.schedule(at + timedelta(hours=self.rng.uniform(1, 30)), "ship", (order.id, 0))
 
     def on_restock(self, at: datetime, _) -> None:
+        # Products below their minimum, and products that waiting orders need, are ordered from the supplier.
+        _, missing, _ = order_service.queue_state(self.db, [p.id for p in self.products])
+        demand = Counter()
+        for short in missing.values():
+            demand.update(short)
         for p in self.products:
-            if p.quantity < p.min_quantity * 1.3 and self.rng.random() < 0.6:
-                qty = max(10, round((p.min_quantity * 3 - p.quantity) / 5) * 5)
+            low = p.quantity < p.min_quantity * 1.3
+            if (low and self.rng.random() < 0.6) or (demand[p.id] and self.rng.random() < 0.5):
+                qty = max(10, round((p.min_quantity * 3 + demand[p.id] - p.quantity) / 5) * 5)
                 self.stock_in(p, qty, at + timedelta(minutes=self.rng.randint(0, 300)))
 
     def on_create(self, at: datetime, _) -> None:
@@ -247,54 +264,55 @@ class Simulation:
         items = [OrderItemIn(product_id=p.id, quantity=self.rng.choices([1, 2, 3, 4], [55, 28, 12, 5])[0])
                  for p in picks]
         order = self.create_order(customer, items, at)
-        self.stats["orders"] += 1
-        if self.rng.random() < 0.04:
+        if self.rng.random() < 0.03:
             self.schedule(at + timedelta(hours=self.rng.uniform(0.2, 3)), "customer_cancel", order.id)
+        elif self.rng.random() < 0.02:
+            self.schedule(at + timedelta(hours=self.rng.uniform(0.3, 6)), "manager_reject", order.id)
+        if order.status == OrderStatus.APPROVED:
+            self.schedule_ship(order, at)
         else:
-            self.schedule(at + timedelta(hours=self.rng.uniform(0.3, 18)), "decide", order.id)
+            self.stats["waited_for_stock"] += 1
+            if self.rng.random() < 0.3:  # some customers cannot wait and buy elsewhere
+                self.schedule(at + timedelta(days=self.rng.uniform(1, 3)), "customer_cancel", order.id)
 
     def on_customer_cancel(self, at: datetime, order_id: int) -> None:
         order = self.db.get(Order, order_id)
-        if order.status == OrderStatus.PENDING:
+        if order.status in (OrderStatus.PENDING, OrderStatus.APPROVED):
             order_service.cancel_order(self.db, order, by_customer=True, at=at)
             self.stats["cancelled"] += 1
 
-    def on_decide(self, at: datetime, order_id: int) -> None:
+    def on_manager_reject(self, at: datetime, order_id: int) -> None:
         order = self.db.get(Order, order_id)
-        if order.status != OrderStatus.PENDING:
-            return
-        weights = [self.activity[m.id] for m in self.managers]
-        manager = self.rng.choices(self.managers, weights)[0]
-        if self.rng.random() < 0.03:
+        if order.status in (OrderStatus.PENDING, OrderStatus.APPROVED):
+            weights = [self.activity[m.id] for m in self.managers]
+            manager = self.rng.choices(self.managers, weights)[0]
             order_service.reject_order(self.db, order, manager, "Delivery address is outside the service area", at)
             self.stats["rejected"] += 1
-            return
-        try:
-            with self.db.begin_nested():
-                order_service.approve_order(self.db, order, manager, at)
-        except HTTPException:
-            order_service.reject_order(self.db, order, manager, "Not enough stock", at)
-            self.stats["rejected"] += 1
-            return
-        self.schedule(at + timedelta(hours=self.rng.uniform(1, 30)), "ship", (order_id, manager.id, 0))
 
-    def on_ship(self, at: datetime, payload) -> None:
-        order_id, manager_id, attempt = payload
-        order = self.db.get(Order, order_id)
-        if order.status != OrderStatus.APPROVED:
-            return
-        shipper = self.db.get(Employee, manager_id) if self.rng.random() < 0.05 else self.team_worker(manager_id)
+    def ship(self, order: Order, at: datetime, shipper: Employee) -> bool:
         try:
             with self.db.begin_nested():
                 order_service.ship_order(self.db, order, shipper, at)
             self.stats["shipped"] += 1
+            return True
         except HTTPException:
-            # Stock ran out meanwhile: wait for the next delivery, or cancel after 3 tries.
+            return False
+
+    def on_ship(self, at: datetime, payload) -> None:
+        order_id, attempt = payload
+        order = self.db.get(Order, order_id)
+        if order.status != OrderStatus.APPROVED:
+            return
+        # Usually the assigned Worker; sometimes a colleague takes it over (the assigned one is ill or busy).
+        assigned = self.db.get(Employee, order.assigned_to_id) if order.assigned_to_id else None
+        shipper = assigned if assigned and self.rng.random() < 0.85 else self.team_worker()
+        if not self.ship(order, at, shipper):
+            # Should not happen (stock is reserved), but never leave an order stuck.
             if attempt >= 2:
                 order_service.cancel_order(self.db, order, by_customer=False, at=at)
                 self.stats["cancelled"] += 1
             else:
-                self.schedule(at + timedelta(days=1), "ship", (order_id, manager_id, attempt + 1))
+                self.schedule(at + timedelta(days=1), "ship", (order_id, attempt + 1))
 
 
 def seed_demo(db: Session) -> None:
@@ -345,7 +363,7 @@ def seed_demo(db: Session) -> None:
 
     sim = Simulation(db, rng, year_ago, now)
     sim.run()
-    print("Demo data:", sim.stats)
+    print("Demo data:", dict(sim.stats))
 
 
 def main() -> None:

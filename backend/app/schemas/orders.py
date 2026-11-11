@@ -90,6 +90,35 @@ class PersonShort(BaseModel):
     full_name: str
 
 
+class WaitingLine(BaseModel):
+    """A product the order waits for: `missing` units are not in the free stock yet."""
+
+    product_id: int
+    product_code: str
+    product_name: str
+    missing: int
+
+
+class StockCheckOut(BaseModel):
+    """Checkout preview: what would wait and for how long, before the customer pays."""
+
+    waiting: list[WaitingLine]
+    eta_min_days: int | None
+    eta_max_days: int | None
+
+
+class WorkerLoadOut(BaseModel):
+    worker: PersonShort
+    team_name: str
+    open_orders: int
+    open_units: int
+
+
+class RebalanceOut(BaseModel):
+    moved: int
+    workload: list[WorkerLoadOut]
+
+
 class OrderOut(BaseModel):
     id: int
     code: str
@@ -107,10 +136,18 @@ class OrderOut(BaseModel):
     customer: PersonShort
     approved_by: PersonShort | None
     shipped_by: PersonShort | None
+    # The Worker who should pick it (least loaded at approval); any Worker may still ship it.
+    assigned_to: PersonShort | None
+    assigned_at: datetime | None
     items: list[OrderItemOut]
+    # Only for PENDING orders: what is missing and the expected wait in days.
+    waiting: list[WaitingLine] | None = None
+    eta_min_days: int | None = None
+    eta_max_days: int | None = None
 
     @classmethod
-    def from_order(cls, order, staff_view: bool) -> "OrderOut":
+    def from_order(cls, order, staff_view: bool, waiting: dict[int, int] | None = None,
+                   eta=None) -> "OrderOut":
         def person(p):
             return PersonShort(id=p.id, code=p.code, full_name=p.full_name) if p else None
 
@@ -130,6 +167,15 @@ class OrderOut(BaseModel):
             customer=person(order.customer),
             approved_by=person(order.approved_by),
             shipped_by=person(order.shipped_by),
+            assigned_to=person(order.assigned_to),
+            assigned_at=order.assigned_at,
+            waiting=[
+                WaitingLine(product_id=i.product_id, product_code=i.product.code,
+                            product_name=i.product.product_name, missing=waiting[i.product_id])
+                for i in order.items if i.product_id in waiting
+            ] if waiting else None,
+            eta_min_days=eta.min_days if eta else None,
+            eta_max_days=eta.max_days if eta else None,
             items=[
                 OrderItemOut(
                     id=i.id,

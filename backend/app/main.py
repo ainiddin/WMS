@@ -6,12 +6,14 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.models import Product
 from app.routers import account, admin, auth, catalog, customers, movements, orders, performance, reports
+from app.services import assignment_service, order_service
 from app.services.user_service import ensure_first_admin
 
 log = logging.getLogger("keyfive")
@@ -27,6 +29,12 @@ async def lifespan(_: FastAPI):
                 log.warning("First admin %s created", settings.ADMIN_EMAIL)
         except RuntimeError as exc:
             log.error("%s", exc)
+        # Orders left from before (or from a moment without Workers): approve what fits, give every one a Worker.
+        approved = order_service.approve_waiting(db, db.scalars(select(Product.id)).all())
+        assigned = assignment_service.assign_unassigned(db)
+        db.commit()
+        if approved or assigned:
+            log.warning("Orders approved at start: %d, assigned to Workers: %d", len(approved), assigned)
     yield
 
 

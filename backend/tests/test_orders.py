@@ -1,3 +1,6 @@
+from sqlalchemy import text
+
+
 def get_qty(client, headers, product_id):
     return client.get(f"/api/products/{product_id}/", headers=headers).json()["quantity"]
 
@@ -7,13 +10,13 @@ def test_full_order_flow(client, api, team):
     r = api.order(team["customer"], [(p["id"], 2), (p["id"], 1)])  # same product twice -> one line
     assert r.status_code == 201
     order = r.json()
-    assert order["status"] == "PENDING"
+    # Stock is there: approved by the system at once and given to the only Worker. No Manager needed.
+    assert order["status"] == "APPROVED"
+    assert order["approved_by"] is None and order["approved_at"]
+    assert order["assigned_to"]["id"] == team["worker_id"]
     assert order["code"] == "O0001"
     assert len(order["items"]) == 1 and order["items"][0]["quantity"] == 3
     assert order["total_amount"] == 4500  # 3 x 1500, computed by the server
-
-    r = client.post(f"/api/orders/{order['id']}/approve/", headers=team["manager"])
-    assert r.status_code == 200 and r.json()["status"] == "APPROVED"
 
     # Price change after ordering does not touch the order (rule 6).
     client.patch(f"/api/products/{p['id']}/", headers=team["manager"], json={"unit_price": 9999})
@@ -30,25 +33,27 @@ def test_full_order_flow(client, api, team):
     assert len(outs) == 1 and outs[0]["quantity"] == 3 and outs[0]["customer_id"] is not None
 
 
-def test_approve_fails_when_not_enough_stock(client, api, team):
-    order = api.order(team["customer"], [(team["product"]["id"], 11)]).json()
+def test_order_waits_when_not_enough_stock(client, api, team):
+    order = api.order(team["customer"], [(team["product"]["id"], 11)]).json()  # 10 in stock
+    assert order["status"] == "PENDING"
+    assert order["assigned_to"] is None
+    assert order["waiting"][0]["missing"] == 1
+    assert order["eta_min_days"] >= 1 and order["eta_max_days"] > order["eta_min_days"]
+    # A Manager cannot push it through either: the stock is simply not there.
     r = client.post(f"/api/orders/{order['id']}/approve/", headers=team["manager"])
     assert r.status_code == 409
     assert "Not enough stock" in r.json()["detail"]
-    assert client.get(f"/api/orders/{order['id']}/", headers=team["manager"]).json()["status"] == "PENDING"
 
 
-def test_ship_rolls_back_completely(client, api, team):
+def test_ship_rolls_back_completely(client, api, team, db):
     first = team["product"]
     second = api.product(team["manager"], "Pan", price=2000)
     api.stock_in(team["worker"], second["id"], 3)
-
     big = api.order(team["customer"], [(first["id"], 4), (second["id"], 3)]).json()
-    small = api.order(team["customer"], [(second["id"], 2)]).json()
-    for o in (big, small):
-        assert client.post(f"/api/orders/{o['id']}/approve/", headers=team["manager"]).status_code == 200
-    # The small order takes 2 of the 3 pans, so the big one can no longer be shipped.
-    assert client.post(f"/api/orders/{small['id']}/ship/", headers=team["worker"]).status_code == 200
+    assert big["status"] == "APPROVED"
+    # Two pans were found broken and written off directly in the database (not through the app).
+    db.execute(text("UPDATE products SET quantity = 1 WHERE id = :id"), {"id": second["id"]})
+    db.commit()
 
     r = client.post(f"/api/orders/{big['id']}/ship/", headers=team["worker"])
     assert r.status_code == 409
@@ -71,15 +76,19 @@ def test_customer_sees_only_own_orders(client, api, team):
 
 
 def test_status_rules(client, api, team):
+    empty = api.product(team["manager"], "Toaster", price=500)  # nothing in stock
+    waiting = api.order(team["customer"], [(empty["id"], 1)]).json()
+    wid = waiting["id"]
+    assert client.post(f"/api/orders/{wid}/approve/", headers=team["worker"]).status_code == 403
+    assert client.post(f"/api/orders/{wid}/ship/", headers=team["worker"]).status_code == 409  # not approved yet
+
     order = api.order(team["customer"], [(team["product"]["id"], 1)]).json()
     oid = order["id"]
-    assert client.post(f"/api/orders/{oid}/approve/", headers=team["worker"]).status_code == 403
-    assert client.post(f"/api/orders/{oid}/ship/", headers=team["worker"]).status_code == 409  # not approved yet
-    assert client.post(f"/api/orders/{oid}/approve/", headers=team["manager"]).status_code == 200
-    # Customer may cancel only while PENDING
-    assert client.post(f"/api/orders/{oid}/cancel/", headers=team["customer"]).status_code == 409
-    assert client.post(f"/api/orders/{oid}/cancel/", headers=team["manager"]).json()["status"] == "CANCELLED"
+    assert order["status"] == "APPROVED"
+    # Customer may cancel until the order is shipped
+    assert client.post(f"/api/orders/{oid}/cancel/", headers=team["customer"]).json()["status"] == "CANCELLED"
     assert client.post(f"/api/orders/{oid}/ship/", headers=team["worker"]).status_code == 409
+    assert client.post(f"/api/orders/{oid}/cancel/", headers=team["manager"]).status_code == 409
 
 
 def test_reject_and_customer_cancel(client, api, team):
@@ -89,6 +98,9 @@ def test_reject_and_customer_cancel(client, api, team):
 
     b = api.order(team["customer"], [(team["product"]["id"], 1)]).json()
     assert client.post(f"/api/orders/{b['id']}/cancel/", headers=team["customer"]).json()["status"] == "CANCELLED"
+    shipped = api.order(team["customer"], [(team["product"]["id"], 1)]).json()
+    client.post(f"/api/orders/{shipped['id']}/ship/", headers=team["worker"])
+    assert client.post(f"/api/orders/{shipped['id']}/cancel/", headers=team["customer"]).status_code == 409
 
 
 def test_inactive_product_cannot_be_ordered(client, api, team):

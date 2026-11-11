@@ -17,7 +17,8 @@ class Order(Base):
         CheckConstraint("total_amount >= 0", name="chk_orders_total"),
         CheckConstraint("status <> 'SHIPPED' OR (shipped_by_id IS NOT NULL AND shipped_at IS NOT NULL)",
                         name="chk_orders_shipped_fields"),
-        CheckConstraint("status NOT IN ('APPROVED', 'SHIPPED') OR approved_by_id IS NOT NULL",
+        # approved_by is NULL when the system approved the order by itself (stock was there).
+        CheckConstraint("status NOT IN ('APPROVED', 'SHIPPED') OR approved_at IS NOT NULL",
                         name="chk_orders_approved_fields"),
         Index("ix_orders_status", "status"),
         Index("ix_orders_approved_at", "approved_at"),
@@ -33,10 +34,14 @@ class Order(Base):
     total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     comment: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = created_at_column()
-    # approved_by is set on approve AND on reject: it is "the manager who decided".
+    # approved_by is set on a manual approve AND on reject: it is "the manager who decided".
+    # NULL with approved_at set = approved automatically by the system.
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id", ondelete="RESTRICT"))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(String(255))
+    # The Worker who should pick and ship it: the least loaded one at approval time (assignment_service).
+    assigned_to_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id", ondelete="RESTRICT"), index=True)
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     shipped_by_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id", ondelete="RESTRICT"))
     shipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -44,6 +49,7 @@ class Order(Base):
     customer: Mapped[Customer] = relationship()
     approved_by: Mapped[Employee | None] = relationship(foreign_keys=[approved_by_id])
     shipped_by: Mapped[Employee | None] = relationship(foreign_keys=[shipped_by_id])
+    assigned_to: Mapped[Employee | None] = relationship(foreign_keys=[assigned_to_id])
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan", order_by="OrderItem.id"
     )

@@ -9,7 +9,7 @@ from app.core.security import hash_password
 from app.models import Account, Customer, Employee, Role, User, UserStatus
 from app.models.common import utcnow
 from app.schemas.auth import CustomerRegister, StaffRegister
-from app.services import email_service
+from app.services import assignment_service, email_service
 
 
 def _ensure_email_free(db: Session, email: str) -> None:
@@ -93,6 +93,8 @@ def approve_staff(db: Session, user: User, role: Role, manager_id: int | None, a
         manager_id=manager.id if manager else None,
     )
     db.flush()
+    if role == Role.WORKER:  # a new pair of hands: open orders are spread again
+        assignment_service.rebalance(db)
     return user
 
 
@@ -116,6 +118,8 @@ def block_user(db: Session, user: User, admin: User) -> User:
         user.employee.is_active = False
     if user.customer:
         user.customer.is_active = False
+    if user.role == Role.WORKER:  # his open orders go to the other Workers
+        assignment_service.rebalance(db)
     return user
 
 
@@ -127,6 +131,8 @@ def unblock_user(db: Session, user: User) -> User:
         user.employee.is_active = True
     if user.customer:
         user.customer.is_active = True
+    if user.role == Role.WORKER:
+        assignment_service.rebalance(db)
     return user
 
 
@@ -142,9 +148,12 @@ def change_role(db: Session, user: User, role: Role, manager_id: int | None, adm
     if manager and manager.id == employee.id:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "An employee cannot be his own manager")
 
+    was_worker = employee.role == Role.WORKER
     user.role = role
     employee.role = role
     employee.manager_id = manager.id if manager else None
+    if was_worker or role == Role.WORKER:  # the set of Workers changed
+        assignment_service.rebalance(db)
     return user
 
 

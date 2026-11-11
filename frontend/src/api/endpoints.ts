@@ -20,12 +20,14 @@ import type {
   ProductStaff,
   RestockRow,
   Role,
+  StockCheck,
   Supplier,
   TeamPerformance,
   TokenPair,
   TopCustomerRow,
   User,
   UserStatus,
+  WorkerLoad,
 } from './types'
 
 const get = <T>(url: string, params?: object) => api.get<T>(url, { params }).then((r) => r.data)
@@ -127,7 +129,8 @@ export const movementsApi = {
 
 // ---- Orders ----
 export const ordersApi = {
-  list: (status?: OrderStatus, limit = 200) => get<Order[]>('/orders/', { status, limit }),
+  list: (status?: OrderStatus, limit = 200, assigned_to?: number) =>
+    get<Order[]>('/orders/', { status, limit, assigned_to }),
   get: (id: number) => get<Order>(`/orders/${id}/`),
   create: (data: { items: { product_id: number; quantity: number }[]; delivery_address?: string; comment?: string }) =>
     post<Order>('/orders/', data),
@@ -135,6 +138,10 @@ export const ordersApi = {
   reject: (id: number, reason?: string) => post<Order>(`/orders/${id}/reject/`, { reason: reason || null }),
   ship: (id: number) => post<Order>(`/orders/${id}/ship/`),
   cancel: (id: number) => post<Order>(`/orders/${id}/cancel/`),
+  /** Checkout preview: which items would wait for a delivery and how long. */
+  check: (items: { product_id: number; quantity: number }[]) => post<StockCheck>('/orders/check/', { items }),
+  workload: () => get<WorkerLoad[]>('/orders/workload/'),
+  rebalance: () => post<{ moved: number; workload: WorkerLoad[] }>('/orders/rebalance/'),
 }
 
 // ---- Reports ----

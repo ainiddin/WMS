@@ -131,8 +131,9 @@ backend/app/
 │                      orders, order_items, stock_movements, accounts, account_transactions,
 │                      email_verifications (all CHECK / UNIQUE / RESTRICT rules)
 ├── schemas/           Pydantic request / response models
-├── services/          movement_service (record_movement), order_service, account_service
-│                      (top-up / payment / refund), user_service, email_service,
+├── services/          movement_service (record_movement), order_service (auto-approval + stock queue),
+│                      assignment_service (least loaded Worker, rebalance), eta_service (expected wait),
+│                      account_service (top-up / payment / refund), user_service, email_service,
 │                      report_service, performance_service, export_service
 ├── routers/           auth, admin, catalog, customers, movements, orders, reports, performance
 └── seed.py            first admin + demo data

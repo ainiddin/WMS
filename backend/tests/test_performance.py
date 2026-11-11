@@ -1,6 +1,6 @@
 def ship_one(client, api, team, qty=1):
     order = api.order(team["customer"], [(team["product"]["id"], qty)]).json()
-    assert client.post(f"/api/orders/{order['id']}/approve/", headers=team["manager"]).status_code == 200
+    assert order["status"] == "APPROVED"  # approved by the system, no manager needed
     assert client.post(f"/api/orders/{order['id']}/ship/", headers=team["worker"]).status_code == 200
 
 
@@ -16,13 +16,17 @@ def test_points_follow_the_formula(client, api, team):
     assert me["me"]["points"] == 2 * 10 + 1 * 1
     assert me["rank_in_team"] == 1 and me["team_size"] == 1
 
+    # Automatic approvals are nobody's points; a Manager gets points only for orders he approved by hand.
     manager = client.get("/api/performance/me/?period=week", headers=team["manager"]).json()["me"]
-    assert manager["orders_approved"] == 2
-    assert manager["points"] == 2 * 2
+    assert manager["orders_approved"] == 0
+    waiting = api.order(team["customer"], [(team["product"]["id"], 20)]).json()
+    assert waiting["status"] == "PENDING"
+    api.stock_in(team["worker"], team["product"]["id"], 30)  # the system approves it after the delivery
+    me = client.get("/api/performance/me/?period=week", headers=team["worker"]).json()
 
     board = client.get("/api/leaderboard/?period=week", headers=team["worker"]).json()["teams"]
     assert len(board) == 1
-    assert board[0]["points"] == 21 + 4
+    assert board[0]["points"] == 2 * 10 + 2 * 1
     assert board[0]["rank"] == 1
 
     timeline = me["timeline"]

@@ -15,7 +15,7 @@ import { Link as RouterLink, useLocation } from 'react-router'
 import { ordersApi } from '@/api/endpoints'
 import { ConfirmDialog, EmptyState, OrderStatusChip, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
-import { OrderItemsTable, OrderMeta, OrderProgress } from '@/components/OrderParts'
+import { OrderItemsTable, OrderMeta, OrderProgress, WaitingNotice } from '@/components/OrderParts'
 import { formatDateTime, formatMoney } from '@/format'
 
 export function MyOrdersPage() {
@@ -72,10 +72,18 @@ export function MyOrdersPage() {
                 </AccordionSummary>
                 <AccordionDetails>
                   <Stack spacing={2.5}>
+                    {order.waiting && (
+                      <WaitingNotice
+                        waiting={order.waiting}
+                        etaMin={order.eta_min_days}
+                        etaMax={order.eta_max_days}
+                        footer="The order is confirmed automatically when the goods arrive. If you cannot wait, cancel it: the money goes back to your account at once."
+                      />
+                    )}
                     <OrderProgress order={order} />
                     <OrderMeta order={order} />
                     <OrderItemsTable order={order} />
-                    {order.status === 'PENDING' && (
+                    {(order.status === 'PENDING' || order.status === 'APPROVED') && (
                       <Box>
                         <Button color="error" variant="outlined" onClick={() => setCancelId(order.id)}>
                           Cancel order
@@ -103,7 +111,7 @@ export function MyOrdersPage() {
       <ConfirmDialog
         open={cancelId !== null}
         title="Cancel this order?"
-        text="You can cancel while the order is waiting for confirmation. The money goes back to your account at once."
+        text="You can cancel until the order is shipped. The money goes back to your account at once."
         confirmLabel="Cancel order"
         color="error"
         loading={cancel.isPending}

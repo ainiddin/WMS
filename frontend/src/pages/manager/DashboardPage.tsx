@@ -50,7 +50,7 @@ export function DashboardPage() {
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
-                label="Orders to approve"
+                label="Waiting for stock"
                 value={d.cards.orders_pending}
                 hint={`${d.cards.orders_to_ship} waiting to ship`}
                 icon={<PendingActionsOutlinedIcon />}

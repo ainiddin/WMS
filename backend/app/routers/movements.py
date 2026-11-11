@@ -9,6 +9,7 @@ from app.core.deps import DB, CurrentEmployee, require_role
 from app.models import MovementType, Product, StockMovement, User
 from app.models.common import STAFF_ROLES
 from app.schemas.orders import MovementOut, StockInRequest
+from app.services import order_service
 from app.services.movement_service import record_movement
 from app.services.timeutil import local_tz
 
@@ -35,6 +36,8 @@ def stock_in(data: StockInRequest, db: DB, employee: CurrentEmployee):
         employee_id=employee.id,
         note=data.note,
     )
+    # Orders that waited for this product are approved and given to Workers in the same transaction.
+    order_service.approve_waiting(db, [product_id], movement.movement_time)
     db.commit()
     return MovementOut.from_movement(movement)
 

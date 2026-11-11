@@ -94,8 +94,17 @@ const ORDER_COLORS: Record<OrderStatus, ChipProps['color']> = {
   CANCELLED: 'default',
 }
 
+/** PENDING now only means "waiting for stock": nobody approves orders by hand. */
+export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  PENDING: 'WAITING FOR STOCK',
+  APPROVED: 'APPROVED',
+  SHIPPED: 'SHIPPED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+}
+
 export function OrderStatusChip({ status }: { status: OrderStatus }) {
-  return <Chip size="small" label={status} color={ORDER_COLORS[status]} variant="outlined" />
+  return <Chip size="small" label={ORDER_STATUS_LABEL[status]} color={ORDER_COLORS[status]} variant="outlined" />
 }
 
 const USER_COLORS: Record<UserStatus, ChipProps['color']> = {
