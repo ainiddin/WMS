@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from app.schemas.common import Name, ORMModel, Phone
+from app.schemas.common import Money, Name, ORMModel, Phone
 
 
 class CustomerOut(ORMModel):
@@ -14,6 +14,7 @@ class CustomerOut(ORMModel):
     address: str | None
     email: str | None
     is_active: bool
+    balance: Money
 
 
 class CustomerUpdateMe(BaseModel):

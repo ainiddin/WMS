@@ -47,6 +47,13 @@ class Order(Base):
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan", order_by="OrderItem.id"
     )
+    transactions: Mapped[list["AccountTransaction"]] = relationship(back_populates="order")  # noqa: F821
+
+    @property
+    def payment_status(self) -> str | None:
+        """PAID / REFUNDED for orders paid from the account; None for old orders paid on delivery."""
+        types = {t.tx_type for t in self.transactions}
+        return "REFUNDED" if "REFUND" in types else "PAID" if "PAYMENT" in types else None
 
 
 class OrderItem(Base):

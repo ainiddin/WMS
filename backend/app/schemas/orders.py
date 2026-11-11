@@ -96,6 +96,8 @@ class OrderOut(BaseModel):
     status: str
     delivery_address: str
     total_amount: Money
+    # PAID / REFUNDED (from the customer's account), None = old order paid on delivery
+    payment_status: str | None
     comment: str | None
     rejection_reason: str | None
     created_at: datetime
@@ -118,6 +120,7 @@ class OrderOut(BaseModel):
             status=order.status,
             delivery_address=order.delivery_address,
             total_amount=order.total_amount,
+            payment_status=order.payment_status,
             comment=order.comment,
             rejection_reason=order.rejection_reason,
             created_at=order.created_at,

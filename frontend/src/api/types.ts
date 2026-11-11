@@ -85,6 +85,7 @@ export interface Customer {
   address: string | null
   email: string | null
   is_active: boolean
+  balance: number
 }
 
 export interface Employee {
@@ -154,6 +155,8 @@ export interface Order {
   status: OrderStatus
   delivery_address: string
   total_amount: number
+  /** PAID / REFUNDED = paid from the customer's account; null = old order paid on delivery */
+  payment_status: 'PAID' | 'REFUNDED' | null
   comment: string | null
   rejection_reason: string | null
   created_at: string
@@ -164,6 +167,28 @@ export interface Order {
   approved_by: PersonShort | null
   shipped_by: PersonShort | null
   items: OrderItem[]
+}
+
+// ---- Customer account ----
+export type TransactionType = 'TOPUP' | 'PAYMENT' | 'REFUND'
+
+export interface AccountTransaction {
+  id: number
+  code: string
+  tx_type: TransactionType
+  amount: number
+  balance_after: number
+  order_id: number | null
+  order_code: string | null
+  note: string | null
+  created_at: string
+}
+
+export interface Account {
+  code: string
+  balance: number
+  bank: string
+  transactions: AccountTransaction[]
 }
 
 // ---- Reports / dashboard ----

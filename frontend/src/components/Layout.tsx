@@ -1,3 +1,4 @@
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined'
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
@@ -50,11 +51,11 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { adminApi, ordersApi } from '@/api/endpoints'
+import { accountApi, adminApi, ordersApi } from '@/api/endpoints'
 import type { Role } from '@/api/types'
 import { useAuth } from '@/auth/AuthContext'
 import { useCart } from '@/cart/CartContext'
-import { roleLabel } from '@/format'
+import { formatMoney, roleLabel } from '@/format'
 
 const DRAWER_WIDTH = 248
 
@@ -306,6 +307,7 @@ export function ShopLayout() {
   const { count } = useCart()
   const navigate = useNavigate()
   const isCustomer = user?.role === 'CUSTOMER'
+  const account = useQuery({ queryKey: ['account'], queryFn: accountApi.get, enabled: isCustomer })
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
@@ -320,6 +322,19 @@ export function ShopLayout() {
             <Button color="inherit" component={RouterLink} to="/my-orders" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
               My orders
             </Button>
+          )}
+          {isCustomer && account.data && (
+            <Tooltip title="My account">
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/account"
+                startIcon={<AccountBalanceWalletOutlinedIcon />}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                {formatMoney(account.data.balance)}
+              </Button>
+            </Tooltip>
           )}
           <ThemeToggle />
           <Tooltip title="Cart">
@@ -337,6 +352,12 @@ export function ShopLayout() {
                     <ReceiptLongOutlinedIcon fontSize="small" />
                   </ListItemIcon>
                   My orders
+                </MenuItem>,
+                <MenuItem key="account" onClick={() => navigate('/account')}>
+                  <ListItemIcon>
+                    <AccountBalanceWalletOutlinedIcon fontSize="small" />
+                  </ListItemIcon>
+                  My account
                 </MenuItem>,
                 <MenuItem key="profile" onClick={() => navigate('/profile')}>
                   <ListItemIcon>

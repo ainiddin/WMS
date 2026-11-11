@@ -100,13 +100,23 @@ class Api:
         assert r.status_code == 200, r.text
         return self.login(email), r.json()["employee"]["id"]
 
-    def customer(self, email: str) -> dict:
+    def customer(self, email: str, money: int = 100_000) -> dict:
+        """A signed-up customer whose account already has `money` KZT (orders are paid from it)."""
         r = self.c.post("/api/auth/register/", json={
             "email": email, "code": signup_code(self.c, email), "password": PASSWORD, "full_name": "Customer " + email.split("@")[0],
             "address": "Almaty, Abay 1",
         })
         assert r.status_code == 201, r.text
-        return {"Authorization": f"Bearer {r.json()['access_token']}"}
+        headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        if money:
+            assert self.top_up(headers, money).status_code == 201
+        return headers
+
+    def top_up(self, headers: dict, amount: int):
+        return self.c.post("/api/account/top-up/", headers=headers, json={"amount": amount})
+
+    def balance(self, headers: dict) -> float:
+        return self.c.get("/api/account/", headers=headers).json()["balance"]
 
     def product(self, headers: dict, name: str = "Kettle", price: float = 1000, min_quantity: int = 5,
                 barcode: str | None = None) -> dict:

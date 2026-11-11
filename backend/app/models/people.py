@@ -52,7 +52,12 @@ class Customer(Base):
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
 
     user: Mapped[User | None] = relationship(back_populates="customer")
+    account: Mapped["Account"] = relationship(back_populates="customer", uselist=False)  # noqa: F821
 
     @property
     def email(self) -> str | None:
         return self.user.email if self.user else None
+
+    @property
+    def balance(self):
+        return self.account.balance if self.account else 0

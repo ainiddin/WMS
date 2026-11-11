@@ -648,6 +648,7 @@ export function CustomersPage() {
                       <TableCell>Phone</TableCell>
                       <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Email</TableCell>
                       <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Address</TableCell>
+                      <TableCell align="right">Balance</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -658,6 +659,9 @@ export function CustomersPage() {
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>{c.phone}</TableCell>
                         <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{c.email}</TableCell>
                         <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{c.address}</TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          {formatMoney(c.balance)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

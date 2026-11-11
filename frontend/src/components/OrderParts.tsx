@@ -123,10 +123,17 @@ export function OrderProgress({ order }: { order: Order }) {
   )
 }
 
+const PAYMENT_LABEL = {
+  PAID: 'Paid from the KeyFive account',
+  REFUNDED: 'Refunded to the KeyFive account',
+  NONE: 'On delivery',
+}
+
 export function OrderMeta({ order, staff = false }: { order: Order; staff?: boolean }) {
   const rows: [string, string | null | undefined][] = [
     ['Customer', staff ? `${order.customer.full_name} (${order.customer.code})` : null],
     ['Delivery address', order.delivery_address],
+    ['Payment', PAYMENT_LABEL[order.payment_status ?? 'NONE']],
     ['Comment', order.comment],
     ['Approved by', staff ? order.approved_by?.full_name : null],
     ['Shipped by', staff ? order.shipped_by?.full_name : null],

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Customer, Employee, MovementType, Order, OrderItem, OrderStatus, Product
 from app.models.common import utcnow
 from app.schemas.orders import OrderCreate
+from app.services import account_service
 from app.services.movement_service import record_movement
 
 
@@ -67,6 +68,8 @@ def create_order(db: Session, customer: Customer, data: OrderCreate, at: datetim
     order.total_amount = sum((i.unit_price * i.quantity for i in order.items), Decimal("0"))
     db.add(order)
     db.flush()
+    # Paid from the customer's account at once; not enough money -> the whole order is rolled back.
+    account_service.pay_order(db, order, at)
     return order
 
 
@@ -96,6 +99,7 @@ def reject_order(db: Session, order: Order, manager: Employee, reason: str | Non
     order.approved_by_id = manager.id
     order.approved_at = at or utcnow()
     order.rejection_reason = reason
+    account_service.refund_order(db, order, order.approved_at)
     return order
 
 
@@ -129,6 +133,7 @@ def cancel_order(db: Session, order: Order, *, by_customer: bool, at: datetime |
         _require_status(order, OrderStatus.PENDING, OrderStatus.APPROVED)
     order.status = OrderStatus.CANCELLED
     order.cancelled_at = at or utcnow()
+    account_service.refund_order(db, order, order.cancelled_at)
     return order
 
 
@@ -138,4 +143,5 @@ def order_query():
         selectinload(Order.customer),
         selectinload(Order.approved_by),
         selectinload(Order.shipped_by),
+        selectinload(Order.transactions),
     )

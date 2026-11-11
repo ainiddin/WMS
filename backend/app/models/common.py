@@ -32,6 +32,12 @@ class MovementType(StrEnum):
     OUT = "OUT"
 
 
+class TransactionType(StrEnum):
+    TOPUP = "TOPUP"
+    PAYMENT = "PAYMENT"
+    REFUND = "REFUND"
+
+
 STAFF_ROLES = (Role.ADMIN, Role.MANAGER, Role.WORKER)
 
 

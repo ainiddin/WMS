@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import hash_password
-from app.models import Customer, Employee, Role, User, UserStatus
+from app.models import Account, Customer, Employee, Role, User, UserStatus
 from app.models.common import utcnow
 from app.schemas.auth import CustomerRegister, StaffRegister
 from app.services import email_service
@@ -33,7 +33,7 @@ def register_customer(db: Session, data: CustomerRegister) -> User:
         role=Role.CUSTOMER,
         status=UserStatus.ACTIVE,
     )
-    user.customer = Customer(full_name=data.full_name, phone=data.phone, address=data.address)
+    user.customer = Customer(full_name=data.full_name, phone=data.phone, address=data.address, account=Account())
     db.add(user)
     db.flush()
     return user

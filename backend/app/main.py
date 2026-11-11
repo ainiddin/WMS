@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.routers import admin, auth, catalog, customers, movements, orders, performance, reports
+from app.routers import account, admin, auth, catalog, customers, movements, orders, performance, reports
 from app.services.user_service import ensure_first_admin
 
 log = logging.getLogger("keyfive")
@@ -69,7 +69,7 @@ async def integrity_error_handler(_: Request, exc: IntegrityError):
     return JSONResponse(status_code=http_status, content=body)
 
 
-for module in (auth, admin, catalog, customers, movements, orders, reports, performance):
+for module in (auth, admin, catalog, customers, account, movements, orders, reports, performance):
     app.include_router(module.router)
 
 

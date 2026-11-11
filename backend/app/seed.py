@@ -15,7 +15,7 @@ import itertools
 import random
 import sys
 from datetime import UTC, datetime, time, timedelta
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 
 from fastapi import HTTPException
 from sqlalchemy import select, text
@@ -25,6 +25,7 @@ from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import Base, SessionLocal
 from app.models import (
+    Account,
     Category,
     Customer,
     Employee,
@@ -38,7 +39,7 @@ from app.models import (
     UserStatus,
 )
 from app.schemas.orders import OrderCreate, OrderItemIn
-from app.services import order_service
+from app.services import account_service, order_service
 from app.services.movement_service import record_movement
 from app.services.timeutil import local_tz
 from app.services.user_service import ensure_first_admin
@@ -162,6 +163,16 @@ class Simulation:
         weights = [self.activity[w.manager_id] for w in pool]
         return self.rng.choices(pool, weights)[0]
 
+    def create_order(self, customer: Customer, items: list[OrderItemIn], at: datetime, comment: str | None = None) -> Order:
+        """Orders are paid from the account, so a customer short of money first tops up from the bank."""
+        total = sum((self.db.get(Product, i.product_id).unit_price * i.quantity for i in items), Decimal("0"))
+        account = account_service.get_account(self.db, customer.id)
+        if account.balance < total:
+            needed = ((total - account.balance) / 5000).to_integral_value(ROUND_CEILING) * 5000
+            amount = max(needed, Decimal(self.rng.choice([10_000, 20_000, 30_000, 50_000, 100_000])))
+            account_service.top_up(self.db, customer, amount, at - timedelta(minutes=self.rng.randint(3, 40)))
+        return order_service.create_order(self.db, customer, OrderCreate(items=items, comment=comment), at=at)
+
     def local(self, day, hour: float) -> datetime:
         return datetime.combine(day, time(), local_tz()) + timedelta(hours=hour)
 
@@ -201,9 +212,8 @@ class Simulation:
                 continue
             at = self.now - timedelta(hours=self.rng.uniform(4, 6))
             customer = self.rng.choice(self.customers)
-            order = order_service.create_order(
-                self.db, customer, OrderCreate(items=[OrderItemIn(product_id=p.id, quantity=qty)],
-                                               comment="Bulk purchase for an office"), at=at)
+            order = self.create_order(customer, [OrderItemIn(product_id=p.id, quantity=qty)], at,
+                                      comment="Bulk purchase for an office")
             order_service.approve_order(self.db, order, manager, at + timedelta(hours=1))
             order_service.ship_order(self.db, order, self.team_worker(manager.id), at + timedelta(hours=2))
             self.stats["orders"] += 1
@@ -214,7 +224,7 @@ class Simulation:
             at = self.now - timedelta(hours=3 - i * 0.5)
             items = [OrderItemIn(product_id=p.id, quantity=self.rng.randint(1, 2))
                      for p in self.rng.sample(in_stock, self.rng.randint(1, 3))]
-            order = order_service.create_order(self.db, self.rng.choice(self.customers), OrderCreate(items=items), at=at)
+            order = self.create_order(self.rng.choice(self.customers), items, at)
             if i < 2:
                 order_service.approve_order(self.db, order, manager, at + timedelta(minutes=40))
             self.stats["orders"] += 1
@@ -236,7 +246,7 @@ class Simulation:
         picks = self.rng.sample(self.products, self.rng.choices([1, 2, 3, 4], [40, 35, 18, 7])[0])
         items = [OrderItemIn(product_id=p.id, quantity=self.rng.choices([1, 2, 3, 4], [55, 28, 12, 5])[0])
                  for p in picks]
-        order = order_service.create_order(self.db, customer, OrderCreate(items=items), at=at)
+        order = self.create_order(customer, items, at)
         self.stats["orders"] += 1
         if self.rng.random() < 0.04:
             self.schedule(at + timedelta(hours=self.rng.uniform(0.2, 3)), "customer_cancel", order.id)
@@ -326,7 +336,7 @@ def seed_demo(db: Session) -> None:
     for name, email, phone, address in CUSTOMERS:
         c_user = _user(email, name, phone, Role.CUSTOMER, UserStatus.ACTIVE, pw,
                        year_ago + timedelta(days=rng.randint(0, 60)))
-        c_user.customer = Customer(full_name=name, phone=phone, address=address)
+        c_user.customer = Customer(full_name=name, phone=phone, address=address, account=Account())
         db.add(c_user)
 
     for name, email, phone, role in PENDING_STAFF:

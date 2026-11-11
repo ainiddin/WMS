@@ -1,5 +1,6 @@
 import { api } from './client'
 import type {
+  Account,
   AdminUser,
   AllPerformance,
   Category,
@@ -100,6 +101,12 @@ export const customersApi = {
   list: (search?: string) => get<Customer[]>('/customers/', { search }),
   me: () => get<Customer>('/customers/me/'),
   updateMe: (data: Partial<Pick<Customer, 'full_name' | 'phone' | 'address'>>) => patch<Customer>('/customers/me/', data),
+}
+
+// ---- Customer account (simulated bank top-ups) ----
+export const accountApi = {
+  get: () => get<Account>('/account/'),
+  topUp: (amount: number) => post<Account>('/account/top-up/', { amount }),
 }
 
 // ---- Movements ----

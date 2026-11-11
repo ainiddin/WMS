@@ -103,7 +103,7 @@ export function MyOrdersPage() {
       <ConfirmDialog
         open={cancelId !== null}
         title="Cancel this order?"
-        text="You can cancel while the order is waiting for confirmation."
+        text="You can cancel while the order is waiting for confirmation. The money goes back to your account at once."
         confirmLabel="Cancel order"
         color="error"
         loading={cancel.isPending}

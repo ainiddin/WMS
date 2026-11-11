@@ -6,6 +6,7 @@ import { FullPageSpinner, ProtectedRoute } from '@/auth/ProtectedRoute'
 import { ShopLayout, StaffLayout } from '@/components/Layout'
 import { PendingApprovalsPage, UsersPage } from '@/pages/admin/AdminPages'
 import { ErrorPage, LoginPage, SignUpPage, StaffSignUpPage, WaitingApprovalPage } from '@/pages/auth/AuthPages'
+import { AccountPage } from '@/pages/customer/AccountPage'
 import { MyOrdersPage } from '@/pages/customer/MyOrdersPage'
 import { CartPage, CatalogPage, CheckoutPage, HomePage, ProductDetailsPage, ProfilePage } from '@/pages/customer/ShopPages'
 import { CategoriesPage, CustomersPage, ProductsPage, SuppliersPage } from '@/pages/manager/CatalogAdminPages'
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/checkout" element={only(['CUSTOMER'], <CheckoutPage />)} />
         <Route path="/my-orders" element={only(['CUSTOMER'], <MyOrdersPage />)} />
         <Route path="/profile" element={only(['CUSTOMER'], <ProfilePage />)} />
+        <Route path="/account" element={only(['CUSTOMER'], <AccountPage />)} />
       </Route>
 
       {/* Warehouse app: Admin / Manager / Worker */}

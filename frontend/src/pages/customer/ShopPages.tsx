@@ -32,6 +32,7 @@ import { MAX_LINE_QUANTITY, useCart } from '@/cart/CartContext'
 import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
 import { formatMoney, PHONE_HINT, phoneError } from '@/format'
+import { TopUpDialog, useAccount } from './AccountPage'
 import { categoryLook, ProductCard, ProductPicture } from './ProductCard'
 
 function useCategories() {
@@ -428,10 +429,14 @@ export function CheckoutPage() {
   const profile = useQuery({ queryKey: ['customers', 'me'], queryFn: customersApi.me })
   const [address, setAddress] = useState<string | null>(null)
   const [comment, setComment] = useState('')
+  const [topUpOpen, setTopUpOpen] = useState(false)
+  const account = useAccount()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const notify = useNotify()
 
+  const balance = account.data?.balance ?? 0
+  const missing = Math.max(0, total - balance)
   const shownAddress = address ?? profile.data?.address ?? ''
 
   const placeOrder = useMutation({
@@ -444,7 +449,8 @@ export function CheckoutPage() {
     onSuccess: (order) => {
       clear()
       queryClient.invalidateQueries({ queryKey: ['orders'] })
-      notify.success(`Order ${order.code} placed. Total ${formatMoney(order.total_amount)}`)
+      queryClient.invalidateQueries({ queryKey: ['account'] })
+      notify.success(`Order ${order.code} placed and paid: ${formatMoney(order.total_amount)}`)
       navigate('/my-orders', { replace: true, state: { highlight: order.id } })
     },
     onError: notify.error,
@@ -467,7 +473,10 @@ export function CheckoutPage() {
 
   return (
     <>
-      <PageHeader title="Checkout" subtitle="No payment online — you pay on delivery." />
+      <PageHeader
+        title="Checkout"
+        subtitle="Paid from your KeyFive account. If the order is rejected or cancelled, the money comes back."
+      />
       <Grid container spacing={3} component="form" onSubmit={submit}>
         <Grid size={{ xs: 12, md: 7 }}>
           <Card>
@@ -514,16 +523,45 @@ export function CheckoutPage() {
               ))}
               <Divider sx={{ my: 1.5 }} />
               <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                <Typography sx={{ fontWeight: 600 }}>Estimated total</Typography>
+                <Typography sx={{ fontWeight: 600 }}>Total</Typography>
                 <Typography sx={{ fontWeight: 600 }}>{formatMoney(total)}</Typography>
               </Stack>
-              <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 2 }} disabled={placeOrder.isPending}>
-                Place order
+              <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Account balance
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {account.data ? formatMoney(balance) : '…'}
+                </Typography>
+              </Stack>
+              {account.data && missing > 0 && (
+                <Alert
+                  severity="warning"
+                  sx={{ mt: 2 }}
+                  action={
+                    <Button color="inherit" size="small" onClick={() => setTopUpOpen(true)}>
+                      Top up
+                    </Button>
+                  }
+                >
+                  Not enough money: top up at least {formatMoney(missing)}.
+                </Alert>
+              )}
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                size="large"
+                sx={{ mt: 2 }}
+                disabled={placeOrder.isPending || !account.data || missing > 0}
+              >
+                Pay {formatMoney(total)} and place order
               </Button>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
+      <TopUpDialog open={topUpOpen} onClose={() => setTopUpOpen(false)} suggested={Math.max(100, Math.ceil(missing))} />
     </>
   )
 }
