@@ -46,3 +46,14 @@ export function phoneError(value: string): string | null {
   if (/[^\d\s()+-]/.test(value) || digits.length !== 10 || digits[0] !== '7') return `Enter a Kazakhstan number: ${PHONE_HINT}`
   return null
 }
+
+/** Same rule as the backend: EAN-13 = 13 digits, the last one is the check digit. Empty = no error (optional). */
+export function barcodeError(value: string): string | null {
+  const code = value.trim()
+  if (!code) return null
+  if (/\D/.test(code)) return 'EAN-13 has digits only'
+  if (code.length !== 13) return `EAN-13 has exactly 13 digits (now ${code.length})`
+  const total = [...code.slice(0, 12)].reduce((sum, d, i) => sum + Number(d) * (i % 2 ? 3 : 1), 0)
+  const check = (10 - (total % 10)) % 10
+  return Number(code[12]) === check ? null : `Wrong check digit: for ${code.slice(0, 12)} the last digit must be ${check}`
+}

@@ -1,11 +1,27 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, StringConstraints
 
 from app.schemas.common import Money, Name, ORMModel, Phone, PriceIn
 
-Barcode = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9A-Za-z\-]{4,32}$")]
+
+def ean13_check_digit(body12: str) -> str:
+    """Last digit of an EAN-13: digits at odd positions x1, at even positions x3, rounded up to a multiple of 10."""
+    total = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(body12))
+    return str((10 - total % 10) % 10)
+
+
+def check_ean13(value: str) -> str:
+    """A barcode must be a real EAN-13: 13 digits and a correct check digit (catches a mistyped digit)."""
+    if len(value) != 13 or not value.isdigit():
+        raise ValueError("Barcode must be EAN-13: exactly 13 digits")
+    if value[-1] != ean13_check_digit(value[:12]):
+        raise ValueError(f"Wrong EAN-13 check digit: for {value[:12]} the last digit must be {ean13_check_digit(value[:12])}")
+    return value
+
+
+Barcode = Annotated[str, StringConstraints(strip_whitespace=True), AfterValidator(check_ean13)]
 
 
 # ---- Categories ----

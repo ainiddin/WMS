@@ -68,6 +68,24 @@ def test_duplicate_barcode_is_rejected(client, api, team):
     assert r.status_code == 409
 
 
+def test_barcode_must_be_a_valid_ean13(client, team):
+    cat_id, sup_id = team["product"]["category"]["id"], team["product"]["supplier"]["id"]
+
+    def create(barcode):
+        return client.post("/api/products/", headers=team["manager"], json={
+            "product_name": "Mop", "category_id": cat_id, "supplier_id": sup_id, "unit_price": 1, "barcode": barcode,
+        })
+
+    for bad in ("123456789101b", "487000000002", "48700000000234", "ABC-123", "4870000000025"):
+        r = create(bad)
+        assert r.status_code == 422, bad
+    assert "last digit must be 9" in create("4870000000025").json()["detail"][0]["msg"]
+    assert create(" 4870000000029 ").json()["barcode"] == "4870000000029"  # spaces trimmed, check digit 9 is right
+    assert create(None).status_code == 201  # a product may have no barcode yet
+    r = client.patch(f"/api/products/{team['product']['id']}/", headers=team["manager"], json={"barcode": "1234"})
+    assert r.status_code == 422
+
+
 # ---- Rules enforced by PostgreSQL itself (same as sql/06_tests.sql) ----
 def test_db_rejects_negative_stock(db, team):
     with pytest.raises(IntegrityError, match="chk_products_quantity"):

@@ -39,6 +39,7 @@ from app.models import (
     User,
     UserStatus,
 )
+from app.schemas.catalog import ean13_check_digit
 from app.schemas.orders import OrderCreate, OrderItemIn
 from app.services import account_service, order_service
 from app.services.movement_service import record_movement
@@ -122,8 +123,7 @@ PENDING_STAFF = [
 
 
 def ean13(body12: str) -> str:
-    total = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(body12))
-    return body12 + str((10 - total % 10) % 10)
+    return body12 + ean13_check_digit(body12)
 
 
 def _user(email, full_name, phone, role, status, password_hash, created_at, requested_role=None) -> User:

@@ -154,7 +154,7 @@ def team(api):
     """A Manager with one Worker, plus a product with 10 units in stock and a customer."""
     m_headers, m_id = api.staff("manager@wms.kz", "MANAGER")
     w_headers, w_id = api.staff("worker@wms.kz", "WORKER", manager_id=m_id)
-    product = api.product(m_headers, "Kettle", price=1500, min_quantity=3, barcode="4870000000017")
+    product = api.product(m_headers, "Kettle", price=1500, min_quantity=3, barcode="4870000000012")
     assert api.stock_in(w_headers, product["id"], 10).status_code == 201
     c_headers = api.customer("buyer@mail.kz")
     return {"manager": m_headers, "manager_id": m_id, "worker": w_headers, "worker_id": w_id,

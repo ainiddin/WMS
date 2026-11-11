@@ -37,7 +37,7 @@ import { catalogApi, customersApi, downloadFile } from '@/api/endpoints'
 import type { Category, ProductInput, ProductStaff, Supplier } from '@/api/types'
 import { ConfirmDialog, EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
-import { formatMoney } from '@/format'
+import { barcodeError, formatMoney } from '@/format'
 
 function ActiveChip({ active }: { active: boolean }) {
   return active ? null : <Chip size="small" label="inactive" sx={{ ml: 1 }} />
@@ -322,7 +322,7 @@ export function ProductsPage() {
         title={editing === 'new' ? 'New product' : `Edit ${(editing as ProductStaff | null)?.code ?? ''}`}
         onClose={() => setEditing(null)}
         onSubmit={() => save.mutate()}
-        busy={save.isPending}
+        busy={save.isPending || !!barcodeError(form.barcode ?? '')}
         error={error}
       >
         <TextField label="Name" required value={form.product_name} onChange={(e) => set('product_name', e.target.value)} />
@@ -394,7 +394,9 @@ export function ProductsPage() {
               label="Barcode"
               value={form.barcode ?? ''}
               onChange={(e) => set('barcode', e.target.value)}
-              helperText="EAN-13 or any code"
+              error={!!barcodeError(form.barcode ?? '')}
+              helperText={barcodeError(form.barcode ?? '') ?? 'EAN-13, 13 digits (optional)'}
+              slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 13 } }}
             />
           </Grid>
         </Grid>
