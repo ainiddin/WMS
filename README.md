@@ -127,10 +127,12 @@ backend/app/
 ├── main.py            app, CORS, DB error handler, routers, first-admin on startup
 ├── core/              config (.env), security (JWT, bcrypt), deps (get_db, current user, require_role)
 ├── db/session.py      engine, session, Base
-├── models/            9 tables: users, categories, suppliers, products, employees, customers,
-│                      orders, order_items, stock_movements (all CHECK / UNIQUE / RESTRICT rules)
+├── models/            12 tables: users, categories, suppliers, products, employees, customers,
+│                      orders, order_items, stock_movements, accounts, account_transactions,
+│                      email_verifications (all CHECK / UNIQUE / RESTRICT rules)
 ├── schemas/           Pydantic request / response models
-├── services/          movement_service (record_movement), order_service, user_service,
+├── services/          movement_service (record_movement), order_service, account_service
+│                      (top-up / payment / refund), user_service, email_service,
 │                      report_service, performance_service, export_service
 ├── routers/           auth, admin, catalog, customers, movements, orders, reports, performance
 └── seed.py            first admin + demo data
