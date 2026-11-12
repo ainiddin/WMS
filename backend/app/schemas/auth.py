@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
 
 from app.schemas.common import Name, ORMModel, Password, Phone
 
@@ -41,6 +41,14 @@ class StaffRegister(BaseModel):
     requested_role: Literal["MANAGER", "WORKER"]
 
     _email = field_validator("email")(_normalize_email)
+
+
+class StaffLogin(BaseModel):
+    email: str
+    password: str
+    # Random secret the app made on its first start (base64url of 32 bytes) and the phone model for the Admin.
+    device_secret: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{43}$")]
+    device_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 
 class RefreshRequest(BaseModel):

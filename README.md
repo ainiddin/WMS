@@ -3,7 +3,8 @@
 Warehouse Management System for an online household-goods shop — course **Basics of Information Systems**, KBTU, autumn 2026.
 
 - `backend/` — FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL
-- `frontend/` — React + TypeScript + Vite + MUI
+- `frontend/` — the shop website for customers: React + TypeScript + Vite + MUI
+- `mobile/` — **KeyFive Staff**, the Android app for Workers, Managers and Admins: Kotlin + Jetpack Compose
 - `sql/` — schema, queries and tests from Task 9 (reference)
 
 ## Requirements
@@ -39,7 +40,7 @@ python -m app.seed --demo --reset    # wipe everything and recreate the demo
 uvicorn app.main:app --reload
 ```
 
-- API: http://localhost:8000 · Swagger: **http://localhost:8000/docs** (button *Authorize* → email + password)
+- API: http://localhost:8000 · Swagger: **http://localhost:8000/docs** (*Authorize* signs in customers only; staff get tokens from `POST /api/auth/staff/login/`)
 - The first admin `Admin001@wms.kz` is created automatically on start; its password is `ADMIN_PASSWORD` from `.env`.
 
 ### Tests
@@ -61,6 +62,8 @@ Tests use the separate `wms_test` database (`TEST_DATABASE_URL`) and wipe it on 
 | Customer | `aliya@mail.kz`, `ruslan@mail.kz`, `saule@mail.kz` … (12 in total) |
 | Pending staff | `ayan@wms.kz` (Worker), `dilnaz@wms.kz` (Manager) — waiting for admin approval |
 
+Staff logins work only in the KeyFive Staff app, and only on a phone the Admin has approved (see below).
+
 The demo year is simulated through the real services (orders → approve → ship, daily restock), so stock always
 matches the history (`/api/reports/reconciliation/`). At the end some products are below minimum and some orders
 wait in the PENDING / APPROVED queues.
@@ -76,30 +79,54 @@ npm run dev            # http://localhost:5173
 ```
 
 - `npm run build` — type-check + production build into `dist/`
-- `npm run dev:https` — HTTPS on the local network (`https://<laptop-ip>:5173`), needed for the camera barcode
-  scanner on a phone. Accept the self-signed certificate warning once. Typing the barcode always works too.
+### Pages
 
-Print barcode labels for the demo products: **Products → Barcode labels** (PDF, EAN-13).
-
-### Pages by role
-
-| Role | Pages |
-|---|---|
-| Visitor / Customer | Home, Catalog (search, category, price, in stock), Product, Cart, Checkout, My orders, Profile |
-| Worker | My performance, Leaderboard, Stock, Stock IN (scanner), Orders to ship (scan → Ship), Movement history |
-| Manager | + Dashboard, Team performance, Orders (approve / reject), Products, Categories, Suppliers, Customers, Restock list, Reports + Excel/PDF |
-| Admin | + Performance of all teams, Pending approvals (role + team), Users (role, team, block) |
-
-The React route guards only hide pages; every permission is checked again by FastAPI.
+Home, Catalog (search, category, price, in stock), Product, Cart, Checkout, My orders, My account (balance), Profile.
+The website is for customers only: `/api/auth/login/` refuses staff accounts.
 
 ```
 frontend/src/
 ├── api/          axios client (JWT + automatic refresh), endpoint functions, response types
 ├── auth/         AuthContext, ProtectedRoute
 ├── cart/         cart in localStorage
-├── components/   layouts, barcode scanner, charts, shared UI
-└── pages/        auth, customer, staff (warehouse + performance), manager, admin
+├── components/   shop layout, order parts, shared UI
+└── pages/        auth, customer
 ```
+
+## Staff app (Android, `mobile/`)
+
+Workers, Managers and Admins work only in **KeyFive Staff**. It is a separate program from the shop, so a customer
+never gets the warehouse screens, and a staff password that leaks is not enough to get in:
+
+1. The app makes a random 32-byte secret on its first start and keeps it in `EncryptedSharedPreferences`
+   (key in the Android Keystore, excluded from backups). The server stores only its SHA-256 hash (`staff_devices`).
+2. `POST /api/auth/staff/login/` needs the right password **and** an approved phone. A new phone is saved as
+   PENDING and refused; the Admin approves or blocks it in **Staff phones**. The first Admin phone is approved
+   automatically (otherwise nobody could approve anything).
+3. Staff tokens carry the phone id (`dev`). Every request checks that the phone is still approved, so blocking a
+   phone (lost, stolen, unknown request) signs it out at once. A token without a phone gives no staff access.
+4. Release builds forbid screenshots (`FLAG_SECURE`) and plain `http`.
+
+| Role | Screens |
+|---|---|
+| Worker | Orders to ship (scan every unit → Ship), Stock IN (scanner), Stock, Movement history, My performance, Leaderboard |
+| Manager | + Dashboard, Orders (approve / reject / cancel, workload, rebalance), Restock list, Reports + Excel/PDF, Products, Categories, Suppliers, Customers, My team |
+| Admin | + All teams performance, Staff requests (role + team), Staff phones, Users (role, team, block) |
+
+Build (JDK 17 and the Android SDK; Android Studio can simply open `mobile/`):
+
+```bash
+cd mobile
+gradlew assembleDebug      # app/build/outputs/apk/debug/app-debug.apk   (allows http, e.g. http://10.0.2.2:8000)
+gradlew assembleRelease    # app/build/outputs/apk/release/app-release.apk (https only, no screenshots)
+```
+
+The app talks to https://keyfive-wms.onrender.com by default; **Server** on the sign-in screen changes it
+(emulator + local backend: `http://10.0.2.2:8000`, debug build only). The barcode scanner is the Google Play
+services scanner, so the phone needs Google Play services; typing the code always works too.
+
+Install the APK only on work phones. Staff sign up in the app too (email code → request → Admin approves the
+account → first sign in → Admin approves the phone).
 
 ## Deploy (Render)
 

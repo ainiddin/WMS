@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_token
 from app.db.session import get_db
-from app.models import Customer, Employee, Role, User, UserStatus
+from app.models import Customer, DeviceStatus, Employee, Role, StaffDevice, User, UserStatus
+from app.models.common import STAFF_ROLES
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login/")
 optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login/", auto_error=False)
@@ -20,6 +21,16 @@ _credentials_error = HTTPException(
     detail="Could not validate credentials",
     headers={"WWW-Authenticate": "Bearer"},
 )
+
+
+def check_staff_device(db: Session, user: User, device_id: object) -> None:
+    """Staff tokens are bound to an approved phone. A token without one (e.g. made before a customer
+    was promoted) or from a phone the Admin has blocked stops working at once."""
+    if user.role not in STAFF_ROLES:
+        return
+    device = db.get(StaffDevice, device_id) if isinstance(device_id, int) else None
+    if device is None or device.user_id != user.id or device.status != DeviceStatus.APPROVED:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff access is allowed only from an approved phone")
 
 
 def _user_from_token(db: Session, token: str) -> User:
@@ -34,6 +45,8 @@ def _user_from_token(db: Session, token: str) -> User:
     # Checked on every request, so a BLOCKED user loses access at once, not when the token expires.
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
+    check_staff_device(db, user, payload.get("dev"))
+    user.device_id = payload.get("dev")  # not a column: lets an Admin see which phone he is on
     return user
 
 

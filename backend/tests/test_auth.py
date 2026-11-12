@@ -1,4 +1,4 @@
-from tests.conftest import ADMIN, OUTBOX, PASSWORD, last_code, signup_code
+from tests.conftest import ADMIN, OUTBOX, PASSWORD, last_code, signup_code, staff_login
 
 
 def register_staff(client, email="new@wms.kz", role="WORKER"):
@@ -12,7 +12,7 @@ def login(client, email, password=PASSWORD):
 
 
 def test_first_admin_is_created_and_can_login(client):
-    r = login(client, "Admin001@wms.kz", ADMIN[1])  # email is case-insensitive
+    r = staff_login(client, "Admin001@wms.kz", ADMIN[1])  # email is case-insensitive
     assert r.status_code == 200
     assert r.json()["user"]["role"] == "ADMIN"
     assert r.json()["user"]["employee_code"] == "E001"
@@ -23,7 +23,7 @@ def test_pending_staff_cannot_login_until_approved(client, api):
     assert r.status_code == 201
     assert r.json()["user"]["status"] == "PENDING"
 
-    r = login(client, "new@wms.kz")
+    r = staff_login(client, "new@wms.kz")
     assert r.status_code == 403
     assert r.json()["detail"] == "Account is waiting for admin approval"
 
@@ -35,7 +35,8 @@ def test_pending_staff_cannot_login_until_approved(client, api):
     assert r.json()["status"] == "ACTIVE"
     assert r.json()["employee"]["manager_id"] == manager_id
 
-    r = login(client, "second@wms.kz")
+    api.staff_login("second@wms.kz")  # the new phone is approved by the Admin too
+    r = staff_login(client, "second@wms.kz")
     assert r.status_code == 200
     assert r.json()["user"]["role"] == "WORKER"
 
@@ -48,7 +49,7 @@ def test_staff_cannot_request_admin_role(client):
 def test_rejected_user_gets_access_denied(client, api):
     user_id = register_staff(client).json()["user"]["id"]
     assert client.post(f"/api/admin/users/{user_id}/reject/", headers=api.admin).status_code == 200
-    r = login(client, "new@wms.kz")
+    r = staff_login(client, "new@wms.kz")
     assert r.status_code == 403
     assert r.json()["detail"] == "Access denied"
 
@@ -105,7 +106,7 @@ def test_only_admin_uses_admin_api(client, api):
 
 
 def test_refresh_token(client):
-    tokens = login(client, *ADMIN).json()
+    tokens = staff_login(client, *ADMIN).json()
     r = client.post("/api/auth/refresh/", json={"refresh_token": tokens["refresh_token"]})
     assert r.status_code == 200
     # An access token cannot be used as a refresh token.

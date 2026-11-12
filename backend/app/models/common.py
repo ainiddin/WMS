@@ -19,6 +19,12 @@ class UserStatus(StrEnum):
     BLOCKED = "BLOCKED"
 
 
+class DeviceStatus(StrEnum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REVOKED = "REVOKED"
+
+
 class OrderStatus(StrEnum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"

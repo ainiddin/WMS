@@ -5,20 +5,22 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
-from app.core.deps import DB, CurrentUser
+from app.core.deps import DB, CurrentUser, check_staff_device
 from app.core.security import create_token, decode_token, verify_password
 from app.models import User, UserStatus
+from app.models.common import STAFF_ROLES
 from app.schemas.auth import (
     CustomerRegister,
     RefreshRequest,
     SendCodeRequest,
+    StaffLogin,
     StaffRegister,
     StaffRegistered,
     TokenPair,
     UserOut,
 )
 from app.schemas.common import Message
-from app.services import user_service
+from app.services import device_service, user_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -29,12 +31,21 @@ STATUS_MESSAGES = {
 }
 
 
-def _tokens(user: User) -> TokenPair:
+def _tokens(user: User, device_id: int | None = None) -> TokenPair:
     return TokenPair(
-        access_token=create_token(user.id, user.role, "access"),
-        refresh_token=create_token(user.id, user.role, "refresh"),
+        access_token=create_token(user.id, user.role, "access", device_id),
+        refresh_token=create_token(user.id, user.role, "refresh", device_id),
         user=UserOut.from_user(user),
     )
+
+
+def _check_password(db: DB, email: str, password: str) -> User:
+    user = db.scalars(select(User).where(User.email == email.strip().lower())).one_or_none()
+    if user is None or not verify_password(password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password")
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, STATUS_MESSAGES[UserStatus(user.status)])
+    return user
 
 
 @router.post("/send-code/", response_model=Message)
@@ -63,14 +74,25 @@ def register_staff(data: StaffRegister, db: DB):
 
 @router.post("/login/", response_model=TokenPair)
 def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DB):
-    """OAuth2 form: `username` = email. Only ACTIVE accounts receive a token (rule 8)."""
-    email = form.username.strip().lower()
-    user = db.scalars(select(User).where(User.email == email)).one_or_none()
-    if user is None or not verify_password(form.password, user.password_hash):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password")
-    if user.status != UserStatus.ACTIVE:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, STATUS_MESSAGES[UserStatus(user.status)])
+    """Website (customers). OAuth2 form: `username` = email. Only ACTIVE accounts receive a token (rule 8).
+
+    Staff accounts are refused here: they work only in the KeyFive Staff app on an approved phone.
+    """
+    user = _check_password(db, form.username, form.password)
+    if user.role in STAFF_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff accounts sign in only in the KeyFive Staff app")
     return _tokens(user)
+
+
+@router.post("/staff/login/", response_model=TokenPair)
+def staff_login(data: StaffLogin, db: DB):
+    """KeyFive Staff app. Needs the right password AND a phone approved by an Admin (see StaffDevice)."""
+    user = _check_password(db, data.email, data.password)
+    if user.role not in STAFF_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This app is for warehouse staff only")
+    device = device_service.check_in(db, user, data.device_secret, data.device_name)
+    db.commit()
+    return _tokens(user, device.id)
 
 
 @router.post("/refresh/", response_model=TokenPair)
@@ -82,7 +104,8 @@ def refresh(data: RefreshRequest, db: DB):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token") from None
     if user is None or user.status != UserStatus.ACTIVE:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
-    return _tokens(user)
+    check_staff_device(db, user, payload.get("dev"))
+    return _tokens(user, payload.get("dev"))
 
 
 @router.get("/me/", response_model=UserOut)

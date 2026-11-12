@@ -5,9 +5,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import DB, require_role
-from app.models import Employee, Role, User, UserStatus
-from app.schemas.people import AdminUserOut, ApproveRequest, ChangeRoleRequest, EmployeeOut, TeamChangeRequest
-from app.services import user_service
+from app.models import DeviceStatus, Employee, Role, StaffDevice, User, UserStatus
+from app.schemas.people import (
+    AdminUserOut,
+    ApproveRequest,
+    ChangeRoleRequest,
+    EmployeeOut,
+    StaffDeviceOut,
+    TeamChangeRequest,
+)
+from app.services import device_service, user_service
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -90,3 +97,28 @@ def change_team(employee_id: int, data: TeamChangeRequest, db: DB, _: Admin):
     user_service.change_team(db, employee, data.manager_id)
     db.commit()
     return employee
+
+
+# ---- Staff phones ----
+@router.get("/devices/", response_model=list[StaffDeviceOut])
+def list_devices(db: DB, admin: Admin, device_status: Annotated[DeviceStatus | None, Query(alias="status")] = None):
+    """Phones staff signed in from. `?status=PENDING` = phones waiting for approval."""
+    stmt = select(StaffDevice).options(selectinload(StaffDevice.user)).order_by(StaffDevice.created_at.desc())
+    if device_status:
+        stmt = stmt.where(StaffDevice.status == device_status)
+    return [StaffDeviceOut.from_device(d, admin.device_id) for d in db.scalars(stmt)]
+
+
+@router.post("/devices/{device_id}/approve/", response_model=StaffDeviceOut)
+def approve_device(device_id: int, db: DB, admin: Admin):
+    device = device_service.approve(device_service.get_device(db, device_id), admin)
+    db.commit()
+    return StaffDeviceOut.from_device(device, admin.device_id)
+
+
+@router.post("/devices/{device_id}/revoke/", response_model=StaffDeviceOut)
+def revoke_device(device_id: int, db: DB, admin: Admin):
+    """Block a phone (lost, stolen, unknown request). Its tokens stop working at once."""
+    device = device_service.revoke(device_service.get_device(db, device_id), admin, admin.device_id)
+    db.commit()
+    return StaffDeviceOut.from_device(device, admin.device_id)

@@ -13,6 +13,8 @@ os.environ["ADMIN_PASSWORD"] = "admin-test-pass"
 os.environ["BCRYPT_ROUNDS"] = "4"  # fast hashing, tests only
 os.environ["JWT_SECRET"] = "test-secret-" + "x" * 40
 
+import base64  # noqa: E402
+import hashlib  # noqa: E402
 import re  # noqa: E402
 
 import pytest  # noqa: E402
@@ -72,6 +74,17 @@ def db():
         yield session
 
 
+def phone_secret(name: str) -> str:
+    """A fixed fake "phone" per name: the device secret the Staff app would send."""
+    return base64.urlsafe_b64encode(hashlib.sha256(name.encode()).digest()).decode().rstrip("=")
+
+
+def staff_login(client, email: str, password: str = PASSWORD, phone: str | None = None):
+    return client.post("/api/auth/staff/login/", json={
+        "email": email, "password": password, "device_secret": phone_secret(phone or email), "device_name": "Test phone",
+    })
+
+
 class Api:
     """Small helper around TestClient for building test scenarios."""
 
@@ -79,13 +92,28 @@ class Api:
         self.c = client
 
     def login(self, email: str, password: str = PASSWORD) -> dict:
+        """Website login (customers)."""
         r = self.c.post("/api/auth/login/", data={"username": email, "password": password})
+        assert r.status_code == 200, r.text
+        return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+    def staff_login(self, email: str, password: str = PASSWORD) -> dict:
+        """Staff app login. A new phone waits for the Admin, so the Admin approves it and the login is repeated."""
+        r = staff_login(self.c, email, password)
+        if r.status_code == 403 and "waiting for admin approval" in r.text:
+            pending = self.c.get("/api/admin/devices/?status=PENDING", headers=self.admin).json()
+            device = next(d for d in pending if d["user_email"] == email.lower())
+            assert self.c.post(f"/api/admin/devices/{device['id']}/approve/", headers=self.admin).status_code == 200
+            r = staff_login(self.c, email, password)
         assert r.status_code == 200, r.text
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     @property
     def admin(self) -> dict:
-        return self.login(*ADMIN)
+        # The first Admin phone is approved automatically.
+        r = staff_login(self.c, *ADMIN)
+        assert r.status_code == 200, r.text
+        return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     def staff(self, email: str, role: str, manager_id: int | None = None) -> tuple[dict, int]:
         """Register + approve a staff member. Returns (auth headers, employee id)."""
@@ -98,7 +126,7 @@ class Api:
         r = self.c.post(f"/api/admin/users/{user_id}/approve/", headers=self.admin,
                         json={"role": role, "manager_id": manager_id})
         assert r.status_code == 200, r.text
-        return self.login(email), r.json()["employee"]["id"]
+        return self.staff_login(email), r.json()["employee"]["id"]
 
     def customer(self, email: str, money: int = 100_000) -> dict:
         """A signed-up customer whose account already has `money` KZT (orders are paid from it)."""

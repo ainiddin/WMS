@@ -62,3 +62,27 @@ class AdminUserOut(ORMModel):
     created_at: datetime
     approved_at: datetime | None
     employee: EmployeeOut | None
+
+
+class StaffDeviceOut(ORMModel):
+    id: int
+    device_name: str
+    status: str
+    created_at: datetime
+    approved_at: datetime | None
+    last_seen_at: datetime | None
+    user_id: int
+    user_email: str
+    user_full_name: str
+    user_role: str
+    # True for the phone the Admin is using right now (it cannot be blocked from itself).
+    current: bool = False
+
+    @classmethod
+    def from_device(cls, device, current_device_id: int | None) -> "StaffDeviceOut":
+        return cls(
+            id=device.id, device_name=device.device_name, status=device.status, created_at=device.created_at,
+            approved_at=device.approved_at, last_seen_at=device.last_seen_at, user_id=device.user_id,
+            user_email=device.user.email, user_full_name=device.user.full_name, user_role=device.user.role,
+            current=device.id == current_device_id,
+        )
