@@ -44,6 +44,7 @@ import kz.keyfive.staff.data.TwoFactorChallenge
 import kz.keyfive.staff.data.acceptProblem
 import kz.keyfive.staff.data.digitsOnly
 import kz.keyfive.staff.data.formatWait
+import kz.keyfive.staff.data.lockMessage
 import kz.keyfive.staff.data.message
 import kz.keyfive.staff.data.newPasswordProblem
 import kz.keyfive.staff.data.retryAfterSeconds
@@ -94,10 +95,41 @@ private fun rememberNow(active: Boolean): Long {
     LaunchedEffect(active) {
         while (active) {
             now = System.currentTimeMillis()
-            delay(1000)
+            delay(250) // the shown second changes on time; the value is always read from the clock
         }
     }
     return now
+}
+
+/** A 429: when it ends (from Retry-After, received once) and the server's text. Counted down here, never polled. */
+private class Lock {
+    var until by mutableStateOf<Long?>(null)
+    var text by mutableStateOf("")
+
+    /** Takes a 429 with Retry-After and returns true; any other error returns false. */
+    fun take(error: Throwable): Boolean {
+        val seconds = retryAfterSeconds(error) ?: return false
+        until = System.currentTimeMillis() + seconds * 1000L
+        text = error.message()
+        return true
+    }
+}
+
+/** Shows the live "Try again in 8:59." while locked; returns true while it lasts. Clears itself at 0:00. */
+@Composable
+private fun LockBanner(lock: Lock): Boolean {
+    val until = lock.until ?: return false
+    val now = rememberNow(active = true)
+    val left = secondsLeft(until, 0, now)
+    LaunchedEffect(left) {
+        if (left == 0) lock.until = null // over: the banner goes away and the buttons work again
+    }
+    if (left > 0) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+            Text(lockMessage(lock.text, left), Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onTertiaryContainer)
+        }
+    }
+    return left > 0
 }
 
 @Composable
@@ -110,6 +142,7 @@ private fun Login(session: Session, initialEmail: String, openInvitation: () -> 
     var showServer by rememberSaveable { mutableStateOf(false) }
     var server by rememberSaveable { mutableStateOf(session.server) }
     var challenge by remember { mutableStateOf<TwoFactorChallenge?>(null) }
+    val lock = remember { Lock() }
 
     challenge?.let { c ->
         CodeStep(session, c, onChallenge = { challenge = it }, onRestart = { challenge = null })
@@ -121,6 +154,7 @@ private fun Login(session: Session, initialEmail: String, openInvitation: () -> 
     OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true,
         visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+    val locked = LockBanner(lock)
     error?.let { ErrorCard(it) }
     Button(
         onClick = {
@@ -135,13 +169,13 @@ private fun Login(session: Session, initialEmail: String, openInvitation: () -> 
                         challenge = step.challenge
                     }
                 } catch (e: Exception) {
-                    error = e.message() + (retryAfterSeconds(e)?.let { " (${formatWait(it)} left)" } ?: "")
+                    if (!lock.take(e)) error = e.message()
                 } finally {
                     busy = false
                 }
             }
         },
-        enabled = !busy && email.isNotBlank() && password.isNotBlank(),
+        enabled = !busy && !locked && email.isNotBlank() && password.isNotBlank(),
         modifier = Modifier.fillMaxWidth(),
     ) { Text(if (busy) "Signing in…" else "Sign in") }
 
@@ -175,6 +209,7 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
     val now = rememberNow(active = true)
     val resendIn = secondsLeft(sentAt, challenge.resendSeconds, now)
     val codeLeft = secondsLeft(sentAt, challenge.codeSeconds, now)
+    val lock = remember { Lock() }
 
     fun call(block: suspend () -> Unit) {
         busy = true
@@ -191,7 +226,8 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
                         info = message
                     }
                     message.contains("Sign in again") -> onRestart()
-                    else -> error = message + (retryAfterSeconds(e)?.let { " (${formatWait(it)} left)" } ?: "")
+                    lock.take(e) -> Unit
+                    else -> error = message
                 }
             } finally {
                 busy = false
@@ -201,13 +237,14 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
 
     Text("Enter the code", style = MaterialTheme.typography.titleLarge)
     Hint("We sent a 6-digit code to the corporate mailbox ${challenge.sentTo}. It is asked once on this phone.")
+    val locked = LockBanner(lock)
     error?.let { ErrorCard(it) }
     info?.let { Hint(it) }
     OutlinedTextField(code, { code = digitsOnly(it) }, label = { Text("Code from the email") }, singleLine = true,
         modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         supportingText = { Text(if (codeLeft > 0) "Works for ${formatWait(codeLeft)} more" else "Expired: send a new one") })
     Button(onClick = { call { session.verifyCode(challenge.challengeToken, code) } },
-        enabled = !busy && code.length == 6, modifier = Modifier.fillMaxWidth()) { Text("Sign in") }
+        enabled = !busy && !locked && code.length == 6, modifier = Modifier.fillMaxWidth()) { Text("Sign in") }
     OutlinedButton(
         onClick = {
             call {
@@ -216,7 +253,7 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
                 info = "A new code was sent. The previous one no longer works."
             }
         },
-        enabled = !busy && resendIn == 0,
+        enabled = !busy && !locked && resendIn == 0,
         modifier = Modifier.fillMaxWidth(),
     ) { Text(if (resendIn > 0) "Send again in $resendIn s" else "Send again") }
     TextButton(onClick = onRestart) { Text("Use another account") }
@@ -235,6 +272,7 @@ private fun AcceptInvitation(session: Session, done: (String) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var joined by rememberSaveable { mutableStateOf(false) }
     val problem = acceptProblem(email, code, password, repeat)
+    val lock = remember { Lock() }
 
     if (joined) {
         Text("Your account is ready", style = MaterialTheme.typography.titleLarge)
@@ -256,6 +294,7 @@ private fun AcceptInvitation(session: Session, done: (String) -> Unit) {
     OutlinedTextField(repeat, { repeat = it }, label = { Text("Repeat the password") }, singleLine = true,
         visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
     if (problem != null && (code.isNotEmpty() || password.isNotEmpty())) Hint(problem)
+    val locked = LockBanner(lock)
     error?.let { ErrorCard(it) }
     Button(
         onClick = {
@@ -268,13 +307,13 @@ private fun AcceptInvitation(session: Session, done: (String) -> Unit) {
                     repeat = ""
                     joined = true
                 } catch (e: Exception) {
-                    error = e.message() + (retryAfterSeconds(e)?.let { " (${formatWait(it)} left)" } ?: "")
+                    if (!lock.take(e)) error = e.message()
                 } finally {
                     busy = false
                 }
             }
         },
-        enabled = !busy && problem == null,
+        enabled = !busy && !locked && problem == null,
         modifier = Modifier.fillMaxWidth(),
     ) { Text("Create my account") }
 }

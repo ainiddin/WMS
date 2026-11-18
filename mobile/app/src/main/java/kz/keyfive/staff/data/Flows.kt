@@ -74,3 +74,26 @@ fun acceptProblem(email: String, code: String, password: String, repeat: String)
     repeat != password -> "The passwords do not match"
     else -> null
 }
+
+/** Exact "m:ss" (or "h:mm:ss") for a countdown in whole seconds. */
+fun formatClock(seconds: Int): String {
+    val s = max(0, seconds)
+    val h = s / 3600
+    val m = (s % 3600) / 60
+    val sec = (s % 60).toString().padStart(2, '0')
+    return if (h > 0) "$h:${m.toString().padStart(2, '0')}:$sec" else "$m:$sec"
+}
+
+private val waitBefore = Regex("^Wait \\d+ s before")
+private val tryAgain = Regex("\\s*Try again in \\d+ min\\.?\\s*$")
+
+/**
+ * A 429 text with a live time. The server says the wait only once (Retry-After); its rounded
+ * "Try again in 9 min." / "Wait 42 s ..." is replaced by the phone's own countdown.
+ */
+fun lockMessage(detail: String, secondsLeft: Int): String {
+    val clock = formatClock(secondsLeft)
+    if (waitBefore.containsMatchIn(detail)) return "A new code can be requested in $clock."
+    val what = detail.replace(tryAgain, "").trim().ifEmpty { "Too many attempts." }
+    return "$what Try again in $clock."
+}

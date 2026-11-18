@@ -147,4 +147,35 @@ class FlowsTest {
         assertEquals("The passwords do not match", acceptProblem("a@wms.kz", "123456", "password1", "password2"))
         assertNull(acceptProblem(" a@wms.kz ", "123456", "password1", "password1"))
     }
+
+    // ---- live lock countdown ----
+    @Test
+    fun `exact clock`() {
+        assertEquals("0:00", formatClock(0))
+        assertEquals("0:05", formatClock(5))
+        assertEquals("1:05", formatClock(65))
+        assertEquals("15:00", formatClock(900))
+        assertEquals("1:02:05", formatClock(3725))
+        assertEquals("0:00", formatClock(-3))
+    }
+
+    @Test
+    fun `the server rounded time is replaced by the live one`() {
+        assertEquals("Too many attempts. Try again in 14:59.", lockMessage("Too many attempts. Try again in 15 min.", 899))
+        assertEquals("Too many codes were sent to the corporate mailbox. Try again in 9:01.",
+            lockMessage("Too many codes were sent to the corporate mailbox. Try again in 9 min.", 541))
+        assertEquals("A new code can be requested in 0:42.", lockMessage("Wait 42 s before requesting a new code", 42))
+        assertEquals("Too many attempts. Try again in 0:10.", lockMessage("Try again in 3 min.", 10))
+        assertEquals("Some other limit Try again in 0:10.", lockMessage("Some other limit", 10))
+    }
+
+    @Test
+    fun `the countdown reaches zero exactly at the end`() {
+        val until = 1_000_000L
+        assertEquals("1:05", formatClock(secondsLeft(until, 0, until - 65_000)))
+        assertEquals("1:05", formatClock(secondsLeft(until, 0, until - 64_001))) // still the 65th second
+        assertEquals("1:04", formatClock(secondsLeft(until, 0, until - 64_000)))
+        assertEquals("0:01", formatClock(secondsLeft(until, 0, until - 1)))
+        assertEquals("0:00", formatClock(secondsLeft(until, 0, until)))
+    }
 }
