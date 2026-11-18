@@ -1,8 +1,20 @@
 import { api } from "./client";
 import type {
   Account,
+  AdminUser,
+  AllPerformance,
+  AuditAction,
+  AuditRow,
   Category,
   Customer,
+  DeviceStatus,
+  Employee,
+  Period,
+  Role,
+  StaffDevice,
+  TeamPerformance,
+  TwoFactorRequired,
+  UserStatus,
   Order,
   OrderStatus,
   ProductPublic,
@@ -85,4 +97,53 @@ export const ordersApi = {
   /** Checkout preview: which items would wait for a delivery and how long. */
   check: (items: { product_id: number; quantity: number }[]) =>
     post<StockCheck>("/orders/check/", { items }),
+};
+
+// ---- Admin sign in (password, then the code from the corporate mailbox) ----
+export const adminAuthApi = {
+  login: (email: string, password: string) =>
+    post<TwoFactorRequired>("/auth/admin/login/", { email, password }),
+  verify: (challenge_token: string, code: string) =>
+    post<TokenPair>("/auth/2fa/verify/", { challenge_token, code }),
+  resend: (challenge_token: string) =>
+    post<TwoFactorRequired>("/auth/2fa/resend/", { challenge_token }),
+  changePassword: (old_password: string, new_password: string) =>
+    post<TokenPair>("/auth/password/", { old_password, new_password }),
+};
+
+export interface AuditFilters {
+  action?: AuditAction;
+  user_id?: number;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const adminApi = {
+  users: (filters: { status?: UserStatus; role?: Role; search?: string } = {}) =>
+    get<AdminUser[]>("/admin/users/", filters),
+  approve: (id: number, role: "MANAGER" | "WORKER", manager_id: number | null) =>
+    post<AdminUser>(`/admin/users/${id}/approve/`, { role, manager_id }),
+  reject: (id: number) => post<AdminUser>(`/admin/users/${id}/reject/`),
+  block: (id: number) => post<AdminUser>(`/admin/users/${id}/block/`),
+  unblock: (id: number) => post<AdminUser>(`/admin/users/${id}/unblock/`),
+  clearLoginTimer: (id: number) => post<AdminUser>(`/admin/users/${id}/clear-login-timer/`),
+  changeRole: (id: number, role: Role, manager_id: number | null) =>
+    patch<AdminUser>(`/admin/users/${id}/role/`, { role, manager_id }),
+  employees: (filters: { role?: Role; manager_id?: number } = {}) =>
+    get<Employee[]>("/admin/employees/", filters),
+  changeTeam: (employeeId: number, manager_id: number) =>
+    patch<Employee>(`/admin/employees/${employeeId}/team/`, { manager_id }),
+  devices: (status?: DeviceStatus) =>
+    get<StaffDevice[]>("/admin/devices/", status ? { status } : {}),
+  approveDevice: (id: number) => post<StaffDevice>(`/admin/devices/${id}/approve/`),
+  revokeDevice: (id: number) => post<StaffDevice>(`/admin/devices/${id}/revoke/`),
+  audit: (filters: AuditFilters = {}) => get<AuditRow[]>("/admin/audit/", filters),
+};
+
+export const performanceApi = {
+  all: (period: Period) => get<AllPerformance>("/performance/all/", { period }),
+  team: (managerId: number, period: Period) =>
+    get<TeamPerformance>(`/performance/team/${managerId}/`, { period }),
 };

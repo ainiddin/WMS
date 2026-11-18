@@ -50,6 +50,11 @@ api.interceptors.request.use((config) => {
 
 /** Fired when the session cannot be restored; AuthContext listens and signs the user out. */
 export const SESSION_EXPIRED_EVENT = 'kf:session-expired'
+/** Fired when the server says the Admin password has expired (403 + X-Password-Expired). */
+export const PASSWORD_EXPIRED_EVENT = 'kf:password-expired'
+
+/** Calls that must never trigger a token refresh: they are the sign in itself. */
+const AUTH_CALLS = ['/auth/login', '/auth/refresh', '/auth/admin/login', '/auth/2fa/']
 
 let refreshing: Promise<string> | null = null
 
@@ -63,7 +68,10 @@ async function refreshAccessToken(): Promise<string> {
 
 api.interceptors.response.use(undefined, async (error: AxiosError) => {
   const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined
-  const isAuthCall = original?.url?.startsWith('/auth/login') || original?.url?.startsWith('/auth/refresh')
+  const isAuthCall = AUTH_CALLS.some((path) => original?.url?.startsWith(path))
+  if (error.response?.status === 403 && error.response.headers?.['x-password-expired']) {
+    window.dispatchEvent(new Event(PASSWORD_EXPIRED_EVENT))
+  }
   if (error.response?.status === 401 && original && !original._retried && !isAuthCall && tokens.refresh) {
     original._retried = true
     try {
@@ -79,6 +87,24 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
   }
   return Promise.reject(error)
 })
+
+/** Seconds from the Retry-After header of a 429, if any. */
+export function retryAfter(error: unknown): number | undefined {
+  if (!axios.isAxiosError(error)) return undefined
+  const value = Number(error.response?.headers?.['retry-after'])
+  return Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+/** Hard end of an Admin website session (the `web` claim of the access token), or null. */
+export function sessionEndsAt(accessToken: string | null): Date | null {
+  if (!accessToken) return null
+  try {
+    const payload = JSON.parse(atob(accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof payload.web === 'number' ? new Date(payload.web * 1000) : null
+  } catch {
+    return null
+  }
+}
 
 /** Human-readable message from a FastAPI error ({detail: string} or a validation list). */
 export function errorMessage(error: unknown): string {

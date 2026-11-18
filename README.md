@@ -79,10 +79,16 @@ npm run dev            # http://localhost:5173
 ```
 
 - `npm run build` — type-check + production build into `dist/`
+- `npm test` — unit tests (Vitest + Testing Library): Admin sign in, session, password, audit view
+
+**Admin panel:** http://localhost:5173/admin — password, then the 6-digit code from the corporate mailbox
+(`ADMIN_2FA_EMAIL`; locally without email delivery the code is in the backend log). Users (role, team, block,
+Clear timer), Staff requests, Staff phones, Performance, Audit log, Change password. The session ends after 4 hours.
+The panel is loaded only when /admin is opened, so shop visitors never download it.
 ### Pages
 
 Home, Catalog (search, category, price, in stock), Product, Cart, Checkout, My orders, My account (balance), Profile.
-The website is for customers only: `/api/auth/login/` refuses staff accounts.
+The shop is for customers: `/api/auth/login/` refuses staff accounts. The Admin has his own sign in at `/admin`.
 
 ```
 frontend/src/

@@ -1,4 +1,5 @@
-// Types of the FastAPI responses the shop uses (see backend/app/schemas). Staff types live in the Android app.
+// Types of the FastAPI responses (see backend/app/schemas): the shop and the Admin panel.
+// Manager / Worker types live in the Android app.
 
 export type Role = "ADMIN" | "MANAGER" | "WORKER" | "CUSTOMER";
 export type UserStatus = "PENDING" | "ACTIVE" | "REJECTED" | "BLOCKED";
@@ -19,6 +20,8 @@ export interface User {
   manager_id: number | null;
   customer_id: number | null;
   customer_code: string | null;
+  /** Admins only: change the password before this moment. */
+  password_expires_at: string | null;
 }
 
 export interface TokenPair {
@@ -135,4 +138,148 @@ export interface Account {
   balance: number;
   bank: string;
   transactions: AccountTransaction[];
+}
+
+// ---- Admin (website Admin panel) ----
+export type Period = "week" | "month" | "quarter" | "year";
+
+/** Answer of an Admin sign in after the right password: the code is in the corporate mailbox. */
+export interface TwoFactorRequired {
+  two_factor_required: true;
+  challenge_token: string;
+  sent_to: string;
+  code_seconds: number;
+  resend_seconds: number;
+  expires_at: string;
+}
+
+export interface Employee {
+  id: number;
+  code: string;
+  user_id: number;
+  full_name: string;
+  role: Role;
+  phone: string | null;
+  manager_id: number | null;
+  team_name: string;
+  is_active: boolean;
+}
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  role: Role;
+  status: UserStatus;
+  requested_role: Role | null;
+  created_at: string;
+  approved_at: string | null;
+  employee: Employee | null;
+  login_failures: number;
+  login_locked_seconds: number;
+}
+
+export type DeviceStatus = "PENDING" | "APPROVED" | "REVOKED";
+
+export interface StaffDevice {
+  id: number;
+  device_name: string;
+  status: DeviceStatus;
+  created_at: string;
+  approved_at: string | null;
+  last_seen_at: string | null;
+  user_id: number;
+  user_email: string;
+  user_full_name: string;
+  user_role: Role;
+  current: boolean;
+}
+
+export type AuditAction =
+  | "USER_APPROVED"
+  | "USER_REJECTED"
+  | "USER_BLOCKED"
+  | "USER_UNBLOCKED"
+  | "ROLE_CHANGED"
+  | "TEAM_CHANGED"
+  | "LOGIN_TIMER_CLEARED"
+  | "DEVICE_APPROVED"
+  | "DEVICE_REVOKED"
+  | "TWO_FACTOR_CODE_SENT"
+  | "TWO_FACTOR_FAILED"
+  | "TWO_FACTOR_PASSED"
+  | "PASSWORD_CHANGED";
+
+export interface AuditRow {
+  id: number;
+  created_at: string;
+  action: AuditAction;
+  actor_id: number | null;
+  actor_email: string | null;
+  target_user_id: number | null;
+  target_email: string | null;
+  ip: string | null;
+  details: Record<string, unknown>;
+}
+
+export interface Metrics {
+  employee_id: number;
+  code: string;
+  full_name: string;
+  role: Role;
+  manager_id: number | null;
+  is_active: boolean;
+  orders_approved: number;
+  orders_rejected: number;
+  avg_approval_hours: number | null;
+  orders_shipped: number;
+  units_shipped: number;
+  stock_in_count: number;
+  units_in: number;
+  points: number;
+  rank?: number;
+}
+
+export interface TeamSummary {
+  manager_id: number;
+  manager_code: string;
+  manager_name: string;
+  team_name: string;
+  members: number;
+  orders_shipped: number;
+  orders_approved: number;
+  stock_in_count: number;
+  units_shipped: number;
+  points: number;
+  rank: number;
+}
+
+export interface TimelinePoint {
+  date: string;
+  orders_shipped: number;
+  orders_approved: number;
+  stock_in_count: number;
+  units_shipped: number;
+  points: number;
+}
+
+interface PeriodInfo {
+  period: Period;
+  start: string;
+  end: string;
+  bucket: "day" | "week" | "month";
+}
+
+export interface TeamPerformance extends PeriodInfo {
+  team: TeamSummary | null;
+  manager: Metrics;
+  workers: Metrics[];
+  timeline: TimelinePoint[];
+}
+
+export interface AllPerformance extends PeriodInfo {
+  totals: Pick<TeamSummary, "orders_shipped" | "orders_approved" | "stock_in_count" | "units_shipped" | "points">;
+  teams: TeamSummary[];
+  timeline: TimelinePoint[];
 }

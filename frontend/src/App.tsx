@@ -1,5 +1,6 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router";
-import { ProtectedRoute } from "@/auth/ProtectedRoute";
+import { FullPageSpinner, ProtectedRoute } from "@/auth/ProtectedRoute";
 import { ShopLayout } from "@/components/Layout";
 import { ErrorPage, LoginPage, SignUpPage } from "@/pages/auth/AuthPages";
 import { AccountPage } from "@/pages/customer/AccountPage";
@@ -14,9 +15,26 @@ import {
 } from "@/pages/customer/ShopPages";
 
 /**
- * The website is the customer shop only. Admin / Manager / Worker screens live in the KeyFive Staff
- * Android app (mobile/); the API refuses staff sign in here, so a leaked staff password is useless on the site.
+ * The website is the customer shop plus the Admin panel (/admin, password + code from the corporate mailbox).
+ * Manager / Worker screens live in the KeyFive Staff Android app (mobile/); the API refuses their sign in here.
  */
+// The Admin panel is loaded only when someone opens /admin: shop visitors never download it.
+const AdminLayout = lazy(() => import("@/pages/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })));
+const AdminLoginPage = lazy(() => import("@/pages/admin/AdminLoginPage").then((m) => ({ default: m.AdminLoginPage })));
+const AuditPage = lazy(() => import("@/pages/admin/AuditPage").then((m) => ({ default: m.AuditPage })));
+const DevicesPage = lazy(() => import("@/pages/admin/DevicesPage").then((m) => ({ default: m.DevicesPage })));
+const PasswordPage = lazy(() => import("@/pages/admin/PasswordPage").then((m) => ({ default: m.PasswordPage })));
+const AdminPerformancePage = lazy(() =>
+  import("@/pages/admin/PerformancePages").then((m) => ({ default: m.AdminPerformancePage })),
+);
+const TeamPerformancePage = lazy(() =>
+  import("@/pages/admin/PerformancePages").then((m) => ({ default: m.TeamPerformancePage })),
+);
+const StaffRequestsPage = lazy(() => import("@/pages/admin/UsersPages").then((m) => ({ default: m.StaffRequestsPage })));
+const UsersPage = lazy(() => import("@/pages/admin/UsersPages").then((m) => ({ default: m.UsersPage })));
+
+const admin = (page: React.ReactNode) => <Suspense fallback={<FullPageSpinner />}>{page}</Suspense>;
+
 const customer = (page: React.ReactNode) => (
   <ProtectedRoute roles={["CUSTOMER"]}>{page}</ProtectedRoute>
 );
@@ -39,6 +57,25 @@ export default function App() {
         <Route path="/my-orders" element={customer(<MyOrdersPage />)} />
         <Route path="/profile" element={customer(<ProfilePage />)} />
         <Route path="/account" element={customer(<AccountPage />)} />
+      </Route>
+
+      {/* Admin panel: its own sign in with the email code */}
+      <Route path="/admin/login" element={admin(<AdminLoginPage />)} />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute roles={["ADMIN"]} loginPath="/admin/login">
+            {admin(<AdminLayout />)}
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={admin(<UsersPage />)} />
+        <Route path="requests" element={admin(<StaffRequestsPage />)} />
+        <Route path="devices" element={admin(<DevicesPage />)} />
+        <Route path="performance" element={admin(<AdminPerformancePage />)} />
+        <Route path="teams/:managerId" element={admin(<TeamPerformancePage />)} />
+        <Route path="audit" element={admin(<AuditPage />)} />
+        <Route path="password" element={admin(<PasswordPage />)} />
       </Route>
 
       <Route path="*" element={<ErrorPage code={404} />} />
