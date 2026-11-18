@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+
+from app.core import rate_limit
 
 from app.schemas.common import Money, Name, ORMModel, Phone
 
@@ -62,6 +64,14 @@ class AdminUserOut(ORMModel):
     created_at: datetime
     approved_at: datetime | None
     employee: EmployeeOut | None
+    # Brute-force timer (core/rate_limit.py): failed logins in the window and seconds until login is allowed again.
+    login_failures: int = 0
+    login_locked_seconds: int = 0
+
+    @model_validator(mode="after")
+    def _login_timer(self):
+        self.login_failures, self.login_locked_seconds = rate_limit.login_timer(self.email)
+        return self
 
 
 class StaffDeviceOut(ORMModel):

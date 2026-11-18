@@ -367,6 +367,9 @@ data class AdminUser(
     @SerialName("requested_role") val requestedRole: String? = null,
     @SerialName("created_at") val createdAt: String,
     val employee: Employee? = null,
+    // Wrong passwords in the last 15 min and seconds until the next login is allowed (0 = not locked).
+    @SerialName("login_failures") val loginFailures: Int = 0,
+    @SerialName("login_locked_seconds") val loginLockedSeconds: Int = 0,
 )
 
 @Serializable

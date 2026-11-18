@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.core import rate_limit
 from app.core.deps import DB, require_role
 from app.models import DeviceStatus, Employee, Role, StaffDevice, User, UserStatus
 from app.schemas.people import (
@@ -67,6 +68,15 @@ def block_user(user_id: int, db: DB, admin: Admin):
 def unblock_user(user_id: int, db: DB, _: Admin):
     user = user_service.unblock_user(db, user_service.get_user(db, user_id))
     db.commit()
+    return user
+
+
+@router.post("/users/{user_id}/clear-login-timer/", response_model=AdminUserOut)
+def clear_login_timer(user_id: int, db: DB, _: Admin):
+    """Unlock an account after too many wrong passwords: the failed-login counter of its email is cleared,
+    so the user may sign in at once instead of waiting for the timer (HTTP 429 / Retry-After)."""
+    user = user_service.get_user(db, user_id)
+    rate_limit.clear_login_timer(user.email)
     return user
 
 

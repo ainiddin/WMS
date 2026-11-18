@@ -163,6 +163,9 @@ interface Api {
     @POST("admin/users/{id}/unblock/")
     suspend fun unblockUser(@Path("id") id: Int): AdminUser
 
+    @POST("admin/users/{id}/clear-login-timer/")
+    suspend fun clearLoginTimer(@Path("id") id: Int): AdminUser
+
     @PATCH("admin/users/{id}/role/")
     suspend fun changeRole(@Path("id") id: Int, @Body body: ApproveRequest): AdminUser
 

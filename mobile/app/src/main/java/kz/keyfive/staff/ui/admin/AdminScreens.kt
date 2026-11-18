@@ -10,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -225,6 +226,14 @@ fun UsersScreen(session: Session, me: User) {
                     }
                     Hint("${roleLabel[u.role]}" + (u.employee?.takeIf { it.role != "ADMIN" }?.let { " · ${it.teamName}" } ?: "") +
                         " · signed up ${dateTime(u.createdAt)}")
+                    if (u.loginFailures > 0) {
+                        val locked = u.loginLockedSeconds > 0
+                        Text(
+                            if (locked) "Login locked: ${u.loginFailures} wrong passwords, ${(u.loginLockedSeconds + 59) / 60} min left"
+                            else "${u.loginFailures} wrong password(s) in the last 15 min",
+                            style = MaterialTheme.typography.bodySmall, color = if (locked) Red else Orange,
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (u.status == "PENDING") TextButton(onClick = { approving = u }) { Text("Approve", color = Green) }
                         if (u.status == "ACTIVE" && u.employee != null) {
@@ -234,6 +243,11 @@ fun UsersScreen(session: Session, me: User) {
                             TextButton(onClick = { blocking = u }) {
                                 Text(if (u.status == "BLOCKED") "Unblock" else "Block", color = if (u.status == "BLOCKED") Green else Red)
                             }
+                        }
+                        if (u.loginFailures > 0) {
+                            TextButton(onClick = {
+                                action.run(after = users.reload) { session.api.clearLoginTimer(u.id); "Login timer of ${u.fullName} cleared" }
+                            }, enabled = !action.busy) { Text("Clear timer") }
                         }
                     }
                 }
