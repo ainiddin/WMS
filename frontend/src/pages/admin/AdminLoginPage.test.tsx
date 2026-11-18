@@ -2,10 +2,19 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { Route } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { adminAuthApi } from '@/api/endpoints'
-import type { TwoFactorRequired } from '@/api/types'
-import { renderAt, tokenPair } from '@/test/render'
-import { AdminLoginPage } from './AdminLoginPage'
+import { adminAuthApi, staffAuthApi } from '@/api/endpoints'
+import type { TwoFactorRequired, WebLoginStarted } from '@/api/types'
+import { admin, renderAt, tokenPair } from '@/test/render'
+import { StaffLoginPage, STATUS_EVERY_MS } from './AdminLoginPage'
+
+const started: WebLoginStarted = {
+  request_token: 'web-request-token-xxxxxxxxxxxxxxxx',
+  number: 47,
+  expires_at: '2099-01-01T00:00:00Z',
+  seconds: 120,
+  phone_available: true,
+  role: 'MANAGER',
+}
 
 const challenge: TwoFactorRequired = {
   two_factor_required: true,
@@ -29,10 +38,11 @@ function apiError(status: number, detail: string, headers: Record<string, string
 }
 
 function renderLogin() {
-  return renderAt('/admin/login', (
+  return renderAt('/staff/login', (
     <>
-      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route path="/staff/login" element={<StaffLoginPage />} />
       <Route path="/admin" element={<div>ADMIN HOME</div>} />
+      <Route path="/manage" element={<div>MANAGER HOME</div>} />
     </>
   ))
 }
@@ -56,7 +66,9 @@ const codeInput = () => screen.getByLabelText(/^Code from the email/) as HTMLInp
 
 describe('AdminLoginPage', () => {
   beforeEach(() => {
-    vi.spyOn(adminAuthApi, 'login').mockResolvedValue(challenge)
+    // These tests are about the email code: an Admin with no approving phone goes straight to it.
+    vi.spyOn(staffAuthApi, 'webLogin').mockResolvedValue({ ...started, phone_available: false })
+    vi.spyOn(staffAuthApi, 'emailCode').mockResolvedValue(challenge)
   })
   afterEach(() => vi.useRealTimers())
 
@@ -64,7 +76,8 @@ describe('AdminLoginPage', () => {
     renderLogin()
     typePassword()
     expect(await screen.findByText(/c\*\*\*@keyfive\.kz/)).toBeInTheDocument()
-    expect(adminAuthApi.login).toHaveBeenCalledWith('admin001@wms.kz', 'secret-pass')
+    expect(staffAuthApi.webLogin).toHaveBeenCalledWith('admin001@wms.kz', 'secret-pass')
+    expect(staffAuthApi.emailCode).toHaveBeenCalledWith(started.request_token)
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument() // the password field is gone
   })
 
@@ -157,7 +170,7 @@ describe('AdminLoginPage', () => {
 
   it('a 429 counts down to the second in the browser and then unlocks, asking the server only once', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const login = vi.spyOn(adminAuthApi, 'login').mockRejectedValue(
+    const login = vi.spyOn(staffAuthApi, 'webLogin').mockRejectedValue(
       apiError(429, 'Too many codes were sent to the corporate mailbox. Try again in 2 min.', { 'retry-after': '65' }),
     )
     renderLogin()
@@ -197,7 +210,7 @@ describe('AdminLoginPage', () => {
   })
 
   it('a 429 without Retry-After is shown as a plain error', async () => {
-    vi.spyOn(adminAuthApi, 'login').mockRejectedValue(apiError(429, 'Too many attempts. Try again in 15 min.'))
+    vi.spyOn(staffAuthApi, 'webLogin').mockRejectedValue(apiError(429, 'Too many attempts. Try again in 15 min.'))
     renderLogin()
     typePassword()
     expect(await screen.findByText('Too many attempts. Try again in 15 min.')).toBeInTheDocument()
@@ -210,5 +223,95 @@ describe('AdminLoginPage', () => {
     await screen.findByLabelText(/^Code from the email/)
     fireEvent.click(screen.getByRole('button', { name: 'Use another account' }))
     expect((screen.getByLabelText(/password/i) as HTMLInputElement).value).toBe('')
+  })
+})
+
+describe('StaffLoginPage: confirm on the phone', () => {
+  afterEach(() => vi.useRealTimers())
+
+  async function toPhoneStep(role: 'MANAGER' | 'ADMIN' = 'MANAGER') {
+    vi.spyOn(staffAuthApi, 'webLogin').mockResolvedValue({ ...started, role })
+    renderLogin()
+    typePassword()
+    expect(await screen.findByTestId('phone-number')).toHaveTextContent('47')
+    await act(async () => {}) // let React start its effects (the polling) before time is measured
+  }
+
+  it('shows the number and asks the server only every few seconds until the phone approves', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const status = vi.spyOn(staffAuthApi, 'status')
+      .mockResolvedValueOnce({ status: 'PENDING', tokens: null })
+      .mockResolvedValueOnce({ status: 'PENDING', tokens: null })
+      .mockResolvedValue({ status: 'APPROVED', tokens: tokenPair({ ...admin, role: 'MANAGER' }) })
+    await toPhoneStep()
+    expect(screen.getByText(/tap this number/)).toBeInTheDocument()
+    expect(screen.getByRole('timer')).toHaveTextContent('2:00')
+
+    await tick(1_750)
+    expect(status).not.toHaveBeenCalled() // not hammering the server: once every 2 seconds at most
+    await tick(250)
+    expect(status).toHaveBeenCalledTimes(1)
+    await tick(2 * STATUS_EVERY_MS)
+    expect(await screen.findByText('MANAGER HOME')).toBeInTheDocument()
+    expect(status).toHaveBeenCalledTimes(3)
+    expect(status).toHaveBeenCalledWith(started.request_token)
+    expect(localStorage.getItem('kf.access')).toBeTruthy()
+
+    await tick(3 * STATUS_EVERY_MS)
+    expect(status).toHaveBeenCalledTimes(3) // stopped after the answer
+  })
+
+  it('a rejection on the phone brings back the password form with the reason', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(staffAuthApi, 'status').mockRejectedValue(apiError(403, 'The sign in was rejected on the phone'))
+    await toPhoneStep()
+    await tick(STATUS_EVERY_MS)
+    expect(await screen.findByText('The sign in was rejected on the phone')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
+    expect(screen.queryByTestId('phone-number')).toBeNull()
+  })
+
+  it('no answer in time: the wait ends here, by the browser clock', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(staffAuthApi, 'status').mockResolvedValue({ status: 'PENDING', tokens: null })
+    await toPhoneStep()
+    await tick(60_000)
+    expect(screen.getByRole('timer')).toHaveTextContent('1:00')
+    await tick(60_000)
+    expect(await screen.findByText(/No answer from the phone in time/)).toBeInTheDocument()
+    expect(screen.queryByTestId('phone-number')).toBeNull()
+  })
+
+  it('an Admin can switch to the email code without typing the password again', async () => {
+    vi.spyOn(staffAuthApi, 'status').mockResolvedValue({ status: 'PENDING', tokens: null })
+    const emailCode = vi.spyOn(staffAuthApi, 'emailCode').mockResolvedValue(challenge)
+    await toPhoneStep('ADMIN')
+    fireEvent.click(screen.getByRole('button', { name: 'Use the email code instead' }))
+    expect(await screen.findByLabelText(/^Code from the email/)).toBeInTheDocument()
+    expect(emailCode).toHaveBeenCalledWith(started.request_token)
+  })
+
+  it('a Manager has no email-code way around the phone', async () => {
+    vi.spyOn(staffAuthApi, 'status').mockResolvedValue({ status: 'PENDING', tokens: null })
+    await toPhoneStep('MANAGER')
+    expect(screen.queryByRole('button', { name: 'Use the email code instead' })).toBeNull()
+  })
+
+  it('a Manager without an approved phone is told to use the app first', async () => {
+    vi.spyOn(staffAuthApi, 'webLogin').mockRejectedValue(
+      apiError(409, 'Sign in in the KeyFive Staff app on your work phone first: website sign ins are approved there.'))
+    renderLogin()
+    typePassword()
+    expect(await screen.findByText(/KeyFive Staff app on your work phone first/)).toBeInTheDocument()
+  })
+
+  it('cancel stops waiting', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const status = vi.spyOn(staffAuthApi, 'status').mockResolvedValue({ status: 'PENDING', tokens: null })
+    await toPhoneStep()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await tick(3 * STATUS_EVERY_MS)
+    expect(status).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
   })
 })

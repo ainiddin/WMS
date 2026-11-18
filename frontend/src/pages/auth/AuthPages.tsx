@@ -269,8 +269,11 @@ export function LoginPage() {
           color="text.secondary"
           sx={{ textAlign: "center" }}
         >
-          Warehouse staff sign in and sign up only in the KeyFive Staff app on a
-          work phone.
+          Admin or Manager?{" "}
+          <Link component={RouterLink} to="/staff/login">
+            Staff sign in
+          </Link>{" "}
+          (confirmed on your work phone). Workers use only the KeyFive Staff app.
         </Typography>
       </Stack>
     </AuthCard>

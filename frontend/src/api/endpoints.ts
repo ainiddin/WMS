@@ -16,6 +16,8 @@ import type {
   StaffDevice,
   TeamPerformance,
   TwoFactorRequired,
+  WebLoginStarted,
+  WebLoginState,
   UserStatus,
   Order,
   OrderStatus,
@@ -99,6 +101,17 @@ export const ordersApi = {
   /** Checkout preview: which items would wait for a delivery and how long. */
   check: (items: { product_id: number; quantity: number }[]) =>
     post<StockCheck>("/orders/check/", { items }),
+};
+
+// ---- Staff sign in on the website (Admin, Manager): approved on the phone ----
+export const staffAuthApi = {
+  webLogin: (email: string, password: string) =>
+    post<WebLoginStarted>("/auth/web/login/", { email, password }),
+  /** Asked every few seconds while the phone has not answered. */
+  status: (request_token: string) => post<WebLoginState>("/auth/web/status/", { request_token }),
+  /** Admin without the phone at hand: the code goes to the corporate mailbox instead. */
+  emailCode: (request_token: string) =>
+    post<TwoFactorRequired>("/auth/web/email-code/", { request_token }),
 };
 
 // ---- Admin sign in (password, then the code from the corporate mailbox) ----

@@ -54,6 +54,7 @@ def test_manager_signs_in_on_the_website_by_tapping_the_number_on_his_phone(clie
     assert r.status_code == 200, r.text
     started = r.json()
     assert 10 <= started["number"] <= 99 and started["phone_available"] is True and started["role"] == "MANAGER"
+    assert started["seconds"] == settings.WEB_LOGIN_SECONDS
     assert "access_token" not in r.text
 
     assert status_of(client, started["request_token"]).json() == {"status": "PENDING", "tokens": None}

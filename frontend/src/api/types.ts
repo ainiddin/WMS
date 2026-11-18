@@ -153,6 +153,21 @@ export interface TwoFactorRequired {
   expires_at: string;
 }
 
+/** Website sign in approved on the phone: show `number`, then wait for the phone. */
+export interface WebLoginStarted {
+  request_token: string;
+  number: number;
+  expires_at: string;
+  seconds: number;
+  phone_available: boolean;
+  role: Role;
+}
+
+export interface WebLoginState {
+  status: "PENDING" | "APPROVED";
+  tokens: TokenPair | null;
+}
+
 export interface Employee {
   id: number;
   code: string;

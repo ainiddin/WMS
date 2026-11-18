@@ -12,11 +12,11 @@ def test_staff_cannot_sign_in_on_the_website(client, api):
     api.staff("w@wms.kz", "MANAGER")
     r = client.post("/api/auth/login/", data={"username": "w@wms.kz", "password": PASSWORD})
     assert r.status_code == 403
-    assert "KeyFive Staff app" in r.json()["detail"]
+    assert "Staff sign-in page" in r.json()["detail"]  # w@wms.kz is a Manager
     # The Admin has his own website sign in (with the email code), never the customer one.
     r = client.post("/api/auth/login/", data={"username": ADMIN[0], "password": ADMIN[1]})
     assert r.status_code == 403
-    assert "Admin page" in r.json()["detail"]
+    assert "Staff sign-in page" in r.json()["detail"]
     # A wrong password still says "wrong password", it does not reveal that the account is staff.
     r = client.post("/api/auth/login/", data={"username": "w@wms.kz", "password": "wrong-password"})
     assert r.status_code == 401

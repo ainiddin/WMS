@@ -1,13 +1,14 @@
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import MarkEmailReadOutlinedIcon from '@mui/icons-material/MarkEmailReadOutlined'
+import PhonelinkLockOutlinedIcon from '@mui/icons-material/PhonelinkLockOutlined'
 import { Alert, Box, Button, Card, CardContent, Link, Stack, TextField, Typography } from '@mui/material'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, Link as RouterLink, useNavigate } from 'react-router'
 import { errorMessage, retryAfter, statusOf } from '@/api/client'
-import { adminAuthApi } from '@/api/endpoints'
-import type { TwoFactorRequired } from '@/api/types'
+import { adminAuthApi, staffAuthApi } from '@/api/endpoints'
+import type { Role, TokenPair, TwoFactorRequired, WebLoginStarted } from '@/api/types'
 import { useAuth } from '@/auth/AuthContext'
-import { formatWait, lockMessage } from './parts'
+import { formatClock, formatWait, lockMessage } from './parts'
 
 /** Seconds left until `deadline` (ms), ticking once a second. */
 export function useCountdown(deadline: number | null): number {
@@ -21,16 +22,28 @@ export function useCountdown(deadline: number | null): number {
   return deadline === null ? 0 : Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
 }
 
+/** Where each role works on the website. */
+export function homeOf(role: Role | undefined): string | null {
+  if (role === 'ADMIN') return '/admin'
+  if (role === 'MANAGER') return '/manage'
+  return null
+}
+
+/** How often the browser asks whether the phone has answered (only while it waits). */
+export const STATUS_EVERY_MS = 2000
+
 /**
- * Admin sign in, two steps: the password, then the 6-digit code that the server mails ONLY to the corporate
- * mailbox. The code itself is never seen by the browser until the Admin types it.
+ * Staff sign in on the website (Admin, Manager): the password, then "Is this you?" on the approved phone, where
+ * the person taps the number shown here. An Admin can use the 6-digit code from the corporate mailbox instead.
  */
-export function AdminLoginPage() {
+export function StaffLoginPage() {
   const { user, acceptTokens } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [challenge, setChallenge] = useState<TwoFactorRequired | null>(null)
+  // Waiting for the phone: the request, and when it ends on this browser's own clock.
+  const [phone, setPhone] = useState<{ req: WebLoginStarted; until: number } | null>(null)
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -42,13 +55,55 @@ export function AdminLoginPage() {
   const resendIn = useCountdown(challenge && sentAt ? sentAt + challenge.resend_seconds * 1000 : null)
   const codeLeft = useCountdown(challenge && sentAt ? sentAt + challenge.code_seconds * 1000 : null)
   const lockLeft = useCountdown(lock?.until ?? null)
+  const phoneLeft = useCountdown(phone?.until ?? null)
 
   // The wait is over: the lock message goes away and the buttons work again.
   useEffect(() => {
     if (lock && lockLeft === 0) setLock(null)
   }, [lock, lockLeft])
 
-  if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />
+  // The latest callbacks, so the polling below restarts only for a new request (not on every countdown render).
+  const onApproved = useRef<(pair: TokenPair) => void>(() => {})
+  onApproved.current = (pair) => {
+    acceptTokens(pair)
+    navigate(homeOf(pair.user.role) ?? '/', { replace: true })
+  }
+
+  // While the phone has not answered: ask the server every STATUS_EVERY_MS. Stops as soon as there is an answer.
+  useEffect(() => {
+    if (!phone) return
+    let stopped = false
+    const id = window.setInterval(async () => {
+      try {
+        const state = await staffAuthApi.status(phone.req.request_token)
+        if (stopped || state.status !== 'APPROVED' || !state.tokens) return
+        stopped = true
+        window.clearInterval(id)
+        onApproved.current(state.tokens)
+      } catch (e) {
+        if (stopped) return
+        stopped = true
+        window.clearInterval(id)
+        setPhone(null)
+        setError(errorMessage(e))
+      }
+    }, STATUS_EVERY_MS)
+    return () => {
+      stopped = true
+      window.clearInterval(id)
+    }
+  }, [phone])
+
+  // Nobody answered on the phone in time.
+  useEffect(() => {
+    if (phone && phoneLeft === 0) {
+      setPhone(null)
+      setError('No answer from the phone in time. Sign in again.')
+    }
+  }, [phone, phoneLeft])
+
+  const home = homeOf(user?.role)
+  if (home) return <Navigate to={home} replace />
 
   const fail = (e: unknown) => {
     setInfo(null)
@@ -66,11 +121,16 @@ export function AdminLoginPage() {
     setBusy(true)
     setError(null)
     try {
-      const c = await adminAuthApi.login(email.trim(), password)
+      const req = await staffAuthApi.webLogin(email.trim(), password)
       setPassword('') // not kept in memory longer than needed
-      setChallenge(c)
-      setSentAt(Date.now())
       setInfo(null)
+      if (req.phone_available) {
+        setPhone({ req, until: Date.now() + req.seconds * 1000 })
+      } else {
+        // An Admin with no approving phone yet: straight to the email code.
+        setChallenge(await staffAuthApi.emailCode(req.request_token))
+        setSentAt(Date.now())
+      }
     } catch (err) {
       fail(err)
     } finally {
@@ -86,7 +146,7 @@ export function AdminLoginPage() {
     try {
       const pair = await adminAuthApi.verify(challenge.challenge_token, code)
       acceptTokens(pair)
-      navigate('/admin', { replace: true })
+      navigate(homeOf(pair.user.role) ?? '/', { replace: true })
     } catch (err) {
       setCode('')
       const message = errorMessage(err)
@@ -100,6 +160,23 @@ export function AdminLoginPage() {
       } else {
         fail(err)
       }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const switchToEmailCode = async () => {
+    if (!phone) return
+    setBusy(true)
+    setError(null)
+    try {
+      const c = await staffAuthApi.emailCode(phone.req.request_token)
+      setPhone(null)
+      setChallenge(c)
+      setSentAt(Date.now())
+    } catch (err) {
+      setPhone(null)
+      fail(err)
     } finally {
       setBusy(false)
     }
@@ -123,6 +200,7 @@ export function AdminLoginPage() {
 
   const restart = () => {
     setChallenge(null)
+    setPhone(null)
     setCode('')
     setError(null)
     setInfo(null)
@@ -135,16 +213,20 @@ export function AdminLoginPage() {
           <Stack spacing={1} sx={{ alignItems: 'center', mb: 3, textAlign: 'center' }}>
             {challenge ? (
               <MarkEmailReadOutlinedIcon color="primary" sx={{ fontSize: 40 }} />
+            ) : phone ? (
+              <PhonelinkLockOutlinedIcon color="primary" sx={{ fontSize: 40 }} />
             ) : (
               <AdminPanelSettingsOutlinedIcon color="primary" sx={{ fontSize: 40 }} />
             )}
             <Typography variant="h5" component="h1">
-              {challenge ? 'Enter the code' : 'KeyFive Admin'}
+              {challenge ? 'Enter the code' : phone ? 'Confirm on your phone' : 'KeyFive Staff sign in'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {challenge
                 ? `We sent a 6-digit code to the corporate mailbox ${challenge.sent_to}.`
-                : 'Sign in with your password. A code will then go to the corporate mailbox.'}
+                : phone
+                  ? 'Open KeyFive Staff on your work phone and tap this number:'
+                  : 'For Admins and Managers. After the password, you confirm the sign in on your work phone.'}
             </Typography>
           </Stack>
 
@@ -164,7 +246,27 @@ export function AdminLoginPage() {
             </Alert>
           )}
 
-          {!challenge ? (
+          {phone && !challenge ? (
+            <Stack spacing={2} sx={{ alignItems: 'center' }}>
+              <Typography
+                data-testid="phone-number"
+                sx={{ fontSize: 56, fontWeight: 700, letterSpacing: 4, fontVariantNumeric: 'tabular-nums' }}
+              >
+                {phone.req.number}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" role="timer">
+                Waiting for the phone · {formatClock(phoneLeft)}
+              </Typography>
+              {phone.req.role === 'ADMIN' && (
+                <Button onClick={switchToEmailCode} disabled={busy}>
+                  Use the email code instead
+                </Button>
+              )}
+              <Button color="inherit" size="small" onClick={restart}>
+                Cancel
+              </Button>
+            </Stack>
+          ) : !challenge ? (
             <Stack component="form" spacing={2} onSubmit={submitPassword}>
               <TextField
                 label="Email"
@@ -211,14 +313,17 @@ export function AdminLoginPage() {
           )}
 
           <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 3, textAlign: 'center' }}>
-            Not an Admin?{' '}
+            A customer?{' '}
             <Link component={RouterLink} to="/login">
               Shop sign in
             </Link>
-            . Managers and Workers use the KeyFive Staff app.
+            . Workers use only the KeyFive Staff app.
           </Typography>
         </CardContent>
       </Card>
     </Box>
   )
 }
+
+/** The old address of the Admin sign in still works. */
+export const AdminLoginPage = StaffLoginPage

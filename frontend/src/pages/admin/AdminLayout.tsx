@@ -63,7 +63,7 @@ export function AdminLayout() {
 
   const signOut = () => {
     logout()
-    navigate('/admin/login', { replace: true })
+    navigate('/staff/login', { replace: true })
   }
 
   const nav = (

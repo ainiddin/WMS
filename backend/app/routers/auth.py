@@ -127,10 +127,11 @@ def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DB, request
     Staff accounts are refused here: they work only in the KeyFive Staff app on an approved phone.
     """
     user = _check_password(db, request, form.username, form.password)
-    if user.role == Role.ADMIN:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admins sign in on the Admin page with the email code")
+    if user.role in (Role.ADMIN, Role.MANAGER):
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Admins and Managers sign in on the Staff sign-in page, confirmed on their phone")
     if user.role in STAFF_ROLES:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff accounts sign in only in the KeyFive Staff app")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Workers sign in only in the KeyFive Staff app")
     return _tokens(user)
 
 
@@ -235,7 +236,7 @@ def web_login(data: AdminLogin, db: DB, request: Request):
                                                     request.headers.get("user-agent"))
     db.commit()
     return WebLoginStarted(request_token=token, number=req.number, expires_at=req.expires_at,
-                           phone_available=has_phone, role=user.role)
+                           seconds=settings.WEB_LOGIN_SECONDS, phone_available=has_phone, role=user.role)
 
 
 @router.post("/web/status/", response_model=WebLoginState)

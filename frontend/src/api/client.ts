@@ -54,7 +54,7 @@ export const SESSION_EXPIRED_EVENT = 'kf:session-expired'
 export const PASSWORD_EXPIRED_EVENT = 'kf:password-expired'
 
 /** Calls that must never trigger a token refresh: they are the sign in itself. */
-const AUTH_CALLS = ['/auth/login', '/auth/refresh', '/auth/admin/login', '/auth/2fa/']
+const AUTH_CALLS = ['/auth/login', '/auth/refresh', '/auth/admin/login', '/auth/2fa/', '/auth/web/']
 
 let refreshing: Promise<string> | null = null
 

@@ -125,6 +125,7 @@ class WebLoginStarted(BaseModel):
     request_token: ChallengeToken
     number: int  # show it in the browser; the person taps the same number on the phone
     expires_at: datetime
+    seconds: int  # how long the phone has to answer; the browser counts down from its own clock
     phone_available: bool  # False: an Admin without an approving phone goes straight to the email code
     role: str
 

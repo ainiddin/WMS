@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes } from "react-router";
 import { FullPageSpinner, ProtectedRoute } from "@/auth/ProtectedRoute";
 import { ShopLayout } from "@/components/Layout";
 import { ErrorPage, LoginPage, SignUpPage } from "@/pages/auth/AuthPages";
@@ -20,7 +20,7 @@ import {
  */
 // The Admin panel is loaded only when someone opens /admin: shop visitors never download it.
 const AdminLayout = lazy(() => import("@/pages/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })));
-const AdminLoginPage = lazy(() => import("@/pages/admin/AdminLoginPage").then((m) => ({ default: m.AdminLoginPage })));
+const StaffLoginPage = lazy(() => import("@/pages/admin/AdminLoginPage").then((m) => ({ default: m.StaffLoginPage })));
 const AuditPage = lazy(() => import("@/pages/admin/AuditPage").then((m) => ({ default: m.AuditPage })));
 const DevicesPage = lazy(() => import("@/pages/admin/DevicesPage").then((m) => ({ default: m.DevicesPage })));
 const PasswordPage = lazy(() => import("@/pages/admin/PasswordPage").then((m) => ({ default: m.PasswordPage })));
@@ -60,11 +60,12 @@ export default function App() {
       </Route>
 
       {/* Admin panel: its own sign in with the email code */}
-      <Route path="/admin/login" element={admin(<AdminLoginPage />)} />
+      <Route path="/staff/login" element={admin(<StaffLoginPage />)} />
+      <Route path="/admin/login" element={<Navigate to="/staff/login" replace />} />
       <Route
         path="/admin"
         element={
-          <ProtectedRoute roles={["ADMIN"]} loginPath="/admin/login">
+          <ProtectedRoute roles={["ADMIN"]} loginPath="/staff/login">
             {admin(<AdminLayout />)}
           </ProtectedRoute>
         }
