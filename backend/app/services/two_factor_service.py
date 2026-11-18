@@ -157,6 +157,7 @@ def verify(db: Session, token: str, code: str, ip: str | None) -> TwoFactorChall
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             "Too many wrong codes. That code no longer works, a new code was sent.")
     challenge.used_at = now
+    rate_limit.two_factor_passed(user.email)
     if challenge.device is not None:
         challenge.device.two_factor_at = now
     audit_service.log(db, AuditAction.TWO_FACTOR_PASSED, user, user, ip, channel=challenge.channel)

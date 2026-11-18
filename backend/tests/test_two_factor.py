@@ -167,17 +167,19 @@ def test_send_again_only_once_a_minute(client, db):
 def test_at_most_three_codes_per_window_then_locked_until_cleared(client, db, api):
     phone_admin = api.admin  # a working Admin session in the app, to clear the timer later
     OUTBOX.clear()
-    token = web_login(client).json()["challenge_token"]  # code 1 (the app sign in above used up one more)
-    age_code(db, 61)
-    r = resend(client, token)  # code 3 in the window
-    assert r.status_code == 200, r.text
+    # The app sign in above entered its code, so it no longer counts: 3 unfinished codes are allowed.
+    token = web_login(client).json()["challenge_token"]  # code 1
+    for _ in range(2):  # codes 2 and 3
+        age_code(db, 61)
+        r = resend(client, token)
+        assert r.status_code == 200, r.text
     age_code(db, 61)
     r = resend(client, token)
     assert r.status_code == 429
-    assert "Too many attempts" in r.json()["detail"]
+    assert "Too many codes were sent" in r.json()["detail"]
     r = web_login(client)  # a fresh sign in does not get around it
     assert r.status_code == 429
-    assert len(OUTBOX[CORPORATE]) == 2
+    assert len(OUTBOX[CORPORATE]) == 3
 
     admin_id = client.get("/api/auth/me/", headers=phone_admin).json()["id"]
     user = next(u for u in client.get("/api/admin/users/", headers=phone_admin).json() if u["id"] == admin_id)
@@ -373,3 +375,40 @@ def test_workers_and_managers_get_no_code_in_the_app(client, api):
     OUTBOX.clear()
     assert staff_login(client, "boss@wms.kz").status_code == 200
     assert CORPORATE not in OUTBOX
+
+
+def test_signing_in_successfully_does_not_use_up_the_code_limit(client):
+    """Three right sign ins in a row, then a fourth: the right code clears the counter."""
+    for _ in range(settings.TWO_FACTOR_MAX_CODES + 2):
+        r = web_login(client)
+        assert r.status_code == 200, r.text
+        assert verify(client, r.json()["challenge_token"], last_code(CORPORATE)).status_code == 200
+
+
+def test_send_again_after_successful_sign_ins_still_works(client, db):
+    """The case from real use: two sign ins, a third one, then "Send again"."""
+    for _ in range(2):
+        r = web_login(client)
+        verify(client, r.json()["challenge_token"], last_code(CORPORATE))
+    token = web_login(client).json()["challenge_token"]
+    age_code(db, 61)
+    assert resend(client, token).status_code == 200
+
+
+def test_unfinished_sign_ins_still_hit_the_limit(client):
+    """Only a right code clears the counter: someone who knows the password but not the code is still limited."""
+    for _ in range(settings.TWO_FACTOR_MAX_CODES):
+        assert web_login(client).status_code == 200
+    r = web_login(client)
+    assert r.status_code == 429
+    assert r.json()["detail"].startswith("Too many codes were sent to the corporate mailbox.")
+    assert 0 < int(r.headers["Retry-After"]) <= settings.TWO_FACTOR_WINDOW_SECONDS
+
+
+def test_wrong_codes_never_clear_the_counter(client):
+    token = web_login(client).json()["challenge_token"]
+    code = last_code(CORPORATE)
+    verify(client, token, wrong(code))
+    web_login(client)
+    web_login(client)
+    assert web_login(client).status_code == 429

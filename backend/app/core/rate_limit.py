@@ -95,11 +95,12 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _too_many(seconds: int) -> HTTPException:
+def _too_many(seconds: int, what: str = "Too many attempts.") -> HTTPException:
+    """429 with Retry-After in seconds: the client counts down by itself, it never needs to ask again."""
     minutes = max(1, math.ceil(seconds / 60))
     return HTTPException(
         status.HTTP_429_TOO_MANY_REQUESTS,
-        f"Too many attempts. Try again in {minutes} min.",
+        f"{what} Try again in {minutes} min.",
         headers={"Retry-After": str(seconds)},
     )
 
@@ -141,7 +142,13 @@ def clear_login_timer(email: str) -> None:
 
 def check_two_factor_code(email: str) -> None:
     """Raise 429 if this account already got TWO_FACTOR_MAX_CODES codes in the window. Call BEFORE sending."""
-    _check(two_factor_codes_by_email, email.strip().lower())
+    _check(two_factor_codes_by_email, email.strip().lower(), "Too many codes were sent to the corporate mailbox.")
+
+
+def two_factor_passed(email: str) -> None:
+    """A right code proves it is the real Admin: his sent codes stop counting (like a right password clears the
+    wrong-password counter). Guessing stays limited: wrong codes never reach this."""
+    two_factor_codes_by_email.reset(email.strip().lower())
 
 
 def two_factor_code_sent(email: str) -> None:
@@ -149,12 +156,12 @@ def two_factor_code_sent(email: str) -> None:
         two_factor_codes_by_email.hit(email.strip().lower())
 
 
-def _check(limiter: SlidingWindowLimiter, ip: str) -> None:
+def _check(limiter: SlidingWindowLimiter, key: str, what: str = "Too many attempts.") -> None:
     if not settings.RATE_LIMIT_ENABLED:
         return
-    wait = limiter.retry_after(ip)
+    wait = limiter.retry_after(key)
     if wait:
-        raise _too_many(wait)
+        raise _too_many(wait, what)
 
 
 def check_signup(ip: str) -> None:
