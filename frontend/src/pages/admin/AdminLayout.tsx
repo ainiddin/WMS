@@ -5,6 +5,15 @@ import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline'
 import PhoneAndroidOutlinedIcon from '@mui/icons-material/PhoneAndroidOutlined'
+import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
+import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined'
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined'
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
+import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined'
+import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined'
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import {
   AppBar,
@@ -21,14 +30,21 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { PASSWORD_EXPIRED_EVENT, sessionEndsAt, tokens } from '@/api/client'
 import { useAuth } from '@/auth/AuthContext'
 import { ThemeToggle } from '@/components/Layout'
 import { formatDateTime } from '@/format'
 
-const NAV = [
+export interface NavItem {
+  to: string
+  label: string
+  icon: ReactNode
+  end?: boolean
+}
+
+export const ADMIN_NAV: NavItem[] = [
   { to: '/admin', label: 'Users', icon: <PeopleOutlineIcon />, end: true },
   { to: '/admin/invitations', label: 'Invitations', icon: <ForwardToInboxOutlinedIcon /> },
   { to: '/admin/devices', label: 'Staff phones', icon: <PhoneAndroidOutlinedIcon /> },
@@ -37,14 +53,38 @@ const NAV = [
   { to: '/admin/password', label: 'Change password', icon: <KeyOutlinedIcon /> },
 ]
 
+/** The Manager's desk work. Scanning screens (Stock IN, shipping) stay in the phone app. */
+export const MANAGER_NAV: NavItem[] = [
+  { to: '/manage', label: 'Dashboard', icon: <DashboardOutlinedIcon />, end: true },
+  { to: '/manage/orders', label: 'Orders', icon: <ShoppingCartOutlinedIcon /> },
+  { to: '/manage/restock', label: 'Restock list', icon: <ReportProblemOutlinedIcon /> },
+  { to: '/manage/reports', label: 'Reports', icon: <AssessmentOutlinedIcon /> },
+  { to: '/manage/products', label: 'Products', icon: <Inventory2OutlinedIcon /> },
+  { to: '/manage/categories', label: 'Categories', icon: <CategoryOutlinedIcon /> },
+  { to: '/manage/suppliers', label: 'Suppliers', icon: <StorefrontOutlinedIcon /> },
+  { to: '/manage/customers', label: 'Customers', icon: <PeopleAltOutlinedIcon /> },
+  { to: '/manage/team', label: 'My team', icon: <GroupsOutlinedIcon /> },
+  { to: '/manage/invitations', label: 'Invitations', icon: <ForwardToInboxOutlinedIcon /> },
+  { to: '/manage/performance', label: 'Team performance', icon: <EmojiEventsOutlinedIcon /> },
+  { to: '/manage/password', label: 'Change password', icon: <KeyOutlinedIcon /> },
+]
+
 const DRAWER = 240
 
 export function passwordExpired(expiresAt: string | null | undefined): boolean {
   return Boolean(expiresAt && new Date(expiresAt).getTime() <= Date.now())
 }
 
-/** Admin panel frame. Only Admins get here (AdminRoute); the server checks every call anyway. */
 export function AdminLayout() {
+  return <StaffLayout title="KeyFive Admin" nav={ADMIN_NAV} passwordPath="/admin/password" />
+}
+
+export function ManagerLayout() {
+  return <StaffLayout title="KeyFive Manager" nav={MANAGER_NAV} passwordPath="/manage/password" />
+}
+
+/** Website frame for staff. Only the right role gets here (ProtectedRoute); the server checks every call anyway. */
+export function StaffLayout({ title, nav: items, passwordPath }: { title: string; nav: NavItem[]; passwordPath: string }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -52,13 +92,13 @@ export function AdminLayout() {
   const endsAt = sessionEndsAt(tokens.access)
 
   useEffect(() => {
-    const onExpired = () => navigate('/admin/password', { replace: true })
+    const onExpired = () => navigate(passwordPath, { replace: true })
     window.addEventListener(PASSWORD_EXPIRED_EVENT, onExpired)
     return () => window.removeEventListener(PASSWORD_EXPIRED_EVENT, onExpired)
-  }, [navigate])
+  }, [navigate, passwordPath])
 
-  if (passwordExpired(user?.password_expires_at) && location.pathname !== '/admin/password') {
-    return <Navigate to="/admin/password" replace />
+  if (passwordExpired(user?.password_expires_at) && location.pathname !== passwordPath) {
+    return <Navigate to={passwordPath} replace />
   }
 
   const signOut = () => {
@@ -68,7 +108,7 @@ export function AdminLayout() {
 
   const nav = (
     <List sx={{ pt: 1 }}>
-      {NAV.map((item) => (
+      {items.map((item) => (
         <ListItemButton
           key={item.to}
           component={NavLink}
@@ -92,10 +132,10 @@ export function AdminLayout() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontSize: '1.1rem' }}>
-            KeyFive Admin
+            {title}
           </Typography>
           {endsAt && (
-            <Tooltip title="Website Admin sessions end after 4 hours; then sign in again with the email code.">
+            <Tooltip title="Website sessions end after 4 hours; then sign in again.">
               <Chip size="small" variant="outlined" label={`Session until ${formatDateTime(endsAt.toISOString())}`} sx={{ display: { xs: 'none', sm: 'flex' } }} />
             </Tooltip>
           )}

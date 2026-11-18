@@ -1,5 +1,6 @@
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
   Alert,
   AlertTitle,
@@ -14,14 +15,15 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import type { ReactNode } from "react";
 import type { Order, WaitingLine } from "@/api/types";
 import { formatDateTime, formatMoney } from "@/format";
 
-/** Order lines with prices and the total. */
-export function OrderItemsTable({ order }: { order: Order }) {
+/** Order lines with prices and the total. Staff (Manager panel) also see the stock, so shortages show up. */
+export function OrderItemsTable({ order, showStock = false }: { order: Order; showStock?: boolean }) {
   return (
     <TableContainer>
       <Table size="small">
@@ -29,12 +31,16 @@ export function OrderItemsTable({ order }: { order: Order }) {
           <TableRow>
             <TableCell>Product</TableCell>
             <TableCell align="right">Qty</TableCell>
+            {showStock && <TableCell align="right">In stock</TableCell>}
             <TableCell align="right">Price</TableCell>
             <TableCell align="right">Sum</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {order.items.map((item) => (
+          {order.items.map((item) => {
+            const short =
+              showStock && item.available_quantity !== null && item.available_quantity < item.quantity;
+            return (
             <TableRow key={item.id}>
               <TableCell>
                 <Typography variant="body2">{item.product_name}</Typography>
@@ -44,6 +50,16 @@ export function OrderItemsTable({ order }: { order: Order }) {
                 </Typography>
               </TableCell>
               <TableCell align="right">{item.quantity}</TableCell>
+              {showStock && (
+                <TableCell align="right" sx={{ color: short ? "error.main" : undefined, whiteSpace: "nowrap" }}>
+                  {short && (
+                    <Tooltip title="Not enough stock">
+                      <WarningAmberIcon fontSize="inherit" sx={{ mr: 0.5, verticalAlign: "middle" }} />
+                    </Tooltip>
+                  )}
+                  {item.available_quantity}
+                </TableCell>
+              )}
               <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                 {formatMoney(item.unit_price)}
               </TableCell>
@@ -51,9 +67,10 @@ export function OrderItemsTable({ order }: { order: Order }) {
                 {formatMoney(item.line_total)}
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
           <TableRow>
-            <TableCell colSpan={3} sx={{ fontWeight: 600, borderBottom: 0 }}>
+            <TableCell colSpan={showStock ? 4 : 3} sx={{ fontWeight: 600, borderBottom: 0 }}>
               Total
             </TableCell>
             <TableCell
@@ -160,11 +177,16 @@ const PAYMENT_LABEL = {
   NONE: "On delivery",
 };
 
-export function OrderMeta({ order }: { order: Order }) {
+/** `staff`: the Manager panel also shows who ordered, approved, picks and shipped it. */
+export function OrderMeta({ order, staff = false }: { order: Order; staff?: boolean }) {
   const rows: [string, string | null | undefined][] = [
+    ["Customer", staff ? `${order.customer.full_name} (${order.customer.code})` : null],
     ["Delivery address", order.delivery_address],
     ["Payment", PAYMENT_LABEL[order.payment_status ?? "NONE"]],
     ["Comment", order.comment],
+    ["Approved by", staff && order.approved_at ? (order.approved_by?.full_name ?? "System (automatic)") : null],
+    ["Assigned to", staff && order.status === "APPROVED" ? (order.assigned_to?.full_name ?? "Nobody yet (no active Workers)") : null],
+    ["Shipped by", staff ? order.shipped_by?.full_name : null],
   ];
   return (
     <Stack spacing={0.5}>

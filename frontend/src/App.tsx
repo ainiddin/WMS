@@ -15,8 +15,8 @@ import {
 } from "@/pages/customer/ShopPages";
 
 /**
- * The website is the customer shop plus the Admin panel (/admin, password + code from the corporate mailbox).
- * Manager / Worker screens live in the KeyFive Staff Android app (mobile/); the API refuses their sign in here.
+ * The website: the customer shop, the Admin panel (/admin) and the Manager panel (/manage). Admins and Managers
+ * sign in at /staff/login and confirm on their work phone. Workers use only the KeyFive Staff Android app.
  */
 // The Admin panel is loaded only when someone opens /admin: shop visitors never download it.
 const AdminLayout = lazy(() => import("@/pages/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })));
@@ -32,6 +32,18 @@ const TeamPerformancePage = lazy(() =>
 );
 const InvitationsPage = lazy(() => import("@/pages/admin/InvitationsPage").then((m) => ({ default: m.InvitationsPage })));
 const UsersPage = lazy(() => import("@/pages/admin/UsersPages").then((m) => ({ default: m.UsersPage })));
+
+const ManagerLayout = lazy(() => import("@/pages/admin/AdminLayout").then((m) => ({ default: m.ManagerLayout })));
+const DashboardPage = lazy(() => import("@/pages/manager/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const OrdersPage = lazy(() => import("@/pages/manager/OrdersPage").then((m) => ({ default: m.OrdersPage })));
+const RestockPage = lazy(() => import("@/pages/manager/ReportsPages").then((m) => ({ default: m.RestockPage })));
+const ReportsPage = lazy(() => import("@/pages/manager/ReportsPages").then((m) => ({ default: m.ReportsPage })));
+const ProductsPage = lazy(() => import("@/pages/manager/CatalogAdminPages").then((m) => ({ default: m.ProductsPage })));
+const CategoriesPage = lazy(() => import("@/pages/manager/CatalogAdminPages").then((m) => ({ default: m.CategoriesPage })));
+const SuppliersPage = lazy(() => import("@/pages/manager/CatalogAdminPages").then((m) => ({ default: m.SuppliersPage })));
+const CustomersPage = lazy(() => import("@/pages/manager/CatalogAdminPages").then((m) => ({ default: m.CustomersPage })));
+const TeamPage = lazy(() => import("@/pages/manager/TeamPages").then((m) => ({ default: m.TeamPage })));
+const ManagerInvitationsPage = lazy(() => import("@/pages/manager/TeamPages").then((m) => ({ default: m.ManagerInvitationsPage })));
 
 const admin = (page: React.ReactNode) => <Suspense fallback={<FullPageSpinner />}>{page}</Suspense>;
 
@@ -76,6 +88,29 @@ export default function App() {
         <Route path="performance" element={admin(<AdminPerformancePage />)} />
         <Route path="teams/:managerId" element={admin(<TeamPerformancePage />)} />
         <Route path="audit" element={admin(<AuditPage />)} />
+        <Route path="password" element={admin(<PasswordPage />)} />
+      </Route>
+
+      {/* Manager panel: signed in with the password, confirmed on his work phone */}
+      <Route
+        path="/manage"
+        element={
+          <ProtectedRoute roles={["MANAGER"]} loginPath="/staff/login">
+            {admin(<ManagerLayout />)}
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={admin(<DashboardPage />)} />
+        <Route path="orders" element={admin(<OrdersPage />)} />
+        <Route path="restock" element={admin(<RestockPage />)} />
+        <Route path="reports" element={admin(<ReportsPage />)} />
+        <Route path="products" element={admin(<ProductsPage />)} />
+        <Route path="categories" element={admin(<CategoriesPage />)} />
+        <Route path="suppliers" element={admin(<SuppliersPage />)} />
+        <Route path="customers" element={admin(<CustomersPage />)} />
+        <Route path="team" element={admin(<TeamPage />)} />
+        <Route path="invitations" element={admin(<ManagerInvitationsPage />)} />
+        <Route path="performance" element={admin(<TeamPerformancePage />)} />
         <Route path="password" element={admin(<PasswordPage />)} />
       </Route>
 

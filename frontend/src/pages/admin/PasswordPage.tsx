@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/common'
 import { useNotify } from '@/components/Notify'
 import { formatDate } from '@/format'
 import { passwordExpired } from './AdminLayout'
+import { homeOf } from './AdminLoginPage'
 
 /** Change the Admin password. Required every 180 days; the new one must differ from the previous. */
 export function PasswordPage() {
@@ -36,7 +37,7 @@ export function PasswordPage() {
       setNext('')
       setRepeat('')
       notify.success('Password changed. Other sessions were signed out.')
-      navigate('/admin', { replace: true })
+      navigate(homeOf(pair.user.role) ?? '/', { replace: true })
     } catch (err) {
       setError(errorMessage(err))
     } finally {

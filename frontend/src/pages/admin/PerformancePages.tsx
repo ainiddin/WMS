@@ -238,7 +238,7 @@ export function TeamPerformancePage() {
 
   return (
     <>
-      {params.managerId && (
+      {params.managerId && user?.role === 'ADMIN' && (
         <Button component={RouterLink} to="/admin/performance" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>
           All teams
         </Button>
