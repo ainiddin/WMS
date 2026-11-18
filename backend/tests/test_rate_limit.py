@@ -93,11 +93,10 @@ def test_signups_are_limited_per_ip(client, monkeypatch):
             "full_name": "Spam", "address": "Almaty",
         })
         assert r.status_code == 201, r.text
-    r = client.post("/api/auth/register-staff/", json={
-        "email": "spam-staff@wms.kz", "code": signup_code(client, "spam-staff@wms.kz"), "password": PASSWORD,
-        "full_name": "Spam", "requested_role": "WORKER",
+    r = client.post("/api/auth/register/", json={
+        "email": "one-more@mail.kz", "code": "000000", "password": PASSWORD, "full_name": "Spam", "address": "Almaty",
     })
-    assert r.status_code == 429
+    assert r.status_code == 429  # refused before the code is even checked
 
 
 def test_one_ip_cannot_mail_codes_to_many_addresses(client):

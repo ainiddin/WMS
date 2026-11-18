@@ -1,4 +1,4 @@
-"""Accounts: sign up, admin approval, roles and teams."""
+"""Accounts: customer sign up, roles and teams. Staff join by invitation (invitation_service)."""
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.security import hash_password, verify_password
 from app.models import Account, Customer, Employee, Role, User, UserStatus
 from app.models.common import utcnow, utcnow_seconds
-from app.schemas.auth import CustomerRegister, StaffRegister
+from app.schemas.auth import CustomerRegister
 from app.services import assignment_service, email_service
 
 
@@ -36,24 +36,6 @@ def register_customer(db: Session, data: CustomerRegister) -> User:
         status=UserStatus.ACTIVE,
     )
     user.customer = Customer(full_name=data.full_name, phone=data.phone, address=data.address, account=Account())
-    db.add(user)
-    db.flush()
-    return user
-
-
-def register_staff(db: Session, data: StaffRegister) -> User:
-    _ensure_email_free(db, data.email)
-    email_service.check_code(db, data.email, data.code)
-    user = User(
-        email=data.email,
-        password_hash=hash_password(data.password),
-        full_name=data.full_name,
-        phone=data.phone,
-        # The final role is set by the Admin on approval; until then the account cannot log in.
-        role=data.requested_role,
-        requested_role=data.requested_role,
-        status=UserStatus.PENDING,
-    )
     db.add(user)
     db.flush()
     return user

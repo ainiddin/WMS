@@ -209,7 +209,12 @@ export type AuditAction =
   | "TWO_FACTOR_CODE_SENT"
   | "TWO_FACTOR_FAILED"
   | "TWO_FACTOR_PASSED"
-  | "PASSWORD_CHANGED";
+  | "PASSWORD_CHANGED"
+  | "INVITE_SENT"
+  | "INVITE_RESENT"
+  | "INVITE_REVOKED"
+  | "INVITE_ACCEPTED"
+  | "INVITE_CODE_FAILED";
 
 export interface AuditRow {
   id: number;
@@ -282,4 +287,23 @@ export interface AllPerformance extends PeriodInfo {
   totals: Pick<TeamSummary, "orders_shipped" | "orders_approved" | "stock_in_count" | "units_shipped" | "points">;
   teams: TeamSummary[];
   timeline: TimelinePoint[];
+}
+
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+
+export interface Invitation {
+  id: number;
+  email: string;
+  full_name: string;
+  role: "WORKER" | "MANAGER";
+  status: InvitationStatus;
+  team_manager_id: number | null;
+  team_name: string | null;
+  invited_by_id: number;
+  invited_by_email: string;
+  created_at: string;
+  code_sent_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
 }

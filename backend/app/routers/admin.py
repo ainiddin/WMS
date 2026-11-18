@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core import rate_limit
 from app.core.deps import DB, ClientIP, require_role
-from app.models import AuditAction, AuditLog, DeviceStatus, Employee, Role, StaffDevice, User, UserStatus
+from app.models import AuditAction, AuditLog, DeviceStatus, Employee, Invitation, Role, StaffDevice, User, UserStatus
 from app.schemas.people import (
     AdminUserOut,
     ApproveRequest,
@@ -17,7 +17,8 @@ from app.schemas.people import (
     StaffDeviceOut,
     TeamChangeRequest,
 )
-from app.services import audit_service, device_service, user_service
+from app.schemas.team import InvitationCreate, InvitationOut
+from app.services import audit_service, device_service, invitation_service, user_service
 from app.services.timeutil import local_tz
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -188,3 +189,40 @@ def audit_log(
         stmt = stmt.where(AuditLog.created_at < datetime.combine(date_to + timedelta(days=1), time.min, local_tz()))
     stmt = stmt.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).limit(limit).offset(offset)
     return db.scalars(stmt).all()
+
+
+# ---- Invitations (Managers invite; the Admin sees all and can step in) ----
+@router.get("/invitations/", response_model=list[InvitationOut])
+def all_invitations(
+    db: DB,
+    _: Admin,
+    invited_by_id: int | None = None,
+    invitation_status: Annotated[str | None, Query(alias="status", pattern="^(PENDING|ACCEPTED|REVOKED|EXPIRED)$")] = None,
+):
+    stmt = select(Invitation).order_by(Invitation.created_at.desc())
+    if invited_by_id:
+        stmt = stmt.where(Invitation.invited_by_id == invited_by_id)
+    rows = [InvitationOut.from_invitation(i) for i in db.scalars(stmt)]
+    return [r for r in rows if invitation_status is None or r.status == invitation_status]
+
+
+@router.post("/invitations/", response_model=InvitationOut, status_code=status.HTTP_201_CREATED)
+def invite_first_manager(data: InvitationCreate, db: DB, admin: Admin, ip: ClientIP):
+    """Only while the company has no active Manager: someone must invite the first one."""
+    invitation = invitation_service.create(db, admin, data.email, data.full_name, Role(data.role), ip)
+    db.commit()
+    return InvitationOut.from_invitation(invitation)
+
+
+@router.post("/invitations/{invitation_id}/revoke/", response_model=InvitationOut)
+def revoke_invitation(invitation_id: int, db: DB, admin: Admin, ip: ClientIP):
+    invitation = invitation_service.revoke(db, invitation_service.get(db, invitation_id), admin, ip)
+    db.commit()
+    return InvitationOut.from_invitation(invitation)
+
+
+@router.post("/invitations/{invitation_id}/resend/", response_model=InvitationOut)
+def resend_invitation(invitation_id: int, db: DB, admin: Admin, ip: ClientIP):
+    invitation = invitation_service.resend(db, invitation_service.get(db, invitation_id), admin, ip)
+    db.commit()
+    return InvitationOut.from_invitation(invitation)

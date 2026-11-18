@@ -1,6 +1,5 @@
 import BlockIcon from '@mui/icons-material/Block'
 import CheckIcon from '@mui/icons-material/Check'
-import CloseIcon from '@mui/icons-material/Close'
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import LockOpenIcon from '@mui/icons-material/LockOpen'
 import LockResetIcon from '@mui/icons-material/LockReset'
@@ -16,7 +15,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
   IconButton,
   InputAdornment,
   MenuItem,
@@ -140,92 +138,6 @@ function ApproveDialog({ user, onClose }: { user: AdminUser; onClose: () => void
         </Button>
       </DialogActions>
     </Dialog>
-  )
-}
-
-// ---------------- Pending approvals ----------------
-export function StaffRequestsPage() {
-  const users = useQuery({
-    queryKey: ['admin', 'users', { status: 'PENDING' }],
-    queryFn: () => adminApi.users({ status: 'PENDING' }),
-  })
-  const refresh = useRefreshAdmin()
-  const notify = useNotify()
-  const [approving, setApproving] = useState<AdminUser | null>(null)
-  const [rejecting, setRejecting] = useState<AdminUser | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  const reject = async () => {
-    if (!rejecting) return
-    setBusy(true)
-    try {
-      await adminApi.reject(rejecting.id)
-      notify.success(`${rejecting.full_name} rejected`)
-      refresh()
-      setRejecting(null)
-    } catch (e) {
-      notify.error(e)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <PageHeader title="Staff requests" subtitle="Staff who signed up and cannot sign in until they are approved." />
-      <QueryState isLoading={users.isLoading} error={users.error}>
-        {users.data?.length ? (
-          <Grid container spacing={2}>
-            {users.data.map((u) => (
-              <Grid key={u.id} size={{ xs: 12, sm: 6, lg: 4 }}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                      <div>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                          {u.full_name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {u.email}
-                          {u.phone ? ` · ${u.phone}` : ''}
-                        </Typography>
-                      </div>
-                      <Chip size="small" color="warning" label={u.requested_role ? roleLabel[u.requested_role] : '—'} />
-                    </Stack>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                      Signed up {formatDateTime(u.created_at)}
-                    </Typography>
-                    <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                      <Button variant="contained" color="success" startIcon={<CheckIcon />} onClick={() => setApproving(u)}>
-                        Approve
-                      </Button>
-                      <Button color="error" startIcon={<CloseIcon />} onClick={() => setRejecting(u)}>
-                        Reject
-                      </Button>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        ) : (
-          <Card>
-            <EmptyState title="No pending requests" text="New staff sign-ups will appear here." />
-          </Card>
-        )}
-      </QueryState>
-      {approving && <ApproveDialog user={approving} onClose={() => setApproving(null)} />}
-      <ConfirmDialog
-        open={Boolean(rejecting)}
-        title={`Reject ${rejecting?.full_name}?`}
-        text="The account will not be able to sign in."
-        confirmLabel="Reject"
-        color="error"
-        loading={busy}
-        onConfirm={reject}
-        onClose={() => setRejecting(null)}
-      />
-    </>
   )
 }
 

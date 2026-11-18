@@ -30,7 +30,7 @@ const AdminPerformancePage = lazy(() =>
 const TeamPerformancePage = lazy(() =>
   import("@/pages/admin/PerformancePages").then((m) => ({ default: m.TeamPerformancePage })),
 );
-const StaffRequestsPage = lazy(() => import("@/pages/admin/UsersPages").then((m) => ({ default: m.StaffRequestsPage })));
+const InvitationsPage = lazy(() => import("@/pages/admin/InvitationsPage").then((m) => ({ default: m.InvitationsPage })));
 const UsersPage = lazy(() => import("@/pages/admin/UsersPages").then((m) => ({ default: m.UsersPage })));
 
 const admin = (page: React.ReactNode) => <Suspense fallback={<FullPageSpinner />}>{page}</Suspense>;
@@ -70,7 +70,7 @@ export default function App() {
         }
       >
         <Route index element={admin(<UsersPage />)} />
-        <Route path="requests" element={admin(<StaffRequestsPage />)} />
+        <Route path="invitations" element={admin(<InvitationsPage />)} />
         <Route path="devices" element={admin(<DevicesPage />)} />
         <Route path="performance" element={admin(<AdminPerformancePage />)} />
         <Route path="teams/:managerId" element={admin(<TeamPerformancePage />)} />

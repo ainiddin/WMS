@@ -1,10 +1,4 @@
-from tests.conftest import ADMIN, OUTBOX, PASSWORD, admin_login, last_code, two_factor, signup_code, staff_login
-
-
-def register_staff(client, email="new@wms.kz", role="WORKER"):
-    return client.post("/api/auth/register-staff/", json={
-        "email": email, "code": signup_code(client, email), "password": PASSWORD, "full_name": "New Person", "requested_role": role,
-    })
+from tests.conftest import ADMIN, OUTBOX, PASSWORD, admin_login, last_code, signup_code, staff_login, two_factor
 
 
 def login(client, email, password=PASSWORD):
@@ -19,40 +13,10 @@ def test_first_admin_is_created_and_can_login(client):
     assert r.json()["user"]["employee_code"] == "E001"
 
 
-def test_pending_staff_cannot_login_until_approved(client, api):
-    r = register_staff(client)
-    assert r.status_code == 201
-    assert r.json()["user"]["status"] == "PENDING"
-
-    r = staff_login(client, "new@wms.kz")
-    assert r.status_code == 403
-    assert r.json()["detail"] == "Account is waiting for admin approval"
-
-    manager_headers, manager_id = api.staff("boss@wms.kz", "MANAGER")
-    user_id = register_staff(client, "second@wms.kz").json()["user"]["id"]
-    r = client.post(f"/api/admin/users/{user_id}/approve/", headers=api.admin,
-                    json={"role": "WORKER", "manager_id": manager_id})
-    assert r.status_code == 200
-    assert r.json()["status"] == "ACTIVE"
-    assert r.json()["employee"]["manager_id"] == manager_id
-
-    api.staff_login("second@wms.kz")  # the new phone is approved by the Admin too
-    r = staff_login(client, "second@wms.kz")
-    assert r.status_code == 200
-    assert r.json()["user"]["role"] == "WORKER"
-
-
-def test_staff_cannot_request_admin_role(client):
-    r = register_staff(client, role="ADMIN")
-    assert r.status_code == 422
-
-
-def test_rejected_user_gets_access_denied(client, api):
-    user_id = register_staff(client).json()["user"]["id"]
-    assert client.post(f"/api/admin/users/{user_id}/reject/", headers=api.admin).status_code == 200
-    r = staff_login(client, "new@wms.kz")
-    assert r.status_code == 403
-    assert r.json()["detail"] == "Access denied"
+def test_staff_can_no_longer_sign_up_on_their_own(client):
+    r = client.post("/api/auth/register-staff/", json={"email": "x@wms.kz", "code": "000000", "password": "password123",
+                                                       "full_name": "X", "requested_role": "WORKER"})
+    assert r.status_code in (404, 405)
 
 
 def test_blocked_user_loses_access_immediately(client, api):
@@ -86,17 +50,6 @@ def test_duplicate_email_and_wrong_password(client, api):
                                                          "password": PASSWORD, "full_name": "X"})
     assert r.status_code == 409
     assert login(client, "dup@mail.kz", "wrong-password").status_code == 401
-
-
-def test_worker_must_get_a_real_manager(client, api):
-    user_id = register_staff(client).json()["user"]["id"]
-    r = client.post(f"/api/admin/users/{user_id}/approve/", headers=api.admin, json={"role": "WORKER"})
-    assert r.status_code == 422
-
-    _, worker_id = api.staff("w1@wms.kz", "WORKER", manager_id=api.staff("m1@wms.kz", "MANAGER")[1])
-    r = client.post(f"/api/admin/users/{user_id}/approve/", headers=api.admin,
-                    json={"role": "WORKER", "manager_id": worker_id})
-    assert r.status_code == 422  # manager_id points to a Worker
 
 
 def test_only_admin_uses_admin_api(client, api):

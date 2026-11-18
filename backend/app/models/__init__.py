@@ -3,6 +3,7 @@ from app.models.audit import AuditAction, AuditLog
 from app.models.catalog import Category, Product, Supplier
 from app.models.common import DeviceStatus, MovementType, OrderStatus, Role, TransactionType, UserStatus
 from app.models.device import StaffDevice
+from app.models.invitation import Invitation
 from app.models.orders import Order, OrderItem, StockMovement
 from app.models.people import Customer, Employee
 from app.models.two_factor import TwoFactorChallenge
@@ -19,6 +20,7 @@ __all__ = [
     "DeviceStatus",
     "EmailVerification",
     "Employee",
+    "Invitation",
     "MovementType",
     "Order",
     "OrderItem",

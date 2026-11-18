@@ -1,5 +1,5 @@
 import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined'
-import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined'
+import ForwardToInboxOutlinedIcon from '@mui/icons-material/ForwardToInboxOutlined'
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined'
 import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
@@ -30,7 +30,7 @@ import { formatDateTime } from '@/format'
 
 const NAV = [
   { to: '/admin', label: 'Users', icon: <PeopleOutlineIcon />, end: true },
-  { to: '/admin/requests', label: 'Staff requests', icon: <HowToRegOutlinedIcon /> },
+  { to: '/admin/invitations', label: 'Invitations', icon: <ForwardToInboxOutlinedIcon /> },
   { to: '/admin/devices', label: 'Staff phones', icon: <PhoneAndroidOutlinedIcon /> },
   { to: '/admin/performance', label: 'Performance', icon: <EmojiEventsOutlinedIcon /> },
   { to: '/admin/audit', label: 'Audit log', icon: <ReceiptLongOutlinedIcon /> },

@@ -20,8 +20,6 @@ from app.schemas.auth import (
     RefreshRequest,
     SendCodeRequest,
     StaffLogin,
-    StaffRegister,
-    StaffRegistered,
     TokenPair,
     TwoFactorRequired,
     TwoFactorResend,
@@ -29,7 +27,8 @@ from app.schemas.auth import (
     UserOut,
 )
 from app.schemas.common import Message
-from app.services import audit_service, device_service, two_factor_service, user_service
+from app.schemas.team import InvitationAccept
+from app.services import audit_service, device_service, invitation_service, two_factor_service, user_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -94,13 +93,21 @@ def register_customer(data: CustomerRegister, db: DB, request: Request):
     return _tokens(user)
 
 
-@router.post("/register-staff/", response_model=StaffRegistered, status_code=status.HTTP_201_CREATED)
-def register_staff(data: StaffRegister, db: DB, request: Request):
-    """Manager / Worker sign up. Status is PENDING: login is possible only after an Admin approves."""
-    rate_limit.check_signup(rate_limit.client_ip(request))
-    user = user_service.register_staff(db, data)
+@router.post("/invite/accept/", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def accept_invitation(data: InvitationAccept, db: DB, ip: ClientIP):
+    """Staff join only by invitation: email + the code from the invitation email + a new password.
+    The account is ACTIVE at once (role and team come from the invitation); then sign in in the Staff app,
+    where the new phone waits for approval. Wrong codes count as failed logins (brute-force limits)."""
+    email = data.email.strip().lower()
+    rate_limit.check_login(ip, email)
+    try:
+        user = invitation_service.accept(db, email, data.code, data.password, data.phone, ip)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_400_BAD_REQUEST:
+            rate_limit.login_failed(ip, email)
+        raise
     db.commit()
-    return StaffRegistered(detail=STATUS_MESSAGES[UserStatus.PENDING], user=UserOut.from_user(user))
+    return UserOut.from_user(user)
 
 
 @router.post("/login/", response_model=TokenPair)

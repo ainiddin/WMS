@@ -64,16 +64,17 @@ def test_role_change_keeps_old_and_new_values(client, api):
                               "old_manager_id": boss_id, "new_manager_id": boss2_id}
 
 
-def test_team_change_and_approval_are_logged(client, api):
+def test_team_change_and_joining_are_logged(client, api):
     admin = api.admin
     _, boss_id = api.staff("boss@wms.kz", "MANAGER")
     _, boss2_id = api.staff("boss2@wms.kz", "MANAGER")
     _, worker_id = api.staff("arman@wms.kz", "WORKER", boss_id)
 
-    approved = audit(client, admin, action="USER_APPROVED")
-    assert {r["target_email"] for r in approved} == {"boss@wms.kz", "boss2@wms.kz", "arman@wms.kz"}
-    assert next(r for r in approved if r["target_email"] == "arman@wms.kz")["details"] == {
-        "role": "WORKER", "manager_id": boss_id}
+    joined = audit(client, admin, action="INVITE_ACCEPTED")
+    assert {r["target_email"] for r in joined} == {"boss@wms.kz", "boss2@wms.kz", "arman@wms.kz"}
+    arman = next(r for r in joined if r["target_email"] == "arman@wms.kz")
+    assert arman["details"]["role"] == "WORKER" and arman["details"]["team_manager_id"] == boss_id
+    assert arman["details"]["invited_by"] == "boss@wms.kz"
 
     r = client.patch(f"/api/admin/employees/{worker_id}/team/", headers=admin, json={"manager_id": boss2_id})
     assert r.status_code == 200, r.text
@@ -190,6 +191,8 @@ def test_no_admin_action_happens_without_a_log_row(client, api):
         ("POST", "/api/admin/users/{user_id}/block/"), ("POST", "/api/admin/users/{user_id}/unblock/"),
         ("POST", "/api/admin/users/{user_id}/clear-login-timer/"), ("PATCH", "/api/admin/users/{user_id}/role/"),
         ("PATCH", "/api/admin/employees/{employee_id}/team/"), ("POST", "/api/admin/devices/{device_id}/approve/"),
-        ("POST", "/api/admin/devices/{device_id}/revoke/"),
+        ("POST", "/api/admin/devices/{device_id}/revoke/"), ("POST", "/api/admin/invitations/"),
+        ("POST", "/api/admin/invitations/{invitation_id}/revoke/"),
+        ("POST", "/api/admin/invitations/{invitation_id}/resend/"),
     }
     assert changing == logged, "a state-changing admin endpoint was added or removed: log it and update this list"

@@ -121,6 +121,7 @@ class Api:
 
     def __init__(self, client: TestClient):
         self.c = client
+        self.managers: dict[int, dict] = {}  # employee id -> auth headers of that Manager
 
     def login(self, email: str, password: str = PASSWORD) -> dict:
         """Website login (customers)."""
@@ -144,18 +145,35 @@ class Api:
         # The first Admin phone is approved automatically; the email code is entered once on it.
         return {"Authorization": f"Bearer {admin_login(self.c).json()['access_token']}"}
 
+    def invite(self, inviter: dict, email: str, role: str, full_name: str | None = None):
+        """POST an invitation as `inviter` (a Manager, or the Admin for the very first Manager)."""
+        url = "/api/admin/invitations/" if inviter is None else "/api/team/invitations/"
+        return self.c.post(url, headers=inviter if inviter is not None else self.admin,
+                           json={"email": email, "role": role,
+                                 "full_name": full_name or email.split("@")[0].title() + " Test"})
+
+    def accept(self, email: str, password: str = PASSWORD):
+        return self.c.post("/api/auth/invite/accept/",
+                           json={"email": email, "code": last_code(email), "password": password})
+
     def staff(self, email: str, role: str, manager_id: int | None = None) -> tuple[dict, int]:
-        """Register + approve a staff member. Returns (auth headers, employee id)."""
-        r = self.c.post("/api/auth/register-staff/", json={
-            "email": email, "code": signup_code(self.c, email), "password": PASSWORD, "full_name": email.split("@")[0].title() + " Test",
-            "requested_role": role,
-        })
+        """A staff member who joined by invitation and signed in on an approved phone.
+        WORKER: invited by the Manager `manager_id`. MANAGER: by any Manager (the Admin for the first one).
+        Returns (auth headers, employee id)."""
+        if role == "WORKER":
+            assert manager_id in self.managers, "a Worker is invited by his Manager: create that Manager first"
+            inviter = self.managers[manager_id]
+        else:
+            inviter = next(iter(self.managers.values()), None)
+        r = self.invite(inviter, email, role)
         assert r.status_code == 201, r.text
-        user_id = r.json()["user"]["id"]
-        r = self.c.post(f"/api/admin/users/{user_id}/approve/", headers=self.admin,
-                        json={"role": role, "manager_id": manager_id})
-        assert r.status_code == 200, r.text
-        return self.staff_login(email), r.json()["employee"]["id"]
+        r = self.accept(email)
+        assert r.status_code == 201, r.text
+        employee_id = r.json()["employee_id"]
+        headers = self.staff_login(email)
+        if role == "MANAGER":
+            self.managers[employee_id] = headers
+        return headers, employee_id
 
     def customer(self, email: str, money: int = 100_000) -> dict:
         """A signed-up customer whose account already has `money` KZT (orders are paid from it)."""

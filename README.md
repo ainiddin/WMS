@@ -60,7 +60,7 @@ Tests use the separate `wms_test` database (`TEST_DATABASE_URL`) and wipe it on 
 | Manager | `dauren@wms.kz`, `aigerim@wms.kz`, `nurlan@wms.kz` — one team each |
 | Worker | Team Dauren: `arman@`, `dana@`, `yerlan@` · Team Aigerim: `madina@`, `timur@` · Team Nurlan: `asel@`, `bekzat@` (all `@wms.kz`) |
 | Customer | `aliya@mail.kz`, `ruslan@mail.kz`, `saule@mail.kz` … (12 in total) |
-| Pending staff | `ayan@wms.kz` (Worker), `dilnaz@wms.kz` (Manager) — waiting for admin approval |
+| Invited staff | `ayan@wms.kz` (Worker), `dilnaz@wms.kz` (Manager) — open invitations from Dauren |
 
 Staff logins work only in the KeyFive Staff app, and only on a phone the Admin has approved (see below).
 
@@ -116,8 +116,8 @@ never gets the warehouse screens, and a staff password that leaks is not enough 
 | Role | Screens |
 |---|---|
 | Worker | Orders to ship (scan every unit → Ship), Stock IN (scanner), Stock, Movement history, My performance, Leaderboard |
-| Manager | + Dashboard, Orders (approve / reject / cancel, workload, rebalance), Restock list, Reports + Excel/PDF, Products, Categories, Suppliers, Customers, My team |
-| Admin | + All teams performance, Staff requests (role + team), Staff phones, Users (role, team, block) |
+| Manager | + Invitations, team members (block / unblock) and their phones, Dashboard, Orders (approve / reject / cancel, workload, rebalance), Restock list, Reports + Excel/PDF, Products, Categories, Suppliers, Customers, My team |
+| Admin | + All teams performance, Invitations (all teams: send again, revoke), Staff phones, Users (role, team, block, Clear timer), Audit log |
 
 Build (JDK 17 and the Android SDK; Android Studio can simply open `mobile/`):
 
@@ -131,8 +131,9 @@ The app talks to https://keyfive-wms.onrender.com by default; **Server** on the 
 (emulator + local backend: `http://10.0.2.2:8000`, debug build only). The barcode scanner is the Google Play
 services scanner, so the phone needs Google Play services; typing the code always works too.
 
-Install the APK only on work phones. Staff sign up in the app too (email code → request → Admin approves the
-account → first sign in → Admin approves the phone).
+Install the APK only on work phones. Staff join **only by invitation**: a Manager invites a Worker into his team
+(or a Manager, who gets a team of his own) → the person gets a code by email → in the app "I have an invitation":
+email, code, new password → first sign in → the phone waits for approval (a Worker's phone: his Manager).
 
 ## Deploy (Render)
 
@@ -191,10 +192,15 @@ backend/app/
     sent automatically; "Send again" once a minute; at most 3 codes per account in 15 min, then 429 (cleared by
     Clear timer). Website: `POST /api/auth/admin/login/` → `POST /api/auth/2fa/verify/`, the session ends hard after
     4 hours. App: the code is asked once per phone (`/staff/login/` answers 202). Every step is in the audit log.
-13. Passwords: `POST /api/auth/password/` (current + new; the new one must differ from the previous, checked only
+12. Passwords: `POST /api/auth/password/` (current + new; the new one must differ from the previous, checked only
     on the server). A change signs out every older session. An Admin must change the password every 180 days;
     with an expired password only `/api/auth/me/` and `/api/auth/password/` work (403 + `X-Password-Expired`).
-12. Audit log (`audit_log`, `GET /api/admin/audit/`): who did what to whom, when, from which IP. Append-only:
+13. Staff join only by invitation (`invitations`, `/api/team/invitations/`): a Manager invites a WORKER into his
+    team or a MANAGER (new team) — never above his rank. The code lives 48 h; 5 wrong codes burn it (and count as
+    failed logins); "Send again" once a minute; one open invitation per email (partial unique index). The Admin
+    sees and can revoke every invitation and invites only the first Manager when none is active. A Manager sees
+    and manages only his own team (`/api/team/members/`, `/api/team/devices/`); anything else answers 404.
+14. Audit log (`audit_log`, `GET /api/admin/audit/`): who did what to whom, when, from which IP. Append-only:
     PostgreSQL refuses UPDATE and DELETE.
 
 Codes like `P001`, `O0001`, `M0001` are PostgreSQL generated columns built from the integer id, so they never collide.

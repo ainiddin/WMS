@@ -20,9 +20,14 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   TWO_FACTOR_FAILED: 'Wrong admin code',
   TWO_FACTOR_PASSED: 'Admin signed in',
   PASSWORD_CHANGED: 'Password changed',
+  INVITE_SENT: 'Invitation sent',
+  INVITE_RESENT: 'Invitation sent again',
+  INVITE_REVOKED: 'Invitation revoked',
+  INVITE_ACCEPTED: 'Joined by invitation',
+  INVITE_CODE_FAILED: 'Wrong invitation code',
 }
 
-const DANGER: AuditAction[] = ['TWO_FACTOR_FAILED', 'USER_BLOCKED', 'DEVICE_REVOKED']
+const DANGER: AuditAction[] = ['TWO_FACTOR_FAILED', 'INVITE_CODE_FAILED', 'USER_BLOCKED', 'DEVICE_REVOKED']
 const PAGE = 50
 
 /** The details object as short "key: value" text; values are data from the server, shown as plain text. */

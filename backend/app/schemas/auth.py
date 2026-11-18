@@ -31,18 +31,6 @@ class CustomerRegister(BaseModel):
     _email = field_validator("email")(_normalize_email)
 
 
-class StaffRegister(BaseModel):
-    email: EmailStr
-    code: EmailCode
-    password: Password
-    full_name: Name
-    phone: Phone | None = None
-    # ADMIN cannot be requested: only another Admin can give it.
-    requested_role: Literal["MANAGER", "WORKER"]
-
-    _email = field_validator("email")(_normalize_email)
-
-
 class StaffLogin(BaseModel):
     email: str
     password: str
@@ -95,10 +83,6 @@ class TokenPair(BaseModel):
     token_type: Literal["bearer"] = "bearer"
     user: UserOut
 
-
-class StaffRegistered(BaseModel):
-    detail: str
-    user: UserOut
 
 
 class AdminLogin(BaseModel):

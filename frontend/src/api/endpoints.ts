@@ -9,6 +9,8 @@ import type {
   Customer,
   DeviceStatus,
   Employee,
+  Invitation,
+  InvitationStatus,
   Period,
   Role,
   StaffDevice,
@@ -140,6 +142,13 @@ export const adminApi = {
   approveDevice: (id: number) => post<StaffDevice>(`/admin/devices/${id}/approve/`),
   revokeDevice: (id: number) => post<StaffDevice>(`/admin/devices/${id}/revoke/`),
   audit: (filters: AuditFilters = {}) => get<AuditRow[]>("/admin/audit/", filters),
+  invitations: (status?: InvitationStatus) =>
+    get<Invitation[]>("/admin/invitations/", status ? { status } : {}),
+  resendInvitation: (id: number) => post<Invitation>(`/admin/invitations/${id}/resend/`),
+  revokeInvitation: (id: number) => post<Invitation>(`/admin/invitations/${id}/revoke/`),
+  /** Only while there is no active Manager. */
+  inviteFirstManager: (email: string, full_name: string) =>
+    post<Invitation>("/admin/invitations/", { email, full_name, role: "MANAGER" }),
 };
 
 export const performanceApi = {
