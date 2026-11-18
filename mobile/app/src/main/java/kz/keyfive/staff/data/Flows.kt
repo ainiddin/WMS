@@ -97,3 +97,36 @@ fun lockMessage(detail: String, secondsLeft: Int): String {
     val what = detail.replace(tryAgain, "").trim().ifEmpty { "Too many attempts." }
     return "$what Try again in $clock."
 }
+
+/** How often the app asks for website sign ins while it is on screen (never in the background). */
+const val WEB_LOGIN_CHECK_MS = 5_000L
+
+/** Admins and Managers sign in on the website and approve it here; Workers have no website. */
+fun answersWebLogins(role: String): Boolean = role == "ADMIN" || role == "MANAGER"
+
+/** "Chrome on Windows" from a browser's User-Agent, so the person can tell whether it is his computer. */
+fun describeBrowser(userAgent: String?): String {
+    val ua = userAgent.orEmpty()
+    val browser = when {
+        "Edg/" in ua -> "Edge"
+        "OPR/" in ua || "Opera" in ua -> "Opera"
+        "Firefox/" in ua -> "Firefox"
+        "Chrome/" in ua -> "Chrome"
+        "Safari/" in ua -> "Safari"
+        else -> null
+    }
+    val system = when {
+        "Windows" in ua -> "Windows"
+        "Android" in ua -> "Android"
+        "iPhone" in ua || "iPad" in ua -> "iOS"
+        "Mac OS X" in ua || "Macintosh" in ua -> "macOS"
+        "Linux" in ua -> "Linux"
+        else -> null
+    }
+    return when {
+        browser != null && system != null -> "$browser on $system"
+        browser != null -> browser
+        system != null -> "A browser on $system"
+        else -> "Unknown browser"
+    }
+}

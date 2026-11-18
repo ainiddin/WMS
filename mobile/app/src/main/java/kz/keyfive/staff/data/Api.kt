@@ -230,4 +230,15 @@ interface Api {
 
     @POST("team/invitations/{id}/revoke/")
     suspend fun revokeInvitation(@Path("id") id: Int): Invitation
+
+    // ---- Website sign ins waiting for "Is this you?" on this phone ----
+    @GET("web-logins/")
+    suspend fun pendingWebLogins(): List<PendingWebLogin>
+
+    /** 204 = signed in on the website; 409 = wrong number, that sign in was rejected. */
+    @POST("web-logins/{id}/approve/")
+    suspend fun approveWebLogin(@Path("id") id: Int, @Body body: WebLoginDecision): Response<Unit>
+
+    @POST("web-logins/{id}/deny/")
+    suspend fun denyWebLogin(@Path("id") id: Int): Response<Unit>
 }

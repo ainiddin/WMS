@@ -69,6 +69,7 @@ import kz.keyfive.staff.ui.manager.RestockScreen
 import kz.keyfive.staff.ui.manager.SuppliersScreen
 import kz.keyfive.staff.ui.manager.TeamMembersScreen
 import kz.keyfive.staff.ui.auth.ChangePasswordScreen
+import kz.keyfive.staff.ui.auth.WebLoginRequests
 import kz.keyfive.staff.ui.performance.AdminPerformanceScreen
 import kz.keyfive.staff.ui.performance.LeaderboardScreen
 import kz.keyfive.staff.ui.performance.MyPerformanceScreen
@@ -125,6 +126,8 @@ fun StaffApp(session: Session, user: User) {
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
     val title = screens.firstOrNull { it.route == route }?.title ?: if (route?.startsWith("team/") == true) "Team" else ""
+
+    WebLoginRequests(session, user.role) // "Is this you?" for website sign ins (Admin, Manager)
 
     ModalNavigationDrawer(
         drawerState = drawer,

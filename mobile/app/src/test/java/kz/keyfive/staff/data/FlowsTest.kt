@@ -178,4 +178,41 @@ class FlowsTest {
         assertEquals("0:01", formatClock(secondsLeft(until, 0, until - 1)))
         assertEquals("0:00", formatClock(secondsLeft(until, 0, until)))
     }
+
+    // ---- website sign ins ----
+    @Test
+    fun `only admins and managers answer website sign ins`() {
+        assertTrue(answersWebLogins("ADMIN"))
+        assertTrue(answersWebLogins("MANAGER"))
+        assertFalse(answersWebLogins("WORKER"))
+        assertFalse(answersWebLogins("CUSTOMER"))
+    }
+
+    @Test
+    fun `the phone asks only every few seconds`() {
+        assertTrue(WEB_LOGIN_CHECK_MS >= 3_000)
+    }
+
+    @Test
+    fun `browser names a person can recognise`() {
+        val chromeWin = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
+        val edgeWin = "$chromeWin Edg/131.0"
+        val firefoxMac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.1; rv:132.0) Gecko/20100101 Firefox/132.0"
+        val safariIphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1"
+        assertEquals("Chrome on Windows", describeBrowser(chromeWin))
+        assertEquals("Edge on Windows", describeBrowser(edgeWin)) // Edge says "Chrome" too
+        assertEquals("Firefox on macOS", describeBrowser(firefoxMac))
+        assertEquals("Safari on iOS", describeBrowser(safariIphone)) // iPhone UA also says "Mac OS X"
+        assertEquals("Unknown browser", describeBrowser(null))
+        assertEquals("Unknown browser", describeBrowser("curl/8.0"))
+    }
+
+    @Test
+    fun `the request arrives as the server sends it`() {
+        val req = json.decodeFromString(PendingWebLogin.serializer(),
+            """{"id":3,"created_at":"2026-11-19T10:00:00Z","expires_at":"2026-11-19T10:02:00Z","ip":"1.2.3.4",
+               "user_agent":null,"choices":[83,47,12]}""")
+        assertEquals(listOf(83, 47, 12), req.choices)
+        assertNull(req.userAgent)
+    }
 }

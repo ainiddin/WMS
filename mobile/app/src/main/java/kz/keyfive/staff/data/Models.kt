@@ -434,3 +434,17 @@ data class TeamMember(
     val role: String,
     val status: String,
 )
+
+// ---- Website sign in approved on the phone ----
+@Serializable
+data class PendingWebLogin(
+    val id: Int,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("expires_at") val expiresAt: String,
+    val ip: String? = null,
+    @SerialName("user_agent") val userAgent: String? = null,
+    val choices: List<Int>,
+)
+
+@Serializable
+data class WebLoginDecision(val number: Int)
