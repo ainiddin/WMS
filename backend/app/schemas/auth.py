@@ -94,3 +94,33 @@ class TokenPair(BaseModel):
 class StaffRegistered(BaseModel):
     detail: str
     user: UserOut
+
+
+class AdminLogin(BaseModel):
+    """Admin on the website, step 1: the password. Step 2 is the email code (POST /api/auth/2fa/verify/)."""
+
+    email: str
+    password: str
+
+
+ChallengeToken = Annotated[str, StringConstraints(min_length=20, max_length=100)]
+
+
+class TwoFactorRequired(BaseModel):
+    """The password was right; now the code from the corporate mailbox is needed."""
+
+    two_factor_required: Literal[True] = True
+    challenge_token: ChallengeToken
+    sent_to: str  # masked: c***@corp.kz
+    code_seconds: int  # how long one code lives
+    resend_seconds: int  # how soon "Send again" works
+    expires_at: datetime  # end of this whole sign in
+
+
+class TwoFactorVerify(BaseModel):
+    challenge_token: ChallengeToken
+    code: EmailCode
+
+
+class TwoFactorResend(BaseModel):
+    challenge_token: ChallengeToken

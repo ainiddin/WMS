@@ -1,16 +1,20 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
 from app.core import rate_limit
+from app.core.config import settings
 from app.core.deps import DB, CurrentUser, check_staff_device
 from app.core.security import create_token, decode_token, verify_password
-from app.models import User, UserStatus
+from app.models import Role, User, UserStatus
+from app.models.common import utcnow
 from app.models.common import STAFF_ROLES
 from app.schemas.auth import (
+    AdminLogin,
     CustomerRegister,
     RefreshRequest,
     SendCodeRequest,
@@ -18,10 +22,13 @@ from app.schemas.auth import (
     StaffRegister,
     StaffRegistered,
     TokenPair,
+    TwoFactorRequired,
+    TwoFactorResend,
+    TwoFactorVerify,
     UserOut,
 )
 from app.schemas.common import Message
-from app.services import device_service, user_service
+from app.services import device_service, two_factor_service, user_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -32,11 +39,21 @@ STATUS_MESSAGES = {
 }
 
 
-def _tokens(user: User, device_id: int | None = None) -> TokenPair:
+def _tokens(user: User, device_id: int | None = None, session_ends: datetime | None = None) -> TokenPair:
     return TokenPair(
-        access_token=create_token(user.id, user.role, "access", device_id),
-        refresh_token=create_token(user.id, user.role, "refresh", device_id),
+        access_token=create_token(user.id, user.role, "access", device_id, session_ends),
+        refresh_token=create_token(user.id, user.role, "refresh", device_id, session_ends),
         user=UserOut.from_user(user),
+    )
+
+
+def _challenge_out(token: str, challenge) -> TwoFactorRequired:
+    return TwoFactorRequired(
+        challenge_token=token,
+        sent_to=two_factor_service.mask_email(two_factor_service.corporate_email()),
+        code_seconds=settings.TWO_FACTOR_CODE_SECONDS,
+        resend_seconds=settings.TWO_FACTOR_RESEND_SECONDS,
+        expires_at=challenge.expires_at,
     )
 
 
@@ -92,18 +109,57 @@ def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DB, request
     Staff accounts are refused here: they work only in the KeyFive Staff app on an approved phone.
     """
     user = _check_password(db, request, form.username, form.password)
+    if user.role == Role.ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admins sign in on the Admin page with the email code")
     if user.role in STAFF_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff accounts sign in only in the KeyFive Staff app")
     return _tokens(user)
 
 
-@router.post("/staff/login/", response_model=TokenPair)
-def staff_login(data: StaffLogin, db: DB, request: Request):
-    """KeyFive Staff app. Needs the right password AND a phone approved by an Admin (see StaffDevice)."""
+@router.post("/admin/login/", response_model=TwoFactorRequired)
+def admin_login(data: AdminLogin, db: DB, request: Request):
+    """Admin on the website, step 1 of 2. Right password -> a code goes to the corporate mailbox.
+    Same brute-force limits as every login."""
+    user = _check_password(db, request, data.email, data.password)
+    if user.role != Role.ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This sign in is for Admins only")
+    token, challenge = two_factor_service.start(db, user, rate_limit.client_ip(request))
+    db.commit()
+    return _challenge_out(token, challenge)
+
+
+@router.post("/2fa/verify/", response_model=TokenPair)
+def two_factor_verify(data: TwoFactorVerify, db: DB, request: Request):
+    """Step 2: the code. Website -> a session of ADMIN_WEB_SESSION_HOURS. App -> the phone is remembered."""
+    challenge = two_factor_service.verify(db, data.challenge_token, data.code, rate_limit.client_ip(request))
+    db.commit()
+    if challenge.device is not None:
+        return _tokens(challenge.user, challenge.device.id)
+    return _tokens(challenge.user, session_ends=utcnow() + timedelta(hours=settings.ADMIN_WEB_SESSION_HOURS))
+
+
+@router.post("/2fa/resend/", response_model=TwoFactorRequired)
+def two_factor_resend(data: TwoFactorResend, db: DB, request: Request):
+    """Send again: a new code for the same sign in, once per TWO_FACTOR_RESEND_SECONDS."""
+    challenge = two_factor_service.resend(db, data.challenge_token, rate_limit.client_ip(request))
+    db.commit()
+    return _challenge_out(data.challenge_token, challenge)
+
+
+@router.post("/staff/login/", response_model=TokenPair | TwoFactorRequired,
+             responses={202: {"model": TwoFactorRequired, "description": "Admin: enter the email code"}})
+def staff_login(data: StaffLogin, db: DB, request: Request, response: Response):
+    """KeyFive Staff app. Needs the right password AND a phone approved by an Admin (see StaffDevice).
+    An Admin also enters the email code once per phone: then the answer is 202 with a challenge."""
     user = _check_password(db, request, data.email, data.password)
     if user.role not in STAFF_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This app is for warehouse staff only")
     device = device_service.check_in(db, user, data.device_secret, data.device_name)
+    if two_factor_service.needs_challenge(user, device):
+        token, challenge = two_factor_service.start(db, user, rate_limit.client_ip(request), device)
+        db.commit()
+        response.status_code = status.HTTP_202_ACCEPTED
+        return _challenge_out(token, challenge)
     db.commit()
     return _tokens(user, device.id)
 
@@ -117,8 +173,10 @@ def refresh(data: RefreshRequest, db: DB):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token") from None
     if user is None or user.status != UserStatus.ACTIVE:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
-    check_staff_device(db, user, payload.get("dev"))
-    return _tokens(user, payload.get("dev"))
+    check_staff_device(db, user, payload.get("dev"), payload.get("web"))
+    # A website Admin session keeps its hard end: refresh never makes it longer.
+    session_ends = datetime.fromtimestamp(payload["web"], UTC) if "web" in payload else None
+    return _tokens(user, payload.get("dev"), session_ends)
 
 
 @router.get("/me/", response_model=UserOut)

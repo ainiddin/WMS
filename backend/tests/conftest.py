@@ -12,6 +12,7 @@ os.environ["ADMIN_EMAIL"] = "Admin001@wms.kz"
 os.environ["ADMIN_PASSWORD"] = "admin-test-pass"
 os.environ["BCRYPT_ROUNDS"] = "4"  # fast hashing, tests only
 os.environ["JWT_SECRET"] = "test-secret-" + "x" * 40
+os.environ["ADMIN_2FA_EMAIL"] = "ceo-office@keyfive.kz"  # the one corporate mailbox for Admin codes
 
 import base64  # noqa: E402
 import hashlib  # noqa: E402
@@ -27,6 +28,7 @@ from app.main import app  # noqa: E402
 
 ADMIN = ("admin001@wms.kz", "admin-test-pass")
 PASSWORD = "password123"
+CORPORATE = "ceo-office@keyfive.kz"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -88,6 +90,32 @@ def staff_login(client, email: str, password: str = PASSWORD, phone: str | None 
     })
 
 
+def two_factor(client, response):
+    """Finish an Admin sign in that answered with a challenge: read the code from the corporate mailbox."""
+    challenge = response.json()
+    assert challenge["two_factor_required"] is True, response.text
+    r = client.post("/api/auth/2fa/verify/",
+                    json={"challenge_token": challenge["challenge_token"], "code": last_code(CORPORATE)})
+    assert r.status_code == 200, r.text
+    return r
+
+
+def admin_login(client, phone: str | None = None):
+    """Admin in the app: password + phone, and the email code the first time on that phone."""
+    r = staff_login(client, *ADMIN, phone=phone)
+    if r.status_code == 202:
+        r = two_factor(client, r)
+    assert r.status_code == 200, r.text
+    return r
+
+
+def admin_web_login(client):
+    """Admin on the website: password, then the email code. Returns the token response."""
+    r = client.post("/api/auth/admin/login/", json={"email": ADMIN[0], "password": ADMIN[1]})
+    assert r.status_code == 200, r.text
+    return two_factor(client, r)
+
+
 class Api:
     """Small helper around TestClient for building test scenarios."""
 
@@ -113,10 +141,8 @@ class Api:
 
     @property
     def admin(self) -> dict:
-        # The first Admin phone is approved automatically.
-        r = staff_login(self.c, *ADMIN)
-        assert r.status_code == 200, r.text
-        return {"Authorization": f"Bearer {r.json()['access_token']}"}
+        # The first Admin phone is approved automatically; the email code is entered once on it.
+        return {"Authorization": f"Bearer {admin_login(self.c).json()['access_token']}"}
 
     def staff(self, email: str, role: str, manager_id: int | None = None) -> tuple[dict, int]:
         """Register + approve a staff member. Returns (auth headers, employee id)."""

@@ -31,14 +31,22 @@ _credentials_error = HTTPException(
 )
 
 
-def check_staff_device(db: Session, user: User, device_id: object) -> None:
+def check_staff_device(db: Session, user: User, device_id: object, web_session: object = None) -> None:
     """Staff tokens are bound to an approved phone. A token without one (e.g. made before a customer
-    was promoted) or from a phone the Admin has blocked stops working at once."""
+    was promoted) or from a phone the Admin has blocked stops working at once.
+
+    Admin is the exception on the website: a token with a `web` session end (only issued after the email code).
+    Admin tokens from a phone also need that phone to have passed the email code once.
+    """
     if user.role not in STAFF_ROLES:
         return
+    if user.role == Role.ADMIN and device_id is None and isinstance(web_session, int):
+        return  # the JWT `exp` already stops it at the session end
     device = db.get(StaffDevice, device_id) if isinstance(device_id, int) else None
     if device is None or device.user_id != user.id or device.status != DeviceStatus.APPROVED:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff access is allowed only from an approved phone")
+    if user.role == Role.ADMIN and device.two_factor_at is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sign in again: this phone has not passed the email code")
 
 
 def _user_from_token(db: Session, token: str) -> User:
@@ -53,7 +61,7 @@ def _user_from_token(db: Session, token: str) -> User:
     # Checked on every request, so a BLOCKED user loses access at once, not when the token expires.
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
-    check_staff_device(db, user, payload.get("dev"))
+    check_staff_device(db, user, payload.get("dev"), payload.get("web"))
     user.device_id = payload.get("dev")  # not a column: lets an Admin see which phone he is on
     return user
 

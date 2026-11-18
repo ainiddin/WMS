@@ -180,6 +180,13 @@ backend/app/
     HTTP 429 with `Retry-After`, even for the right password; 10 sign ups and 10 sent code emails per IP per hour.
     Limits are in `config.py`. Both logins (website and Staff app) are counted. An Admin sees the timer of each
     account in Users and can clear it (`POST /api/admin/users/{id}/clear-login-timer/`) to let the user in at once.
+11. Admin two-factor sign in, always on. After the password a 6-digit code goes **only** to `ADMIN_2FA_EMAIL`
+    (one corporate mailbox for Admin and CEO). A code lives 6 min and works once; 5 wrong codes → a new code is
+    sent automatically; "Send again" once a minute; at most 3 codes per account in 15 min, then 429 (cleared by
+    Clear timer). Website: `POST /api/auth/admin/login/` → `POST /api/auth/2fa/verify/`, the session ends hard after
+    4 hours. App: the code is asked once per phone (`/staff/login/` answers 202). Every step is in the audit log.
+12. Audit log (`audit_log`, `GET /api/admin/audit/`): who did what to whom, when, from which IP. Append-only:
+    PostgreSQL refuses UPDATE and DELETE.
 
 Codes like `P001`, `O0001`, `M0001` are PostgreSQL generated columns built from the integer id, so they never collide.
 

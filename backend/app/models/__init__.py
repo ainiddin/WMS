@@ -5,6 +5,7 @@ from app.models.common import DeviceStatus, MovementType, OrderStatus, Role, Tra
 from app.models.device import StaffDevice
 from app.models.orders import Order, OrderItem, StockMovement
 from app.models.people import Customer, Employee
+from app.models.two_factor import TwoFactorChallenge
 from app.models.user import User
 from app.models.verification import EmailVerification
 
@@ -28,6 +29,7 @@ __all__ = [
     "StockMovement",
     "Supplier",
     "TransactionType",
+    "TwoFactorChallenge",
     "User",
     "UserStatus",
 ]

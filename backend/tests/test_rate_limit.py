@@ -1,7 +1,7 @@
 from app.core import rate_limit
 from app.core.config import settings
 from app.core.rate_limit import SlidingWindowLimiter
-from tests.conftest import ADMIN, OUTBOX, PASSWORD, signup_code, staff_login
+from tests.conftest import ADMIN, OUTBOX, PASSWORD, admin_login, signup_code, staff_login
 
 
 def login(client, email, password):
@@ -39,10 +39,10 @@ def test_too_many_wrong_passwords_lock_the_email_even_for_the_right_password(cli
 def test_successful_login_resets_the_email_counter(client):
     for _ in range(settings.LOGIN_MAX_FAILS_PER_EMAIL - 1):
         assert login(client, ADMIN[0], "wrong-password").status_code == 401
-    assert staff_login(client, *ADMIN).status_code == 200
+    admin_login(client)  # right password (+ code) resets the counter
     for _ in range(settings.LOGIN_MAX_FAILS_PER_EMAIL - 1):
         assert login(client, ADMIN[0], "wrong-password").status_code == 401
-    assert staff_login(client, *ADMIN).status_code == 200
+    assert staff_login(client, *ADMIN).status_code == 200  # phone already passed the code
 
 
 def test_staff_app_login_is_limited_too(client, api):

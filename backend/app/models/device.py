@@ -30,6 +30,8 @@ class StaffDevice(Base):
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Admin phones: when the email code was entered on this phone. Until then the phone gets no Admin token.
+    two_factor_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(foreign_keys=[user_id])
     approved_by: Mapped[User | None] = relationship(foreign_keys=[approved_by_id])

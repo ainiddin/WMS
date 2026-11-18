@@ -24,6 +24,9 @@ services:
         sync: false
       - key: DEMO_PASSWORD
         sync: false
+      # The one corporate mailbox (Admin + CEO) for Admin sign-in codes. Without it no Admin can sign in.
+      - key: ADMIN_2FA_EMAIL
+        sync: false
       # true = fill an empty database with the demo shop on the first start
       - key: SEED_DEMO
         value: "true"

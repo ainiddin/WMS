@@ -1,6 +1,6 @@
 """Staff work only in the KeyFive Staff app, and only on a phone an Admin approved."""
 
-from tests.conftest import ADMIN, PASSWORD, staff_login
+from tests.conftest import ADMIN, PASSWORD, admin_login, staff_login
 
 
 def devices(client, api, status=None):
@@ -10,10 +10,13 @@ def devices(client, api, status=None):
 
 def test_staff_cannot_sign_in_on_the_website(client, api):
     api.staff("w@wms.kz", "MANAGER")
-    for email, password in (ADMIN, ("w@wms.kz", PASSWORD)):
-        r = client.post("/api/auth/login/", data={"username": email, "password": password})
-        assert r.status_code == 403
-        assert "KeyFive Staff app" in r.json()["detail"]
+    r = client.post("/api/auth/login/", data={"username": "w@wms.kz", "password": PASSWORD})
+    assert r.status_code == 403
+    assert "KeyFive Staff app" in r.json()["detail"]
+    # The Admin has his own website sign in (with the email code), never the customer one.
+    r = client.post("/api/auth/login/", data={"username": ADMIN[0], "password": ADMIN[1]})
+    assert r.status_code == 403
+    assert "Admin page" in r.json()["detail"]
     # A wrong password still says "wrong password", it does not reveal that the account is staff.
     r = client.post("/api/auth/login/", data={"username": "w@wms.kz", "password": "wrong-password"})
     assert r.status_code == 401
@@ -60,7 +63,7 @@ def test_token_without_a_phone_cannot_act_as_staff(client, api):
     """A website token never carries a phone, so even a valid staff user id in it gives no staff access."""
     from app.core.security import create_token
 
-    admin_tokens = staff_login(client, *ADMIN).json()
+    admin_tokens = admin_login(client).json()
     forged = create_token(admin_tokens["user"]["id"], "ADMIN", "access")  # same user, no phone in the token
     r = client.get("/api/admin/users/", headers={"Authorization": f"Bearer {forged}"})
     assert r.status_code == 403
@@ -68,7 +71,7 @@ def test_token_without_a_phone_cannot_act_as_staff(client, api):
 
 
 def test_only_the_first_admin_phone_is_approved_automatically(client, api):
-    assert staff_login(client, *ADMIN).status_code == 200
+    admin_login(client)
     r = staff_login(client, *ADMIN, phone="second admin phone")
     assert r.status_code == 403
     me = [d for d in devices(client, api) if d["current"]]

@@ -1,4 +1,4 @@
-from tests.conftest import ADMIN, OUTBOX, PASSWORD, last_code, signup_code, staff_login
+from tests.conftest import ADMIN, OUTBOX, PASSWORD, admin_login, last_code, two_factor, signup_code, staff_login
 
 
 def register_staff(client, email="new@wms.kz", role="WORKER"):
@@ -12,8 +12,9 @@ def login(client, email, password=PASSWORD):
 
 
 def test_first_admin_is_created_and_can_login(client):
-    r = staff_login(client, "Admin001@wms.kz", ADMIN[1])  # email is case-insensitive
-    assert r.status_code == 200
+    r = staff_login(client, "Admin001@wms.kz", ADMIN[1], phone=ADMIN[0])  # email is case-insensitive
+    assert r.status_code == 202  # the Admin also needs the email code
+    r = two_factor(client, r)
     assert r.json()["user"]["role"] == "ADMIN"
     assert r.json()["user"]["employee_code"] == "E001"
 
@@ -106,7 +107,7 @@ def test_only_admin_uses_admin_api(client, api):
 
 
 def test_refresh_token(client):
-    tokens = staff_login(client, *ADMIN).json()
+    tokens = admin_login(client).json()
     r = client.post("/api/auth/refresh/", json={"refresh_token": tokens["refresh_token"]})
     assert r.status_code == 200
     # An access token cannot be used as a refresh token.

@@ -85,7 +85,9 @@ login_fails_by_ip = SlidingWindowLimiter(settings.LOGIN_MAX_FAILS_PER_IP, settin
 signups_by_ip = SlidingWindowLimiter(settings.SIGNUP_MAX_PER_IP, settings.SIGNUP_WINDOW_SECONDS)
 codes_sent_by_ip = SlidingWindowLimiter(settings.SEND_CODE_MAX_PER_IP, settings.SIGNUP_WINDOW_SECONDS)
 
-ALL_LIMITERS = (login_fails_by_email, login_fails_by_ip, signups_by_ip, codes_sent_by_ip)
+two_factor_codes_by_email = SlidingWindowLimiter(settings.TWO_FACTOR_MAX_CODES, settings.TWO_FACTOR_WINDOW_SECONDS)
+
+ALL_LIMITERS = (login_fails_by_email, login_fails_by_ip, signups_by_ip, codes_sent_by_ip, two_factor_codes_by_email)
 
 
 def client_ip(request: Request) -> str:
@@ -122,15 +124,29 @@ def login_succeeded(email: str) -> None:
 
 
 def login_timer(email: str) -> tuple[int, int]:
-    """(failed logins of this email in the window, seconds until it may log in again; 0 = not locked)."""
+    """(failed logins of this email in the window, seconds until it may log in again; 0 = not locked).
+    The lock is the longer of the wrong-password lock and the two-factor code lock."""
     email = email.strip().lower()
-    return login_fails_by_email.count(email), login_fails_by_email.retry_after(email)
+    wait = max(login_fails_by_email.retry_after(email), two_factor_codes_by_email.retry_after(email))
+    return login_fails_by_email.count(email), wait
 
 
 def clear_login_timer(email: str) -> None:
-    """Admin action: forget the failed logins of this email, so the account may log in at once.
-    The IP counter stays: it protects against one client trying many accounts."""
-    login_fails_by_email.reset(email.strip().lower())
+    """Admin action: forget the failed logins and sent two-factor codes of this email, so the account may sign in
+    at once. The IP counter stays: it protects against one client trying many accounts."""
+    email = email.strip().lower()
+    login_fails_by_email.reset(email)
+    two_factor_codes_by_email.reset(email)
+
+
+def check_two_factor_code(email: str) -> None:
+    """Raise 429 if this account already got TWO_FACTOR_MAX_CODES codes in the window. Call BEFORE sending."""
+    _check(two_factor_codes_by_email, email.strip().lower())
+
+
+def two_factor_code_sent(email: str) -> None:
+    if settings.RATE_LIMIT_ENABLED:
+        two_factor_codes_by_email.hit(email.strip().lower())
 
 
 def _check(limiter: SlidingWindowLimiter, ip: str) -> None:

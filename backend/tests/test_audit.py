@@ -18,7 +18,8 @@ def user_id(client, admin, email):
 def audit(client, admin, **params):
     r = client.get("/api/admin/audit/", headers=admin, params=params)
     assert r.status_code == 200, r.text
-    return r.json()
+    # The Admin's own sign in (email code) is logged too; these tests look at the other actions.
+    return [row for row in r.json() if not row["action"].startswith("TWO_FACTOR_")]
 
 
 def test_block_and_unblock_are_logged_with_actor_target_and_ip(client, api):
@@ -163,7 +164,7 @@ def test_the_database_refuses_to_change_or_delete_log_rows(client, api, db):
     with pytest.raises(DBAPIError, match="append-only"):
         db.execute(text("DELETE FROM audit_log"))
     db.rollback()
-    assert db.query(AuditLog).count() == 1
+    assert db.query(AuditLog).count() == 3  # code sent + code passed (Admin sign in) + the block
 
 
 def test_a_user_with_log_rows_cannot_be_deleted(db):

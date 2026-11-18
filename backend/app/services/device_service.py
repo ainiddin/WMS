@@ -71,6 +71,7 @@ def revoke(device: StaffDevice, admin: User, current_device_id: int | None) -> S
     if device.status == DeviceStatus.REVOKED:
         raise HTTPException(status.HTTP_409_CONFLICT, "Device is already blocked")
     device.status = DeviceStatus.REVOKED
+    device.two_factor_at = None  # if it is ever approved again, an Admin must pass the email code on it again
     device.approved_by_id = admin.id
     device.approved_at = utcnow()
     return device

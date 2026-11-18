@@ -31,6 +31,16 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str | None = None
     ADMIN_FULL_NAME: str = "System Administrator"
 
+    # Admin two-factor sign in (always on). The code goes ONLY to this one corporate mailbox, agreed in advance
+    # (Admin and CEO). Without it no Admin can sign in.
+    ADMIN_2FA_EMAIL: str | None = None
+    TWO_FACTOR_CODE_SECONDS: int = 6 * 60       # a code lives 6 minutes
+    TWO_FACTOR_MAX_ATTEMPTS: int = 5            # wrong codes before a new code is sent automatically
+    TWO_FACTOR_RESEND_SECONDS: int = 60         # the "Send again" button: once a minute
+    TWO_FACTOR_MAX_CODES: int = 3               # codes per account per window (sign in + auto + resend)
+    TWO_FACTOR_WINDOW_SECONDS: int = 15 * 60
+    ADMIN_WEB_SESSION_HOURS: int = 4            # website session of an Admin; then password + code again
+
     # Password for all demo users created by `python -m app.seed --demo`.
     DEMO_PASSWORD: str | None = None
 
