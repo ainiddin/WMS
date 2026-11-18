@@ -8,6 +8,7 @@ from app.models.orders import Order, OrderItem, StockMovement
 from app.models.people import Customer, Employee
 from app.models.two_factor import TwoFactorChallenge
 from app.models.user import User
+from app.models.web_login import WebLoginRequest
 from app.models.verification import EmailVerification
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "TwoFactorChallenge",
     "User",
     "UserStatus",
+    "WebLoginRequest",
 ]

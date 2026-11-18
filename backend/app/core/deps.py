@@ -40,7 +40,9 @@ def check_staff_device(db: Session, user: User, device_id: object, web_session: 
     """
     if user.role not in STAFF_ROLES:
         return
-    if user.role == Role.ADMIN and device_id is None and isinstance(web_session, int):
+    # Website sessions (Admin, Manager) are issued only after the phone approved the sign in (or, for an
+    # Admin, the email code). Workers never get one.
+    if user.role in (Role.ADMIN, Role.MANAGER) and device_id is None and isinstance(web_session, int):
         return  # the JWT `exp` already stops it at the session end
     device = db.get(StaffDevice, device_id) if isinstance(device_id, int) else None
     if device is None or device.user_id != user.id or device.status != DeviceStatus.APPROVED:

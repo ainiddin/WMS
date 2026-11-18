@@ -39,7 +39,11 @@ class Settings(BaseSettings):
     TWO_FACTOR_RESEND_SECONDS: int = 60         # the "Send again" button: once a minute
     TWO_FACTOR_MAX_CODES: int = 3               # codes per account per window (sign in + auto + resend)
     TWO_FACTOR_WINDOW_SECONDS: int = 15 * 60
-    ADMIN_WEB_SESSION_HOURS: int = 4            # website session of an Admin; then password + code again
+    ADMIN_WEB_SESSION_HOURS: int = 4            # website session of an Admin or Manager; then sign in again
+    # Website sign in approved on the phone (Steam Guard style).
+    WEB_LOGIN_SECONDS: int = 120                # the phone must answer within 2 minutes
+    WEB_LOGIN_MAX_REQUESTS: int = 5             # unfinished website sign ins per account per window
+    WEB_LOGIN_WINDOW_SECONDS: int = 15 * 60
     ADMIN_PASSWORD_MAX_DAYS: int = 180          # an Admin must change the password this often
 
     # Staff join only by invitation from a Manager.

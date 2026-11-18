@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Product
-from app.routers import account, admin, auth, catalog, customers, movements, orders, performance, reports, team
+from app.routers import account, admin, auth, catalog, customers, movements, orders, performance, reports, team, web_logins
 from app.services import assignment_service, order_service
 from app.services.user_service import ensure_first_admin
 
@@ -77,7 +77,7 @@ async def integrity_error_handler(_: Request, exc: IntegrityError):
     return JSONResponse(status_code=http_status, content=body)
 
 
-for module in (auth, admin, team, catalog, customers, account, movements, orders, reports, performance):
+for module in (auth, web_logins, admin, team, catalog, customers, account, movements, orders, reports, performance):
     app.include_router(module.router)
 
 

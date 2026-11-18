@@ -25,10 +25,20 @@ from app.schemas.auth import (
     TwoFactorResend,
     TwoFactorVerify,
     UserOut,
+    WebLoginStarted,
+    WebLoginState,
+    WebLoginToken,
 )
 from app.schemas.common import Message
 from app.schemas.team import InvitationAccept
-from app.services import audit_service, device_service, invitation_service, two_factor_service, user_service
+from app.services import (
+    audit_service,
+    device_service,
+    invitation_service,
+    two_factor_service,
+    user_service,
+    web_login_service,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -209,3 +219,42 @@ def change_password(data: ChangePassword, db: DB, user: CurrentUser, request: Re
     payload = decode_token(token, "access")
     session_ends = datetime.fromtimestamp(payload["web"], UTC) if "web" in payload else None
     return _tokens(user, payload.get("dev"), session_ends)
+
+
+# ---- Website sign in approved on the phone (Admin, Manager) ----
+def _web_session(user: User) -> TokenPair:
+    return _tokens(user, session_ends=utcnow() + timedelta(hours=settings.ADMIN_WEB_SESSION_HOURS))
+
+
+@router.post("/web/login/", response_model=WebLoginStarted)
+def web_login(data: AdminLogin, db: DB, request: Request):
+    """Step 1 in the browser: the password. Then the phone shows "Is this you?" with three numbers; the browser
+    shows the right one. Admins without an approving phone use the email code (POST /web/email-code/)."""
+    user = _check_password(db, request, data.email, data.password)
+    token, req, has_phone = web_login_service.start(db, user, rate_limit.client_ip(request),
+                                                    request.headers.get("user-agent"))
+    db.commit()
+    return WebLoginStarted(request_token=token, number=req.number, expires_at=req.expires_at,
+                           phone_available=has_phone, role=user.role)
+
+
+@router.post("/web/status/", response_model=WebLoginState)
+def web_login_status(data: WebLoginToken, db: DB):
+    """The browser asks every few seconds while it waits. Approved -> a website session, handed out once."""
+    req = web_login_service.by_token(db, data.request_token)
+    user = web_login_service.collect(db, req)
+    if user is None:
+        return WebLoginState(status="PENDING")
+    rate_limit.web_login_passed(user.email)
+    db.commit()
+    return WebLoginState(status="APPROVED", tokens=_web_session(user))
+
+
+@router.post("/web/email-code/", response_model=TwoFactorRequired)
+def web_login_email_code(data: WebLoginToken, db: DB, ip: ClientIP):
+    """Admin without the phone at hand: close the phone request, send the email code instead (no new password)."""
+    req = web_login_service.by_token(db, data.request_token)
+    user = web_login_service.close_for_email_code(db, req, ip)
+    token, challenge = two_factor_service.start(db, user, ip)
+    db.commit()
+    return _challenge_out(token, challenge)

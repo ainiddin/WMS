@@ -87,7 +87,10 @@ codes_sent_by_ip = SlidingWindowLimiter(settings.SEND_CODE_MAX_PER_IP, settings.
 
 two_factor_codes_by_email = SlidingWindowLimiter(settings.TWO_FACTOR_MAX_CODES, settings.TWO_FACTOR_WINDOW_SECONDS)
 
-ALL_LIMITERS = (login_fails_by_email, login_fails_by_ip, signups_by_ip, codes_sent_by_ip, two_factor_codes_by_email)
+web_logins_by_email = SlidingWindowLimiter(settings.WEB_LOGIN_MAX_REQUESTS, settings.WEB_LOGIN_WINDOW_SECONDS)
+
+ALL_LIMITERS = (login_fails_by_email, login_fails_by_ip, signups_by_ip, codes_sent_by_ip, two_factor_codes_by_email,
+                web_logins_by_email)
 
 
 def client_ip(request: Request) -> str:
@@ -128,7 +131,8 @@ def login_timer(email: str) -> tuple[int, int]:
     """(failed logins of this email in the window, seconds until it may log in again; 0 = not locked).
     The lock is the longer of the wrong-password lock and the two-factor code lock."""
     email = email.strip().lower()
-    wait = max(login_fails_by_email.retry_after(email), two_factor_codes_by_email.retry_after(email))
+    wait = max(login_fails_by_email.retry_after(email), two_factor_codes_by_email.retry_after(email),
+               web_logins_by_email.retry_after(email))
     return login_fails_by_email.count(email), wait
 
 
@@ -138,6 +142,7 @@ def clear_login_timer(email: str) -> None:
     email = email.strip().lower()
     login_fails_by_email.reset(email)
     two_factor_codes_by_email.reset(email)
+    web_logins_by_email.reset(email)
 
 
 def check_two_factor_code(email: str) -> None:
@@ -149,6 +154,21 @@ def two_factor_passed(email: str) -> None:
     """A right code proves it is the real Admin: his sent codes stop counting (like a right password clears the
     wrong-password counter). Guessing stays limited: wrong codes never reach this."""
     two_factor_codes_by_email.reset(email.strip().lower())
+
+
+def check_web_login(email: str) -> None:
+    """Raise 429 if this account has too many unfinished website sign ins (no flood of phone requests)."""
+    _check(web_logins_by_email, email.strip().lower(), "Too many website sign ins are waiting for the phone.")
+
+
+def web_login_requested(email: str) -> None:
+    if settings.RATE_LIMIT_ENABLED:
+        web_logins_by_email.hit(email.strip().lower())
+
+
+def web_login_passed(email: str) -> None:
+    """An approved sign in proves it is the real person: the unfinished ones stop counting."""
+    web_logins_by_email.reset(email.strip().lower())
 
 
 def two_factor_code_sent(email: str) -> None:

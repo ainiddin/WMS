@@ -118,3 +118,34 @@ class TwoFactorResend(BaseModel):
 class ChangePassword(BaseModel):
     old_password: str
     new_password: Password
+
+
+# ---- Website sign in approved on the phone ----
+class WebLoginStarted(BaseModel):
+    request_token: ChallengeToken
+    number: int  # show it in the browser; the person taps the same number on the phone
+    expires_at: datetime
+    phone_available: bool  # False: an Admin without an approving phone goes straight to the email code
+    role: str
+
+
+class WebLoginToken(BaseModel):
+    request_token: ChallengeToken
+
+
+class WebLoginState(BaseModel):
+    status: Literal["PENDING", "APPROVED"]
+    tokens: TokenPair | None = None
+
+
+class PendingWebLogin(BaseModel):
+    id: int
+    created_at: datetime
+    expires_at: datetime
+    ip: str | None
+    user_agent: str | None
+    choices: list[int]
+
+
+class WebLoginDecision(BaseModel):
+    number: Annotated[int, Field(ge=10, le=99)]

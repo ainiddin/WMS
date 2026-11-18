@@ -304,11 +304,13 @@ def test_after_the_session_end_the_tokens_stop_working(client):
     assert client.post("/api/auth/refresh/", json={"refresh_token": refresh}).status_code == 401
 
 
-def test_only_an_admin_may_have_a_session_without_a_phone(client, api):
-    _, _ = api.staff("boss@wms.kz", "MANAGER")
-    boss_id = next(u["id"] for u in client.get("/api/admin/users/?search=boss", headers=api.admin).json())
+def test_a_worker_never_has_a_session_without_a_phone(client, api):
+    """Website sessions exist only for Admins and Managers; a Worker token without a phone is refused."""
+    _, boss_id = api.staff("boss@wms.kz", "MANAGER")
+    api.staff("w@wms.kz", "WORKER", boss_id)
+    worker_id = next(u["id"] for u in client.get("/api/admin/users/?search=w@wms", headers=api.admin).json())
     later = datetime.now(UTC) + timedelta(hours=1)
-    forged = create_token(boss_id, "MANAGER", "access", session_ends=later)
+    forged = create_token(worker_id, "WORKER", "access", session_ends=later)
     r = client.get("/api/orders/", headers={"Authorization": f"Bearer {forged}"})
     assert r.status_code == 403
 
