@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import kz.keyfive.staff.data.AdminUser
 import kz.keyfive.staff.data.ApproveRequest
 import kz.keyfive.staff.data.Employee
+import kz.keyfive.staff.data.Invitation
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.StaffDevice
 import kz.keyfive.staff.data.TeamChangeRequest
@@ -44,6 +45,7 @@ import kz.keyfive.staff.ui.Red
 import kz.keyfive.staff.ui.Section
 import kz.keyfive.staff.ui.dateTime
 import kz.keyfive.staff.ui.load
+import kz.keyfive.staff.ui.manager.InvitationCard
 import kz.keyfive.staff.ui.rememberAction
 import kz.keyfive.staff.ui.roleLabel
 import kz.keyfive.staff.ui.statusColor
@@ -107,38 +109,33 @@ fun DevicesScreen(session: Session) {
     }
 }
 
-// ---------------- Staff requests ----------------
+// ---------------- Invitations (all teams) ----------------
+/** Managers invite their staff. The Admin sees every invitation and can send it again or revoke it. */
 @Composable
-fun ApprovalsScreen(session: Session) {
-    val users = load { session.api.users(status = "PENDING") }
+fun AdminInvitationsScreen(session: Session) {
+    var status by remember { mutableStateOf<String?>("PENDING") }
+    val invitations = load(status) { session.api.allInvitations(status) }
     val action = rememberAction()
-    var approving by remember { mutableStateOf<AdminUser?>(null) }
-    var rejecting by remember { mutableStateOf<AdminUser?>(null) }
+    var revoking by remember { mutableStateOf<Invitation?>(null) }
 
-    LoadedList(users, header = { item { Hint("Staff who signed up and cannot sign in until you approve them.") } }) { list ->
-        if (list.isEmpty()) item { Empty("No pending requests", "New staff sign-ups will appear here.") }
-        items(list, key = { it.id }) { u ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row {
-                        Text(u.fullName, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                        Badge(roleLabel[u.requestedRole] ?: "—", Orange)
-                    }
-                    Hint(u.email + (u.phone?.let { " · $it" } ?: ""))
-                    Hint("Signed up ${dateTime(u.createdAt)}")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { approving = u }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Approve") }
-                        TextButton(onClick = { rejecting = u }) { Text("Reject", color = Red) }
-                    }
-                }
-            }
+    LoadedList(invitations, header = {
+        item { Hint("Staff join only by invitation from a Manager. Old sign-up requests, if any, are in Users.") }
+        item {
+            ChipRow(listOf("PENDING", "ACCEPTED", "EXPIRED", "REVOKED", null), status,
+                { s -> s?.lowercase()?.replaceFirstChar { c -> c.uppercaseChar() } ?: "All" }) { status = it }
+        }
+    }) { list ->
+        if (list.isEmpty()) item { Empty("No invitations") }
+        items(list, key = { it.id }) { inv ->
+            InvitationCard(inv, action.busy, showInviter = true,
+                onResend = { action.run(after = invitations.reload) { session.api.adminResendInvitation(inv.id); "Sent again to ${inv.email}" } },
+                onRevoke = { revoking = inv })
         }
     }
-    approving?.let { RoleDialog(session, it, approve = true, onClose = { approving = null }, onDone = { approving = null; users.reload() }) }
-    rejecting?.let { u ->
-        Confirm("Reject ${u.fullName}?", "The account will not be able to sign in.", "Reject", action.busy,
-            onConfirm = { action.run(after = { rejecting = null; users.reload() }) { "${session.api.rejectUser(u.id).fullName} rejected" } },
-            onDismiss = { rejecting = null })
+    revoking?.let { inv ->
+        Confirm("Revoke the invitation?", "The code sent to ${inv.email} stops working at once.", "Revoke", action.busy,
+            onConfirm = { action.run(after = { revoking = null; invitations.reload() }) { session.api.adminRevokeInvitation(inv.id); "Invitation revoked" } },
+            onDismiss = { revoking = null })
     }
 }
 

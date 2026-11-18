@@ -14,17 +14,24 @@ import retrofit2.http.Streaming
 /** The FastAPI endpoints used by staff (base URL = server + "/api/"). */
 interface Api {
     // ---- Auth ----
+    /** 200 = tokens, 202 = Admin must enter the email code (see parseStaffLogin). */
     @POST("auth/staff/login/")
-    suspend fun staffLogin(@Body body: StaffLoginRequest): TokenPair
+    suspend fun staffLogin(@Body body: StaffLoginRequest): Response<ResponseBody>
+
+    @POST("auth/2fa/verify/")
+    suspend fun verifyTwoFactor(@Body body: TwoFactorVerifyRequest): TokenPair
+
+    @POST("auth/2fa/resend/")
+    suspend fun resendTwoFactor(@Body body: TwoFactorResendRequest): TwoFactorChallenge
+
+    @POST("auth/password/")
+    suspend fun changePassword(@Body body: ChangePasswordRequest): TokenPair
+
+    @POST("auth/invite/accept/")
+    suspend fun acceptInvitation(@Body body: InviteAcceptRequest): User
 
     @GET("auth/me/")
     suspend fun me(): User
-
-    @POST("auth/send-code/")
-    suspend fun sendCode(@Body body: SendCodeRequest): Detail
-
-    @POST("auth/register-staff/")
-    suspend fun registerStaff(@Body body: StaffRegisterRequest): Detail
 
     // ---- Catalog ----
     @GET("categories/")
@@ -183,4 +190,44 @@ interface Api {
 
     @POST("admin/devices/{id}/revoke/")
     suspend fun revokeDevice(@Path("id") id: Int): StaffDevice
+
+    @GET("admin/invitations/")
+    suspend fun allInvitations(@Query("status") status: String? = null): List<Invitation>
+
+    @POST("admin/invitations/{id}/resend/")
+    suspend fun adminResendInvitation(@Path("id") id: Int): Invitation
+
+    @POST("admin/invitations/{id}/revoke/")
+    suspend fun adminRevokeInvitation(@Path("id") id: Int): Invitation
+
+    // ---- Team (Manager: only his own team) ----
+    @GET("team/members/")
+    suspend fun teamMembers(): List<TeamMember>
+
+    @POST("team/members/{id}/block/")
+    suspend fun blockMember(@Path("id") userId: Int): TeamMember
+
+    @POST("team/members/{id}/unblock/")
+    suspend fun unblockMember(@Path("id") userId: Int): TeamMember
+
+    @GET("team/devices/")
+    suspend fun teamDevices(@Query("status") status: String? = null): List<StaffDevice>
+
+    @POST("team/devices/{id}/approve/")
+    suspend fun approveTeamDevice(@Path("id") id: Int): StaffDevice
+
+    @POST("team/devices/{id}/revoke/")
+    suspend fun revokeTeamDevice(@Path("id") id: Int): StaffDevice
+
+    @GET("team/invitations/")
+    suspend fun myInvitations(): List<Invitation>
+
+    @POST("team/invitations/")
+    suspend fun invite(@Body body: InvitationCreate): Invitation
+
+    @POST("team/invitations/{id}/resend/")
+    suspend fun resendInvitation(@Path("id") id: Int): Invitation
+
+    @POST("team/invitations/{id}/revoke/")
+    suspend fun revokeInvitation(@Path("id") id: Int): Invitation
 }

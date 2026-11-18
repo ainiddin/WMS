@@ -2,6 +2,7 @@ package kz.keyfive.staff.ui.auth
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -19,7 +20,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,50 +34,94 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kz.keyfive.staff.BuildConfig
-import kz.keyfive.staff.data.SendCodeRequest
+import kz.keyfive.staff.data.InviteAcceptRequest
+import kz.keyfive.staff.data.LoginStep
 import kz.keyfive.staff.data.Session
-import kz.keyfive.staff.data.StaffRegisterRequest
+import kz.keyfive.staff.data.TwoFactorChallenge
+import kz.keyfive.staff.data.acceptProblem
+import kz.keyfive.staff.data.digitsOnly
+import kz.keyfive.staff.data.formatWait
 import kz.keyfive.staff.data.message
-import kz.keyfive.staff.ui.ChipRow
+import kz.keyfive.staff.data.newPasswordProblem
+import kz.keyfive.staff.data.retryAfterSeconds
+import kz.keyfive.staff.data.secondsLeft
 import kz.keyfive.staff.ui.Hint
 
 @Composable
 fun AuthScreens(session: Session) {
-    var signUp by rememberSaveable { mutableStateOf(false) }
-    Column(
-        Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    var invited by rememberSaveable { mutableStateOf(false) }
+    var email by rememberSaveable { mutableStateOf("") }
+    Page {
         Text("KeyFive Staff", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary)
         Hint("Warehouse app for Workers, Managers and Admins")
-        if (signUp) SignUp(session) { signUp = false } else Login(session) { signUp = true }
+        if (invited) {
+            AcceptInvitation(session) { acceptedEmail ->
+                email = acceptedEmail
+                invited = false
+            }
+            TextButton(onClick = { invited = false }) { Text("I already have an account") }
+        } else {
+            Login(session, email) { invited = true }
+        }
     }
 }
 
 @Composable
-private fun Login(session: Session, openSignUp: () -> Unit) {
+private fun Page(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        content = content,
+    )
+}
+
+@Composable
+private fun ErrorCard(text: String) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Text(text, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer)
+    }
+}
+
+/** Ticks once a second while `active`, so timers on screen move. Returns "now" in milliseconds. */
+@Composable
+private fun rememberNow(active: Boolean): Long {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(active) {
+        while (active) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
+    return now
+}
+
+@Composable
+private fun Login(session: Session, initialEmail: String, openInvitation: () -> Unit) {
     val scope = rememberCoroutineScope()
-    var email by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf(initialEmail) }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var showServer by rememberSaveable { mutableStateOf(false) }
     var server by rememberSaveable { mutableStateOf(session.server) }
+    var challenge by remember { mutableStateOf<TwoFactorChallenge?>(null) }
+
+    challenge?.let { c ->
+        CodeStep(session, c, onChallenge = { challenge = it }, onRestart = { challenge = null })
+        return
+    }
 
     OutlinedTextField(email, { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
     OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true,
         visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
-    error?.let {
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-            Text(it, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer)
-        }
-    }
+    error?.let { ErrorCard(it) }
     Button(
         onClick = {
             busy = true
@@ -82,9 +129,13 @@ private fun Login(session: Session, openSignUp: () -> Unit) {
             scope.launch {
                 try {
                     if (server != session.server) session.server = server
-                    session.login(email, password)
+                    val step = session.login(email, password)
+                    if (step is LoginStep.NeedsCode) {
+                        password = "" // not kept longer than needed
+                        challenge = step.challenge
+                    }
                 } catch (e: Exception) {
-                    error = e.message()
+                    error = e.message() + (retryAfterSeconds(e)?.let { " (${formatWait(it)} left)" } ?: "")
                 } finally {
                     busy = false
                 }
@@ -97,11 +148,11 @@ private fun Login(session: Session, openSignUp: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("This phone: ${session.deviceName}", style = MaterialTheme.typography.labelLarge)
-            Hint("The first sign in from a new phone must be approved by the Admin. Your password alone is not enough, " +
-                "so nobody can enter the warehouse system with it from another phone.")
+            Hint("The first sign in from a new phone must be approved (a Worker's phone by his Manager). Your password " +
+                "alone is not enough, so nobody can enter the warehouse system with it from another phone.")
         }
     }
-    OutlinedButton(onClick = openSignUp, modifier = Modifier.fillMaxWidth()) { Text("New employee? Sign up") }
+    OutlinedButton(onClick = openInvitation, modifier = Modifier.fillMaxWidth()) { Text("I have an invitation") }
 
     TextButton(onClick = { showServer = !showServer }) { Text("Server") }
     if (showServer) {
@@ -112,77 +163,166 @@ private fun Login(session: Session, openSignUp: () -> Unit) {
     }
 }
 
+/** Admin, first sign in on this phone: the 6-digit code from the corporate mailbox. */
 @Composable
-private fun SignUp(session: Session, back: () -> Unit) {
+private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChallenge: (TwoFactorChallenge) -> Unit, onRestart: () -> Unit) {
     val scope = rememberCoroutineScope()
-    var email by rememberSaveable { mutableStateOf("") }
-    var code by rememberSaveable { mutableStateOf("") }
-    var fullName by rememberSaveable { mutableStateOf("") }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var role by rememberSaveable { mutableStateOf("WORKER") }
-    var password by remember { mutableStateOf("") }
-    var codeSent by rememberSaveable { mutableStateOf(false) }
-    var info by remember { mutableStateOf<String?>(null) }
+    var code by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var info by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var done by rememberSaveable { mutableStateOf(false) }
+    var sentAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val now = rememberNow(active = true)
+    val resendIn = secondsLeft(sentAt, challenge.resendSeconds, now)
+    val codeLeft = secondsLeft(sentAt, challenge.codeSeconds, now)
 
-    fun call(block: suspend () -> String) {
+    fun call(block: suspend () -> Unit) {
         busy = true
         error = null
         scope.launch {
             try {
-                info = block()
+                block()
             } catch (e: Exception) {
-                error = e.message()
+                val message = e.message()
+                code = ""
+                when {
+                    message.contains("new code was sent") -> {
+                        sentAt = System.currentTimeMillis()
+                        info = message
+                    }
+                    message.contains("Sign in again") -> onRestart()
+                    else -> error = message + (retryAfterSeconds(e)?.let { " (${formatWait(it)} left)" } ?: "")
+                }
             } finally {
                 busy = false
             }
         }
     }
 
-    if (done) {
-        Text("Request sent", style = MaterialTheme.typography.titleLarge)
-        Hint("An Admin checks staff requests. When your account is approved, sign in on this phone; " +
-            "the Admin then approves the phone too.")
-        Button(onClick = back, modifier = Modifier.fillMaxWidth()) { Text("Back to sign in") }
+    Text("Enter the code", style = MaterialTheme.typography.titleLarge)
+    Hint("We sent a 6-digit code to the corporate mailbox ${challenge.sentTo}. It is asked once on this phone.")
+    error?.let { ErrorCard(it) }
+    info?.let { Hint(it) }
+    OutlinedTextField(code, { code = digitsOnly(it) }, label = { Text("Code from the email") }, singleLine = true,
+        modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        supportingText = { Text(if (codeLeft > 0) "Works for ${formatWait(codeLeft)} more" else "Expired: send a new one") })
+    Button(onClick = { call { session.verifyCode(challenge.challengeToken, code) } },
+        enabled = !busy && code.length == 6, modifier = Modifier.fillMaxWidth()) { Text("Sign in") }
+    OutlinedButton(
+        onClick = {
+            call {
+                onChallenge(session.resendCode(challenge.challengeToken))
+                sentAt = System.currentTimeMillis()
+                info = "A new code was sent. The previous one no longer works."
+            }
+        },
+        enabled = !busy && resendIn == 0,
+        modifier = Modifier.fillMaxWidth(),
+    ) { Text(if (resendIn > 0) "Send again in $resendIn s" else "Send again") }
+    TextButton(onClick = onRestart) { Text("Use another account") }
+}
+
+/** Staff join only by invitation: email, the code from the invitation email and a new password. */
+@Composable
+private fun AcceptInvitation(session: Session, done: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var email by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var repeat by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var joined by rememberSaveable { mutableStateOf(false) }
+    val problem = acceptProblem(email, code, password, repeat)
+
+    if (joined) {
+        Text("Your account is ready", style = MaterialTheme.typography.titleLarge)
+        Hint("Sign in now on this phone. The phone then waits for approval: a Worker's phone is approved by his Manager.")
+        Button(onClick = { done(email.trim()) }, modifier = Modifier.fillMaxWidth()) { Text("Go to sign in") }
         return
     }
 
-    Text("Staff sign up", style = MaterialTheme.typography.titleLarge)
-    OutlinedTextField(email, { email = it; codeSent = false }, label = { Text("Work email") }, singleLine = true,
+    Text("Join by invitation", style = MaterialTheme.typography.titleLarge)
+    Hint("Your Manager invited you by email. Enter that email, the 6-digit code from it and choose a password.")
+    OutlinedTextField(email, { email = it }, label = { Text("Work email") }, singleLine = true,
         modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-    OutlinedButton(
-        onClick = { call { session.api.sendCode(SendCodeRequest(email.trim())).detail.also { codeSent = true } } },
-        enabled = !busy && email.contains('@'),
+    OutlinedTextField(code, { code = digitsOnly(it) }, label = { Text("6-digit invitation code") }, singleLine = true,
+        modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+    OutlinedTextField(phone, { phone = it }, label = { Text("Phone (optional, +7 7XX XXX XX XX)") }, singleLine = true,
+        modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
+    OutlinedTextField(password, { password = it }, label = { Text("New password (8+ characters)") }, singleLine = true,
+        visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(repeat, { repeat = it }, label = { Text("Repeat the password") }, singleLine = true,
+        visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+    if (problem != null && (code.isNotEmpty() || password.isNotEmpty())) Hint(problem)
+    error?.let { ErrorCard(it) }
+    Button(
+        onClick = {
+            busy = true
+            error = null
+            scope.launch {
+                try {
+                    session.api.acceptInvitation(InviteAcceptRequest(email.trim(), code, password, phone.trim().ifEmpty { null }))
+                    password = ""
+                    repeat = ""
+                    joined = true
+                } catch (e: Exception) {
+                    error = e.message() + (retryAfterSeconds(e)?.let { " (${formatWait(it)} left)" } ?: "")
+                } finally {
+                    busy = false
+                }
+            }
+        },
+        enabled = !busy && problem == null,
         modifier = Modifier.fillMaxWidth(),
-    ) { Text(if (codeSent) "Send the code again" else "Send confirmation code") }
+    ) { Text("Create my account") }
+}
 
-    if (codeSent) {
-        OutlinedTextField(code, { code = it.filter(Char::isDigit).take(6) }, label = { Text("6-digit code from the email") },
-            singleLine = true, modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        OutlinedTextField(fullName, { fullName = it }, label = { Text("Full name") }, singleLine = true,
-            modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(phone, { phone = it }, label = { Text("Phone (+7 7XX XXX XX XX)") }, singleLine = true,
-            modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-        OutlinedTextField(password, { password = it }, label = { Text("Password (8+ characters)") }, singleLine = true,
+/** Change the password. `forced`: an Admin whose password expired cannot do anything else until it is done. */
+@Composable
+fun ChangePasswordScreen(session: Session, forced: Boolean, onDone: () -> Unit = {}) {
+    val scope = rememberCoroutineScope()
+    var current by remember { mutableStateOf("") }
+    var new by remember { mutableStateOf("") }
+    var repeat by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val problem = newPasswordProblem(current, new, repeat)
+
+    Page {
+        Text("Change password", style = MaterialTheme.typography.titleLarge)
+        if (forced) Hint("Your password has expired. Admins change it every 180 days; the new one must differ from the old.")
+        else Hint("Other phones and the website will be signed out.")
+        OutlinedTextField(current, { current = it }, label = { Text("Current password") }, singleLine = true,
             visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-        Text("I want to work as", style = MaterialTheme.typography.labelLarge, modifier = Modifier.fillMaxWidth())
-        ChipRow(listOf("WORKER", "MANAGER"), role, { if (it == "WORKER") "Worker" else "Manager" }) { role = it }
+        OutlinedTextField(new, { new = it }, label = { Text("New password") }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(repeat, { repeat = it }, label = { Text("Repeat the new password") }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        if (problem != null && new.isNotEmpty()) Hint(problem)
+        error?.let { ErrorCard(it) }
         Button(
             onClick = {
-                call {
-                    session.api.registerStaff(
-                        StaffRegisterRequest(email.trim(), code, password, fullName.trim(), phone.trim().ifEmpty { null }, role)
-                    ).detail.also { done = true }
+                busy = true
+                error = null
+                scope.launch {
+                    try {
+                        session.changePassword(current, new)
+                        current = ""
+                        new = ""
+                        repeat = ""
+                        onDone()
+                    } catch (e: Exception) {
+                        error = e.message()
+                    } finally {
+                        busy = false
+                    }
                 }
             },
-            enabled = !busy && code.length == 6 && fullName.isNotBlank() && password.length >= 8,
+            enabled = !busy && current.isNotEmpty() && problem == null,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Send request") }
+        ) { Text("Change password") }
+        if (forced) TextButton(onClick = { session.logout() }) { Text("Sign out") }
     }
-    info?.let { Hint(it) }
-    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-    TextButton(onClick = back) { Text("I already have an account") }
 }

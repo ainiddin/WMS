@@ -46,6 +46,10 @@ class Session(context: Context) {
     var user by mutableStateOf<User?>(null)
         private set
 
+    /** Set when the server says the Admin password has expired: the app then shows only the change screen. */
+    var passwordExpired by mutableStateOf(false)
+        private set
+
     var server: String
         get() = prefs.getString("server", null) ?: BuildConfig.DEFAULT_SERVER
         set(value) {
@@ -77,9 +81,25 @@ class Session(context: Context) {
     var api: Api = buildApi()
         private set
 
-    suspend fun login(email: String, password: String) {
-        val pair = api.staffLogin(StaffLoginRequest(email.trim(), password, deviceSecret, deviceName))
-        save(pair)
+    /** Password + this phone. An Admin also needs the email code the first time on a phone (NeedsCode). */
+    suspend fun login(email: String, password: String): LoginStep {
+        val response = api.staffLogin(StaffLoginRequest(email.trim(), password, deviceSecret, deviceName))
+        if (!response.isSuccessful) throw HttpException(response)
+        val step = parseStaffLogin(response.code(), response.body()?.string().orEmpty())
+        if (step is LoginStep.Done) save(step.pair)
+        return step
+    }
+
+    suspend fun verifyCode(challengeToken: String, code: String) {
+        save(api.verifyTwoFactor(TwoFactorVerifyRequest(challengeToken, code)))
+    }
+
+    suspend fun resendCode(challengeToken: String): TwoFactorChallenge =
+        api.resendTwoFactor(TwoFactorResendRequest(challengeToken))
+
+    /** Every other session of this account stops working; this one gets new tokens. */
+    suspend fun changePassword(current: String, new: String) {
+        save(api.changePassword(ChangePasswordRequest(current, new)))
     }
 
     /** On start: check the saved token (the phone may have been blocked meanwhile). */
@@ -87,6 +107,7 @@ class Session(context: Context) {
         if (!hasTokens) return
         try {
             user = api.me()
+            passwordExpired = isPast(user?.passwordExpiresAt, System.currentTimeMillis())
         } catch (e: HttpException) {
             if (e.code() == 401 || e.code() == 403) logout()
         }
@@ -99,12 +120,14 @@ class Session(context: Context) {
     fun logout() {
         prefs.edit().remove("access").remove("refresh").apply()
         user = null
+        passwordExpired = false
     }
 
     private fun save(pair: TokenPair) {
         access = pair.accessToken
         refresh = pair.refreshToken
         user = pair.user
+        passwordExpired = isPast(pair.user.passwordExpiresAt, System.currentTimeMillis())
     }
 
     private fun buildApi(): Api {
@@ -114,7 +137,9 @@ class Session(context: Context) {
             .addInterceptor(Interceptor { chain ->
                 val token = access
                 val request = chain.request()
-                chain.proceed(if (token == null) request else request.withToken(token))
+                val response = chain.proceed(if (token == null) request else request.withToken(token))
+                if (response.code == 403 && response.header("X-Password-Expired") != null) passwordExpired = true
+                response
             })
             .authenticator(TokenRefresher())
             .build()

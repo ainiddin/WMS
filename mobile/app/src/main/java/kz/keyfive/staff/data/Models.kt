@@ -17,6 +17,8 @@ data class User(
     @SerialName("employee_id") val employeeId: Int? = null,
     @SerialName("employee_code") val employeeCode: String? = null,
     @SerialName("manager_id") val managerId: Int? = null,
+    // Admins only: the password must be changed before this moment.
+    @SerialName("password_expires_at") val passwordExpiresAt: String? = null,
 )
 
 @Serializable
@@ -37,18 +39,31 @@ data class StaffLoginRequest(
 @Serializable
 data class RefreshRequest(@SerialName("refresh_token") val refreshToken: String)
 
+/** Admin sign in, step 2: the code went to the corporate mailbox `sentTo`. */
 @Serializable
-data class SendCodeRequest(val email: String)
+data class TwoFactorChallenge(
+    @SerialName("challenge_token") val challengeToken: String,
+    @SerialName("sent_to") val sentTo: String,
+    @SerialName("code_seconds") val codeSeconds: Int,
+    @SerialName("resend_seconds") val resendSeconds: Int,
+    @SerialName("expires_at") val expiresAt: String,
+)
 
 @Serializable
-data class StaffRegisterRequest(
-    val email: String,
-    val code: String,
-    val password: String,
-    @SerialName("full_name") val fullName: String,
-    val phone: String? = null,
-    @SerialName("requested_role") val requestedRole: String,
+data class TwoFactorVerifyRequest(@SerialName("challenge_token") val challengeToken: String, val code: String)
+
+@Serializable
+data class TwoFactorResendRequest(@SerialName("challenge_token") val challengeToken: String)
+
+@Serializable
+data class ChangePasswordRequest(
+    @SerialName("old_password") val oldPassword: String,
+    @SerialName("new_password") val newPassword: String,
 )
+
+/** Staff join only by invitation: the code from the invitation email and a new password. */
+@Serializable
+data class InviteAcceptRequest(val email: String, val code: String, val password: String, val phone: String? = null)
 
 @Serializable
 data class Detail(val detail: String)
@@ -389,4 +404,33 @@ data class StaffDevice(
     @SerialName("user_full_name") val userFullName: String,
     @SerialName("user_role") val userRole: String,
     val current: Boolean = false,
+)
+
+// ---- Team (Manager) and invitations ----
+@Serializable
+data class Invitation(
+    val id: Int,
+    val email: String,
+    @SerialName("full_name") val fullName: String,
+    val role: String,
+    val status: String,
+    @SerialName("team_name") val teamName: String? = null,
+    @SerialName("invited_by_email") val invitedByEmail: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("expires_at") val expiresAt: String,
+)
+
+@Serializable
+data class InvitationCreate(val email: String, @SerialName("full_name") val fullName: String, val role: String)
+
+@Serializable
+data class TeamMember(
+    @SerialName("user_id") val userId: Int,
+    @SerialName("employee_id") val employeeId: Int,
+    val code: String,
+    @SerialName("full_name") val fullName: String,
+    val email: String,
+    val phone: String? = null,
+    val role: String,
+    val status: String,
 )

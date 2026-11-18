@@ -125,6 +125,7 @@ Build (JDK 17 and the Android SDK; Android Studio can simply open `mobile/`):
 cd mobile
 gradlew assembleDebug      # app/build/outputs/apk/debug/app-debug.apk   (allows http, e.g. http://10.0.2.2:8000)
 gradlew assembleRelease    # app/build/outputs/apk/release/app-release.apk (https only, no screenshots)
+gradlew testDebugUnitTest  # JVM unit tests of the sign-in / invitation logic (app/src/test)
 ```
 
 The app talks to https://keyfive-wms.onrender.com by default; **Server** on the sign-in screen changes it

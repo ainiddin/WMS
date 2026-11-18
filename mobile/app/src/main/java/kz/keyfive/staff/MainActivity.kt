@@ -20,6 +20,7 @@ import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.ui.KeyFiveTheme
 import kz.keyfive.staff.ui.StaffApp
 import kz.keyfive.staff.ui.auth.AuthScreens
+import kz.keyfive.staff.ui.auth.ChangePasswordScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
                             CircularProgressIndicator()
                         }
                         user == null -> AuthScreens(session)
+                        session.passwordExpired -> ChangePasswordScreen(session, forced = true)
                         else -> StaffApp(session, user)
                     }
                 }
