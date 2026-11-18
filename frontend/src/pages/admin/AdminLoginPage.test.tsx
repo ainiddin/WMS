@@ -43,6 +43,15 @@ function typePassword() {
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
 }
 
+/** Moves the fake clock like a real one: a quarter second at a time, letting React render in between. */
+async function tick(ms: number) {
+  for (let done = 0; done < ms; done += 250) {
+    await act(async () => {
+      vi.advanceTimersByTime(250)
+    })
+  }
+}
+
 const codeInput = () => screen.getByLabelText(/^Code from the email/) as HTMLInputElement
 
 describe('AdminLoginPage', () => {
@@ -146,15 +155,53 @@ describe('AdminLoginPage', () => {
     expect(screen.getByRole('button', { name: /Send again in 60 s/ })).toBeDisabled()
   })
 
-  it('a 429 shows how long the account is locked and blocks the buttons', async () => {
-    vi.spyOn(adminAuthApi, 'login').mockRejectedValue(
-      apiError(429, 'Too many attempts. Try again in 15 min.', { 'retry-after': '900' }),
+  it('a 429 counts down to the second in the browser and then unlocks, asking the server only once', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const login = vi.spyOn(adminAuthApi, 'login').mockRejectedValue(
+      apiError(429, 'Too many codes were sent to the corporate mailbox. Try again in 2 min.', { 'retry-after': '65' }),
     )
     renderLogin()
     typePassword()
-    expect(await screen.findByText(/Too many attempts/)).toBeInTheDocument()
-    expect(screen.getByText(/15 min left/)).toBeInTheDocument()
+    const timer = await screen.findByRole('timer')
+    expect(timer).toHaveTextContent('Too many codes were sent to the corporate mailbox. Try again in 1:05.')
+    expect(timer).not.toHaveTextContent('2 min') // the server's rounded time is replaced by the live one
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+
+    await tick(1_000)
+    expect(screen.getByRole('timer')).toHaveTextContent('Try again in 1:04.')
+    await tick(59_000)
+    expect(screen.getByRole('timer')).toHaveTextContent('Try again in 0:05.')
+    expect(login).toHaveBeenCalledTimes(1) // no polling while it counts down
+
+    await tick(5_000)
+    expect(screen.queryByRole('timer')).toBeNull() // over: the message goes away
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+    expect(login).toHaveBeenCalledTimes(1)
+    await tick(2_000)
+    expect(vi.getTimerCount()).toBe(0) // and the countdown stopped ticking
+  })
+
+  it('a too-early "Send again" shows its own countdown and the button comes back', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(adminAuthApi, 'resend').mockRejectedValue(
+      apiError(429, 'Wait 3 s before requesting a new code', { 'retry-after': '3' }),
+    )
+    renderLogin()
+    typePassword()
+    await screen.findByLabelText(/^Code from the email/)
+    await tick(60_000)
+    fireEvent.click(screen.getByRole('button', { name: 'Send again' }))
+    expect(await screen.findByRole('timer')).toHaveTextContent('A new code can be requested in 0:03.')
+    await tick(3_000)
+    expect(screen.queryByRole('timer')).toBeNull()
+  })
+
+  it('a 429 without Retry-After is shown as a plain error', async () => {
+    vi.spyOn(adminAuthApi, 'login').mockRejectedValue(apiError(429, 'Too many attempts. Try again in 15 min.'))
+    renderLogin()
+    typePassword()
+    expect(await screen.findByText('Too many attempts. Try again in 15 min.')).toBeInTheDocument()
+    expect(screen.queryByRole('timer')).toBeNull()
   })
 
   it('does not keep the password in the form after it was accepted', async () => {

@@ -9,7 +9,7 @@ import { admin, fakeJwt, renderAt, tokenPair } from '@/test/render'
 import { AdminLayout, passwordExpired } from './AdminLayout'
 import { AuditTable, detailsText } from './AuditPage'
 import { PasswordPage } from './PasswordPage'
-import { formatWait } from './parts'
+import { formatClock, formatWait, lockMessage } from './parts'
 
 function axiosError(status: number, headers: Record<string, string> = {}) {
   const response = { status, statusText: '', data: {}, headers: new AxiosHeaders(headers), config: { headers: new AxiosHeaders() } }
@@ -39,6 +39,25 @@ describe('helpers', () => {
     expect(passwordExpired(undefined)).toBe(false)
     expect(passwordExpired('2000-01-01T00:00:00Z')).toBe(true)
     expect(passwordExpired('2099-01-01T00:00:00Z')).toBe(false)
+  })
+
+  it('formats an exact clock', () => {
+    expect(formatClock(0)).toBe('0:00')
+    expect(formatClock(5)).toBe('0:05')
+    expect(formatClock(65)).toBe('1:05')
+    expect(formatClock(900)).toBe('15:00')
+    expect(formatClock(3725)).toBe('1:02:05')
+    expect(formatClock(-3)).toBe('0:00')
+    expect(formatClock(9.9)).toBe('0:09')
+  })
+
+  it('replaces the server rounded time with the live one', () => {
+    expect(lockMessage('Too many attempts. Try again in 15 min.', 899)).toBe('Too many attempts. Try again in 14:59.')
+    expect(lockMessage('Too many codes were sent to the corporate mailbox. Try again in 9 min.', 541))
+      .toBe('Too many codes were sent to the corporate mailbox. Try again in 9:01.')
+    expect(lockMessage('Wait 42 s before requesting a new code', 42)).toBe('A new code can be requested in 0:42.')
+    expect(lockMessage('Try again in 3 min.', 10)).toBe('Too many attempts. Try again in 0:10.')
+    expect(lockMessage('Some other limit', 10)).toBe('Some other limit Try again in 0:10.')
   })
 
   it('formats lock times', () => {

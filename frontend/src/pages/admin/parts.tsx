@@ -128,3 +128,23 @@ export function RankBadge({ rank }: { rank: number }) {
 export function formatWait(seconds: number): string {
   return seconds >= 60 ? `${Math.ceil(seconds / 60)} min` : `${seconds} s`
 }
+
+/** Exact "m:ss" (or "h:mm:ss") for a countdown in whole seconds. */
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = String(s % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
+}
+
+/**
+ * A 429 text with a live time. The server says the wait only once (Retry-After); its own rounded
+ * "Try again in 9 min." / "Wait 42 s ..." is dropped and replaced by the browser's own countdown.
+ */
+export function lockMessage(detail: string, secondsLeft: number): string {
+  const clock = formatClock(secondsLeft)
+  if (/^Wait \d+ s before/.test(detail)) return `A new code can be requested in ${clock}.`
+  const what = detail.replace(/\s*Try again in \d+ min\.?\s*$/, '').trim() || 'Too many attempts.'
+  return `${what} Try again in ${clock}.`
+}

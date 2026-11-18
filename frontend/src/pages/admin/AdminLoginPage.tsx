@@ -7,14 +7,14 @@ import { errorMessage, retryAfter, statusOf } from '@/api/client'
 import { adminAuthApi } from '@/api/endpoints'
 import type { TwoFactorRequired } from '@/api/types'
 import { useAuth } from '@/auth/AuthContext'
-import { formatWait } from './parts'
+import { formatWait, lockMessage } from './parts'
 
 /** Seconds left until `deadline` (ms), ticking once a second. */
 export function useCountdown(deadline: number | null): number {
   const [, setTick] = useState(0)
   useEffect(() => {
     if (deadline === null) return
-    const id = window.setInterval(() => setTick((t) => t + 1), 1000)
+    const id = window.setInterval(() => setTick((t) => t + 1), 250)
     return () => window.clearInterval(id)
   }, [deadline])
   // Read the clock on every render: a stale "now" from before the deadline was set would show 61 s.
@@ -36,19 +36,29 @@ export function AdminLoginPage() {
   const [info, setInfo] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [sentAt, setSentAt] = useState<number | null>(null)
-  const [lockedUntil, setLockedUntil] = useState<number | null>(null)
+  // A 429: when it ends (computed once from Retry-After) and the server's text. Counted down here, never polled.
+  const [lock, setLock] = useState<{ until: number; text: string } | null>(null)
 
   const resendIn = useCountdown(challenge && sentAt ? sentAt + challenge.resend_seconds * 1000 : null)
   const codeLeft = useCountdown(challenge && sentAt ? sentAt + challenge.code_seconds * 1000 : null)
-  const lockLeft = useCountdown(lockedUntil)
+  const lockLeft = useCountdown(lock?.until ?? null)
+
+  // The wait is over: the lock message goes away and the buttons work again.
+  useEffect(() => {
+    if (lock && lockLeft === 0) setLock(null)
+  }, [lock, lockLeft])
 
   if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />
 
   const fail = (e: unknown) => {
     setInfo(null)
-    setError(errorMessage(e))
     const wait = statusOf(e) === 429 ? retryAfter(e) : undefined
-    if (wait) setLockedUntil(Date.now() + wait * 1000)
+    if (wait) {
+      setError(null)
+      setLock({ until: Date.now() + wait * 1000, text: errorMessage(e) })
+    } else {
+      setError(errorMessage(e))
+    }
   }
 
   const submitPassword = async (e: FormEvent) => {
@@ -138,10 +148,14 @@ export function AdminLoginPage() {
             </Typography>
           </Stack>
 
+          {lock && lockLeft > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }} role="timer" aria-live="off">
+              {lockMessage(lock.text, lockLeft)}
+            </Alert>
+          )}
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
-              {lockLeft > 0 && ` (${formatWait(lockLeft)} left)`}
             </Alert>
           )}
           {info && (
