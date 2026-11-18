@@ -2,10 +2,11 @@ from collections.abc import Callable
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import client_ip
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.models import Customer, DeviceStatus, Employee, Role, StaffDevice, User, UserStatus
@@ -15,6 +16,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login/")
 optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login/", auto_error=False)
 
 DB = Annotated[Session, Depends(get_db)]
+
+
+def _ip(request: Request) -> str:
+    return client_ip(request)
+
+
+ClientIP = Annotated[str, Depends(_ip)]
 
 _credentials_error = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,

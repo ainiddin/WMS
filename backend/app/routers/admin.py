@@ -1,3 +1,4 @@
+from datetime import date, datetime, time, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -5,17 +6,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core import rate_limit
-from app.core.deps import DB, require_role
-from app.models import DeviceStatus, Employee, Role, StaffDevice, User, UserStatus
+from app.core.deps import DB, ClientIP, require_role
+from app.models import AuditAction, AuditLog, DeviceStatus, Employee, Role, StaffDevice, User, UserStatus
 from app.schemas.people import (
     AdminUserOut,
     ApproveRequest,
+    AuditLogOut,
     ChangeRoleRequest,
     EmployeeOut,
     StaffDeviceOut,
     TeamChangeRequest,
 )
-from app.services import device_service, user_service
+from app.services import audit_service, device_service, user_service
+from app.services.timeutil import local_tz
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -43,46 +46,58 @@ def list_users(
 
 
 @router.post("/users/{user_id}/approve/", response_model=AdminUserOut)
-def approve_user(user_id: int, data: ApproveRequest, db: DB, admin: Admin):
+def approve_user(user_id: int, data: ApproveRequest, db: DB, admin: Admin, ip: ClientIP):
     """Approve a PENDING Manager/Worker. The Admin picks the final role and, for a Worker, the team (manager_id)."""
     user = user_service.approve_staff(db, user_service.get_user(db, user_id), Role(data.role), data.manager_id, admin)
+    audit_service.log(db, AuditAction.USER_APPROVED, admin, user, ip, role=user.role, manager_id=data.manager_id)
     db.commit()
     return user
 
 
 @router.post("/users/{user_id}/reject/", response_model=AdminUserOut)
-def reject_user(user_id: int, db: DB, admin: Admin):
+def reject_user(user_id: int, db: DB, admin: Admin, ip: ClientIP):
     user = user_service.reject_staff(db, user_service.get_user(db, user_id), admin)
+    audit_service.log(db, AuditAction.USER_REJECTED, admin, user, ip)
     db.commit()
     return user
 
 
 @router.post("/users/{user_id}/block/", response_model=AdminUserOut)
-def block_user(user_id: int, db: DB, admin: Admin):
+def block_user(user_id: int, db: DB, admin: Admin, ip: ClientIP):
     user = user_service.block_user(db, user_service.get_user(db, user_id), admin)
+    audit_service.log(db, AuditAction.USER_BLOCKED, admin, user, ip)
     db.commit()
     return user
 
 
 @router.post("/users/{user_id}/unblock/", response_model=AdminUserOut)
-def unblock_user(user_id: int, db: DB, _: Admin):
+def unblock_user(user_id: int, db: DB, admin: Admin, ip: ClientIP):
     user = user_service.unblock_user(db, user_service.get_user(db, user_id))
+    audit_service.log(db, AuditAction.USER_UNBLOCKED, admin, user, ip)
     db.commit()
     return user
 
 
 @router.post("/users/{user_id}/clear-login-timer/", response_model=AdminUserOut)
-def clear_login_timer(user_id: int, db: DB, _: Admin):
+def clear_login_timer(user_id: int, db: DB, admin: Admin, ip: ClientIP):
     """Unlock an account after too many wrong passwords: the failed-login counter of its email is cleared,
     so the user may sign in at once instead of waiting for the timer (HTTP 429 / Retry-After)."""
     user = user_service.get_user(db, user_id)
+    failures, _ = rate_limit.login_timer(user.email)
     rate_limit.clear_login_timer(user.email)
+    audit_service.log(db, AuditAction.LOGIN_TIMER_CLEARED, admin, user, ip, failed_logins=failures)
+    db.commit()
     return user
 
 
 @router.patch("/users/{user_id}/role/", response_model=AdminUserOut)
-def change_role(user_id: int, data: ChangeRoleRequest, db: DB, admin: Admin):
-    user = user_service.change_role(db, user_service.get_user(db, user_id), Role(data.role), data.manager_id, admin)
+def change_role(user_id: int, data: ChangeRoleRequest, db: DB, admin: Admin, ip: ClientIP):
+    user = user_service.get_user(db, user_id)
+    old_role = user.role
+    old_manager = user.employee.manager_id if user.employee else None
+    user = user_service.change_role(db, user, Role(data.role), data.manager_id, admin)
+    audit_service.log(db, AuditAction.ROLE_CHANGED, admin, user, ip, old_role=old_role, new_role=user.role,
+                      old_manager_id=old_manager, new_manager_id=user.employee.manager_id)
     db.commit()
     return user
 
@@ -99,12 +114,15 @@ def list_employees(db: DB, _: Admin, role: Role | None = None, manager_id: int |
 
 
 @router.patch("/employees/{employee_id}/team/", response_model=EmployeeOut)
-def change_team(employee_id: int, data: TeamChangeRequest, db: DB, _: Admin):
+def change_team(employee_id: int, data: TeamChangeRequest, db: DB, admin: Admin, ip: ClientIP):
     """Move a Worker to another Manager's team."""
     employee = db.get(Employee, employee_id)
     if employee is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Employee not found")
+    old_manager = employee.manager_id
     user_service.change_team(db, employee, data.manager_id)
+    audit_service.log(db, AuditAction.TEAM_CHANGED, admin, employee.user, ip,
+                      old_manager_id=old_manager, new_manager_id=employee.manager_id)
     db.commit()
     return employee
 
@@ -120,15 +138,53 @@ def list_devices(db: DB, admin: Admin, device_status: Annotated[DeviceStatus | N
 
 
 @router.post("/devices/{device_id}/approve/", response_model=StaffDeviceOut)
-def approve_device(device_id: int, db: DB, admin: Admin):
+def approve_device(device_id: int, db: DB, admin: Admin, ip: ClientIP):
     device = device_service.approve(device_service.get_device(db, device_id), admin)
+    audit_service.log(db, AuditAction.DEVICE_APPROVED, admin, device.user, ip,
+                      device_id=device.id, device_name=device.device_name)
     db.commit()
     return StaffDeviceOut.from_device(device, admin.device_id)
 
 
 @router.post("/devices/{device_id}/revoke/", response_model=StaffDeviceOut)
-def revoke_device(device_id: int, db: DB, admin: Admin):
+def revoke_device(device_id: int, db: DB, admin: Admin, ip: ClientIP):
     """Block a phone (lost, stolen, unknown request). Its tokens stop working at once."""
     device = device_service.revoke(device_service.get_device(db, device_id), admin, admin.device_id)
+    audit_service.log(db, AuditAction.DEVICE_REVOKED, admin, device.user, ip,
+                      device_id=device.id, device_name=device.device_name)
     db.commit()
     return StaffDeviceOut.from_device(device, admin.device_id)
+
+
+# ---- Audit log ----
+@router.get("/audit/", response_model=list[AuditLogOut])
+def audit_log(
+    db: DB,
+    _: Admin,
+    action: AuditAction | None = None,
+    actor_id: int | None = None,
+    target_user_id: int | None = None,
+    user_id: Annotated[int | None, Query(description="Actor OR target")] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    """Newest first. Dates are calendar days in the shop time zone, both ends included."""
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "date_from must not be after date_to")
+    stmt = select(AuditLog)
+    if action:
+        stmt = stmt.where(AuditLog.action == action)
+    if actor_id:
+        stmt = stmt.where(AuditLog.actor_id == actor_id)
+    if target_user_id:
+        stmt = stmt.where(AuditLog.target_user_id == target_user_id)
+    if user_id:
+        stmt = stmt.where((AuditLog.actor_id == user_id) | (AuditLog.target_user_id == user_id))
+    if date_from:
+        stmt = stmt.where(AuditLog.created_at >= datetime.combine(date_from, time.min, local_tz()))
+    if date_to:
+        stmt = stmt.where(AuditLog.created_at < datetime.combine(date_to + timedelta(days=1), time.min, local_tz()))
+    stmt = stmt.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).limit(limit).offset(offset)
+    return db.scalars(stmt).all()

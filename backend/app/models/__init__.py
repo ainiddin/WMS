@@ -1,4 +1,5 @@
 from app.models.accounts import Account, AccountTransaction
+from app.models.audit import AuditAction, AuditLog
 from app.models.catalog import Category, Product, Supplier
 from app.models.common import DeviceStatus, MovementType, OrderStatus, Role, TransactionType, UserStatus
 from app.models.device import StaffDevice
@@ -10,6 +11,8 @@ from app.models.verification import EmailVerification
 __all__ = [
     "Account",
     "AccountTransaction",
+    "AuditAction",
+    "AuditLog",
     "Category",
     "Customer",
     "DeviceStatus",

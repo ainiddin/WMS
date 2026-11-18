@@ -96,3 +96,15 @@ class StaffDeviceOut(ORMModel):
             user_email=device.user.email, user_full_name=device.user.full_name, user_role=device.user.role,
             current=device.id == current_device_id,
         )
+
+
+class AuditLogOut(ORMModel):
+    id: int
+    created_at: datetime
+    action: str
+    actor_id: int | None
+    actor_email: str | None
+    target_user_id: int | None
+    target_email: str | None
+    ip: str | None
+    details: dict
