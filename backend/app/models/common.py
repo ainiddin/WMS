@@ -68,3 +68,8 @@ def created_at_column():
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def utcnow_seconds() -> datetime:
+    """Now without the fraction of a second, comparable with a JWT `iat`."""
+    return datetime.now(UTC).replace(microsecond=0)

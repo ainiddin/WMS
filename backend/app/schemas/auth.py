@@ -70,6 +70,8 @@ class UserOut(ORMModel):
     manager_id: int | None = None
     customer_id: int | None = None
     customer_code: str | None = None
+    # Admins only: the password must be changed before this moment (then only /me and /password work).
+    password_expires_at: datetime | None = None
 
     @classmethod
     def from_user(cls, user) -> "UserOut":
@@ -81,6 +83,9 @@ class UserOut(ORMModel):
         if user.customer:
             out.customer_id = user.customer.id
             out.customer_code = user.customer.code
+        from app.services.user_service import password_expires_at  # avoid an import cycle
+
+        out.password_expires_at = password_expires_at(user)
         return out
 
 
@@ -124,3 +129,8 @@ class TwoFactorVerify(BaseModel):
 
 class TwoFactorResend(BaseModel):
     challenge_token: ChallengeToken
+
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: Password

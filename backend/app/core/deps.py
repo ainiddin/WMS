@@ -49,29 +49,46 @@ def check_staff_device(db: Session, user: User, device_id: object, web_session: 
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Sign in again: this phone has not passed the email code")
 
 
-def _user_from_token(db: Session, token: str) -> User:
+# With an expired Admin password only these work: see who I am, and change the password.
+PASSWORD_EXPIRED_ALLOWED = {"/api/auth/me/", "/api/auth/password/"}
+
+
+def token_older_than_password(payload: dict, user: User) -> bool:
+    """A password change signs out every session made before it (iat is in whole seconds)."""
+    return int(payload.get("iat", 0)) < int(user.password_changed_at.timestamp())
+
+
+def _user_from_token(db: Session, token: str, path: str | None = None) -> User:
     try:
         payload = decode_token(token, "access")
         user_id = int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         raise _credentials_error from None
     user = db.get(User, user_id)
-    if user is None:
+    if user is None or token_older_than_password(payload, user):
         raise _credentials_error
     # Checked on every request, so a BLOCKED user loses access at once, not when the token expires.
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
     check_staff_device(db, user, payload.get("dev"), payload.get("web"))
     user.device_id = payload.get("dev")  # not a column: lets an Admin see which phone he is on
+    if path is not None and path not in PASSWORD_EXPIRED_ALLOWED:
+        from app.services.user_service import password_expired  # avoid an import cycle
+
+        if password_expired(user):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Your password has expired. Change it to continue.",
+                                headers={"X-Password-Expired": "1"})
     return user
 
 
-def get_current_user(db: DB, token: Annotated[str, Depends(oauth2_scheme)]) -> User:
-    return _user_from_token(db, token)
+def get_current_user(db: DB, request: Request, token: Annotated[str, Depends(oauth2_scheme)]) -> User:
+    return _user_from_token(db, token, request.url.path)
 
 
-def get_optional_user(db: DB, token: Annotated[str | None, Depends(optional_oauth2_scheme)]) -> User | None:
-    return _user_from_token(db, token) if token else None
+def get_optional_user(
+    db: DB, request: Request, token: Annotated[str | None, Depends(optional_oauth2_scheme)]
+) -> User | None:
+    return _user_from_token(db, token, request.url.path) if token else None
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

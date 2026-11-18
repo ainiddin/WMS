@@ -8,13 +8,14 @@ from sqlalchemy import select
 
 from app.core import rate_limit
 from app.core.config import settings
-from app.core.deps import DB, CurrentUser, check_staff_device
+from app.core.deps import DB, ClientIP, CurrentUser, check_staff_device, token_older_than_password
 from app.core.security import create_token, decode_token, verify_password
-from app.models import Role, User, UserStatus
+from app.models import AuditAction, Role, User, UserStatus
 from app.models.common import utcnow
 from app.models.common import STAFF_ROLES
 from app.schemas.auth import (
     AdminLogin,
+    ChangePassword,
     CustomerRegister,
     RefreshRequest,
     SendCodeRequest,
@@ -28,7 +29,7 @@ from app.schemas.auth import (
     UserOut,
 )
 from app.schemas.common import Message
-from app.services import device_service, two_factor_service, user_service
+from app.services import audit_service, device_service, two_factor_service, user_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -171,7 +172,7 @@ def refresh(data: RefreshRequest, db: DB):
         user = db.get(User, int(payload["sub"]))
     except (jwt.PyJWTError, KeyError, ValueError):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token") from None
-    if user is None or user.status != UserStatus.ACTIVE:
+    if user is None or user.status != UserStatus.ACTIVE or token_older_than_password(payload, user):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
     check_staff_device(db, user, payload.get("dev"), payload.get("web"))
     # A website Admin session keeps its hard end: refresh never makes it longer.
@@ -182,3 +183,22 @@ def refresh(data: RefreshRequest, db: DB):
 @router.get("/me/", response_model=UserOut)
 def me(user: CurrentUser):
     return UserOut.from_user(user)
+
+
+@router.post("/password/", response_model=TokenPair)
+def change_password(data: ChangePassword, db: DB, user: CurrentUser, request: Request, ip: ClientIP):
+    """Change my password. Every other session (all tokens issued before) stops working; this one gets new tokens.
+    A wrong current password counts as a failed login (brute-force limits)."""
+    rate_limit.check_login(ip, user.email)
+    try:
+        user_service.change_password(user, data.old_password, data.new_password)
+    except HTTPException as exc:
+        if exc.detail == "The current password is wrong":
+            rate_limit.login_failed(ip, user.email)
+        raise
+    audit_service.log(db, AuditAction.PASSWORD_CHANGED, user, user, ip)
+    db.commit()
+    token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+    payload = decode_token(token, "access")
+    session_ends = datetime.fromtimestamp(payload["web"], UTC) if "web" in payload else None
+    return _tokens(user, payload.get("dev"), session_ends)

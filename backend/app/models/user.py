@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
-from app.models.common import Role, UserStatus, created_at_column, in_check
+from app.models.common import Role, UserStatus, created_at_column, in_check, utcnow_seconds
 
 
 class User(Base):
@@ -30,6 +30,12 @@ class User(Base):
     requested_role: Mapped[str | None] = mapped_column(String(10))
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Tokens issued before this moment stop working (a password change signs out every other session).
+    # Set by the app (not the database clock: on hosting they are different machines), in whole seconds
+    # like the token `iat`.
+    password_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), default=lambda: utcnow_seconds(), nullable=False
+    )
     created_at: Mapped[datetime] = created_at_column()
 
     approved_by: Mapped["User | None"] = relationship(remote_side=[id])

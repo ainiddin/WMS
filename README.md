@@ -185,6 +185,9 @@ backend/app/
     sent automatically; "Send again" once a minute; at most 3 codes per account in 15 min, then 429 (cleared by
     Clear timer). Website: `POST /api/auth/admin/login/` → `POST /api/auth/2fa/verify/`, the session ends hard after
     4 hours. App: the code is asked once per phone (`/staff/login/` answers 202). Every step is in the audit log.
+13. Passwords: `POST /api/auth/password/` (current + new; the new one must differ from the previous, checked only
+    on the server). A change signs out every older session. An Admin must change the password every 180 days;
+    with an expired password only `/api/auth/me/` and `/api/auth/password/` work (403 + `X-Password-Expired`).
 12. Audit log (`audit_log`, `GET /api/admin/audit/`): who did what to whom, when, from which IP. Append-only:
     PostgreSQL refuses UPDATE and DELETE.
 

@@ -4,10 +4,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from datetime import datetime, timedelta
+
 from app.core.config import settings
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.models import Account, Customer, Employee, Role, User, UserStatus
-from app.models.common import utcnow
+from app.models.common import utcnow, utcnow_seconds
 from app.schemas.auth import CustomerRegister, StaffRegister
 from app.services import assignment_service, email_service
 
@@ -185,3 +187,26 @@ def ensure_first_admin(db: Session) -> User | None:
     db.add(admin)
     db.flush()
     return admin
+
+
+def password_expires_at(user: User) -> datetime | None:
+    """Only Admins have to change the password regularly."""
+    if user.role != Role.ADMIN:
+        return None
+    return user.password_changed_at + timedelta(days=settings.ADMIN_PASSWORD_MAX_DAYS)
+
+
+def password_expired(user: User) -> bool:
+    expires = password_expires_at(user)
+    return expires is not None and expires <= utcnow()
+
+
+def change_password(user: User, old_password: str, new_password: str) -> None:
+    """The old password must be right and the new one must differ from it. Checked only here, on the server:
+    bcrypt.checkpw hashes the new password with the old hash's salt and compares."""
+    if not verify_password(old_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The current password is wrong")
+    if verify_password(new_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The new password must differ from the previous one")
+    user.password_hash = hash_password(new_password)
+    user.password_changed_at = utcnow_seconds()

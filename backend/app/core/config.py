@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     TWO_FACTOR_MAX_CODES: int = 3               # codes per account per window (sign in + auto + resend)
     TWO_FACTOR_WINDOW_SECONDS: int = 15 * 60
     ADMIN_WEB_SESSION_HOURS: int = 4            # website session of an Admin; then password + code again
+    ADMIN_PASSWORD_MAX_DAYS: int = 180          # an Admin must change the password this often
 
     # Password for all demo users created by `python -m app.seed --demo`.
     DEMO_PASSWORD: str | None = None
