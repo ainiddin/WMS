@@ -177,6 +177,8 @@ export interface WebLoginStarted {
   seconds: number;
   phone_available: boolean;
   role: Role;
+  /** No phone step (switched off for Managers): collect the session at once. */
+  confirmed: boolean;
 }
 
 export interface WebLoginState {

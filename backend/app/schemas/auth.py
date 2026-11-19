@@ -127,6 +127,7 @@ class WebLoginStarted(BaseModel):
     expires_at: datetime
     seconds: int  # how long the phone has to answer; the browser counts down from its own clock
     phone_available: bool  # False: an Admin without an approving phone goes straight to the email code
+    confirmed: bool = False  # True: no phone step (switched off for Managers), ask /web/status/ at once
     role: str
 
 

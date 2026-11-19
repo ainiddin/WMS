@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     WEB_LOGIN_SECONDS: int = 120                # the phone must answer within 2 minutes
     WEB_LOGIN_MAX_REQUESTS: int = 5             # unfinished website sign ins per account per window
     WEB_LOGIN_WINDOW_SECONDS: int = 15 * 60
+    # Managers confirm website sign ins on their phone. Keep True in production. False (only for a demo where
+    # Managers have no phone) lets a Manager in with the password alone; every such sign in is in the audit log.
+    MANAGER_WEB_PHONE_CONFIRM: bool = True
     ADMIN_PASSWORD_MAX_DAYS: int = 180          # an Admin must change the password this often
 
     # Staff join only by invitation from a Manager.
