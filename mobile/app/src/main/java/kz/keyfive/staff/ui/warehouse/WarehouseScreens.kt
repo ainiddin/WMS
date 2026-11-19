@@ -274,8 +274,9 @@ fun OrderMeta(order: Order) {
 }
 
 /**
- * Picking: every unit is counted. The first unit of a line must be scanned (proves the right product is in hand);
- * after that the rest can be scanned again, added with +, or typed in. Lines without a barcode are counted by hand.
+ * Picking: every unit is counted. The first unit of a line needs its barcode, scanned with the camera or typed in by
+ * hand (proves the right product is in hand); after that the rest can be scanned or typed again, added with +, or
+ * the count typed in. Lines without a barcode are counted by hand.
  * Shipping is possible only when every line has exactly the ordered quantity.
  */
 @Composable
@@ -287,7 +288,7 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
     fun count(item: OrderItem) = picked[item.id] ?: 0
     fun unlocked(item: OrderItem) = item.barcode == null || count(item) > 0
     fun setCount(item: OrderItem, n: Int) {
-        val min = if (item.barcode != null) 1 else 0 // a scanned line keeps at least the scanned unit
+        val min = if (item.barcode != null) 1 else 0 // a confirmed line keeps at least the confirmed unit
         picked[item.id] = n.coerceIn(min, item.quantity)
     }
 
@@ -312,7 +313,7 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
             LazyColumn(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item { Text("Ship order ${order.code}", style = MaterialTheme.typography.titleLarge) }
                 item { OrderMeta(order) }
-                item { BarcodeField("Scan every unit", ::onScan) }
+                item { BarcodeField("Scan or type the barcode", ::onScan) }
                 message?.let { (ok, text) ->
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = (if (ok) Green else Red).copy(alpha = 0.12f))) {
@@ -334,7 +335,7 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
                         Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                             Text("${item.quantity} × ${item.productName}")
                             Text(
-                                if (item.barcode != null) "${item.productCode} · ${item.barcode}${if (open) "" else " · scan it first"}"
+                                if (item.barcode != null) "${item.productCode} · ${item.barcode}${if (open) "" else " · scan or type it first"}"
                                 else "${item.productCode} · no barcode: count by hand",
                                 style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

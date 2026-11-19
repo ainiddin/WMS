@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -355,11 +356,14 @@ fun scanBarcode(context: Context, onCode: (String) -> Unit) {
         .addOnFailureListener { context.toast("Scanner is not available: ${it.localizedMessage}. Type the code instead.") }
 }
 
-/** Text field for a barcode with a camera button. Enter or the camera submits the code. */
+/** Text field for a barcode: type it (Enter or the send button) or use the camera button. */
 @Composable
 fun BarcodeField(label: String = "Barcode", onSubmit: (String) -> Unit) {
     val context = LocalContext.current
     var code by remember { mutableStateOf("") }
+    fun submit() {
+        if (code.isNotBlank()) onSubmit(code).also { code = "" }
+    }
     OutlinedTextField(
         value = code,
         onValueChange = { value -> code = value.filter { it.isDigit() }.take(14) },
@@ -370,12 +374,15 @@ fun BarcodeField(label: String = "Barcode", onSubmit: (String) -> Unit) {
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
             imeAction = androidx.compose.ui.text.input.ImeAction.Search,
         ),
-        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = {
-            if (code.isNotBlank()) onSubmit(code).also { code = "" }
-        }),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { submit() }, onDone = { submit() }),
         trailingIcon = {
-            IconButton(onClick = { scanBarcode(context) { onSubmit(it) } }) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan with camera")
+            Row {
+                if (code.isNotBlank()) {
+                    IconButton(onClick = { submit() }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enter the typed code") }
+                }
+                IconButton(onClick = { scanBarcode(context) { onSubmit(it) } }) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan with camera")
+                }
             }
         },
     )
