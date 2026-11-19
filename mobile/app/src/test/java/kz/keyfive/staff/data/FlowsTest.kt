@@ -215,4 +215,21 @@ class FlowsTest {
         assertEquals(listOf(83, 47, 12), req.choices)
         assertNull(req.userAgent)
     }
+
+    // ---- barcode field ----
+    @Test
+    fun `no camera means typing only, otherwise ask first and then scan`() {
+        assertEquals(CameraMode.NONE, cameraMode(hasCamera = false, permissionGranted = false))
+        assertEquals(CameraMode.NONE, cameraMode(hasCamera = false, permissionGranted = true))
+        assertEquals(CameraMode.ASK, cameraMode(hasCamera = true, permissionGranted = false))
+        assertEquals(CameraMode.READY, cameraMode(hasCamera = true, permissionGranted = true))
+    }
+
+    @Test
+    fun `typed barcodes keep only digits`() {
+        assertEquals("4870000000031", barcodeInput("4870 0000 0003 1"))
+        assertEquals("4870000000031", barcodeInput("4870-0000-0003-1"))
+        assertEquals("12345678901234", barcodeInput("123456789012345678"))
+        assertEquals("", barcodeInput("abc"))
+    }
 }

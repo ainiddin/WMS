@@ -1,5 +1,13 @@
 package kz.keyfive.staff.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import kz.keyfive.staff.data.CameraMode
+import kz.keyfive.staff.data.barcodeInput
+import kz.keyfive.staff.data.cameraMode
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -356,17 +364,32 @@ fun scanBarcode(context: Context, onCode: (String) -> Unit) {
         .addOnFailureListener { context.toast("Scanner is not available: ${it.localizedMessage}. Type the code instead.") }
 }
 
-/** Text field for a barcode: type it (Enter or the send button) or use the camera button. */
+/**
+ * Barcode field: type the code and send it (Enter or the send button), or use the camera.
+ * Before the first scan the app asks for camera access; if it is refused, or the device has no camera,
+ * the code is simply typed (the camera button is hidden when there is no camera).
+ */
 @Composable
 fun BarcodeField(label: String = "Barcode", onSubmit: (String) -> Unit) {
     val context = LocalContext.current
     var code by remember { mutableStateOf("") }
+    val hasCamera = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
+    var granted by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }
+    val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        granted = ok
+        if (ok) scanBarcode(context) { onSubmit(it) }
+        else context.toast("No camera access: type the barcode and press Enter or the send button.")
+    }
     fun submit() {
         if (code.isNotBlank()) onSubmit(code).also { code = "" }
     }
+    val mode = cameraMode(hasCamera, granted)
+
     OutlinedTextField(
         value = code,
-        onValueChange = { value -> code = value.filter { it.isDigit() }.take(14) },
+        onValueChange = { value -> code = barcodeInput(value) },
         label = { Text(label) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
@@ -375,13 +398,27 @@ fun BarcodeField(label: String = "Barcode", onSubmit: (String) -> Unit) {
             imeAction = androidx.compose.ui.text.input.ImeAction.Search,
         ),
         keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { submit() }, onDone = { submit() }),
+        supportingText = {
+            Text(
+                when (mode) {
+                    CameraMode.NONE -> "No camera on this device: type the barcode and press Enter or the send button"
+                    CameraMode.ASK -> "Type the barcode, or tap the camera (the app will ask for access)"
+                    CameraMode.READY -> "Type the barcode, or tap the camera to scan"
+                },
+            )
+        },
         trailingIcon = {
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (code.isNotBlank()) {
                     IconButton(onClick = { submit() }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enter the typed code") }
                 }
-                IconButton(onClick = { scanBarcode(context) { onSubmit(it) } }) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan with camera")
+                if (mode != CameraMode.NONE) {
+                    IconButton(onClick = {
+                        if (mode == CameraMode.READY) scanBarcode(context) { onSubmit(it) }
+                        else askCamera.launch(Manifest.permission.CAMERA)
+                    }) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan with camera")
+                    }
                 }
             }
         },

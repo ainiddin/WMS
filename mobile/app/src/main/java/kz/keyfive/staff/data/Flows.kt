@@ -130,3 +130,15 @@ fun describeBrowser(userAgent: String?): String {
         else -> "Unknown browser"
     }
 }
+
+/** What the camera button does: hidden (no camera), ask for access first, or scan. */
+enum class CameraMode { NONE, ASK, READY }
+
+fun cameraMode(hasCamera: Boolean, permissionGranted: Boolean): CameraMode = when {
+    !hasCamera -> CameraMode.NONE
+    !permissionGranted -> CameraMode.ASK
+    else -> CameraMode.READY
+}
+
+/** A typed barcode: digits only, at most 14 (EAN-13, EAN-8, UPC-A, GTIN-14). */
+fun barcodeInput(typed: String): String = typed.filter(Char::isDigit).take(14)
