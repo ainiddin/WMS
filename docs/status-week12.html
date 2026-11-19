@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KeyFive WMS Status</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5d6673; --line: #e2e6eb;
+    --ok: #1a7f37; --ok-bg: #e6f4ea; --part: #9a6700; --part-bg: #fff4d6;
+    --no: #c62828; --no-bg: #fdecea; --vague: #57606a; --vague-bg: #eef0f3; --accent: #2457c5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --card: #171b21; --text: #e6e9ed; --muted: #9aa4b1; --line: #2a3038;
+      --ok: #57c776; --ok-bg: #16301f; --part: #e3b341; --part-bg: #33290f;
+      --no: #f07171; --no-bg: #3a1a1a; --vague: #a8b1bd; --vague-bg: #232930; --accent: #7aa2ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1216; --card: #171b21; --text: #e6e9ed; --muted: #9aa4b1; --line: #2a3038;
+    --ok: #57c776; --ok-bg: #16301f; --part: #e3b341; --part-bg: #33290f;
+    --no: #f07171; --no-bg: #3a1a1a; --vague: #a8b1bd; --vague-bg: #232930; --accent: #7aa2ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 19px; margin: 36px 0 12px; }
+  h3 { font-size: 15px; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0; }
+  code { font: 13px ui-monospace, Consolas, monospace; background: var(--vague-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .tile b { display: block; font-size: 28px; line-height: 1.1; }
+  .tile span { color: var(--muted); font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  .tbl { overflow-x: auto; padding: 0; }
+  .tbl table { min-width: 620px; }
+  .pill { display: inline-block; white-space: nowrap; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+  .ok { color: var(--ok); background: var(--ok-bg); }
+  .part { color: var(--part); background: var(--part-bg); }
+  .no { color: var(--no); background: var(--no-bg); }
+  .vague { color: var(--vague); background: var(--vague-bg); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin: 3px 0; }
+  .muted { color: var(--muted); }
+  .todo li { margin: 8px 0; }
+  .prio { font-size: 11px; font-weight: 700; margin-right: 6px; }
+  .commit { font: 12px ui-monospace, Consolas, monospace; color: var(--muted); }
+  footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>KeyFive WMS — что есть и чего нет</h1>
+  <p class="sub">Состояние ветки <code>main</code> на 19.11.2026, коммит <code>48a93ff</code> (запушен на GitHub). Сверка с планом на неделю 12.</p>
+
+  <div class="tiles">
+    <div class="tile"><b style="color:var(--ok)">10</b><span>фич и исправлений за неделю</span></div>
+    <div class="tile"><b>206</b><span>тестов бэкенда проходят</span></div>
+    <div class="tile"><b>54</b><span>теста сайта проходят</span></div>
+    <div class="tile"><b style="color:var(--part)">1</b><span>часть не собрана здесь: мобилка</span></div>
+  </div>
+
+  <h2>План на неделю 12</h2>
+  <div class="card tbl">
+    <table>
+      <thead><tr><th>Пункт</th><th>Статус</th><th>Что есть сейчас</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Notification</b></td>
+          <td><span class="pill vague">Нужно уточнить</span></td>
+          <td>Есть всплывающие сообщения, письмо с кодом при регистрации, письмо-приглашение и код входа админа на корпоративную почту.
+            Писем о статусе заказа, push-уведомлений и уведомлений о низком остатке нет. Нужно решить, что именно имеется в виду.</td>
+        </tr>
+        <tr>
+          <td><b>Application</b></td>
+          <td><span class="pill vague">Нужно уточнить</span></td>
+          <td>Android-приложение KeyFive Staff для Worker / Manager / Admin есть и на этой неделе дополнено.
+            Неясно, этот пункт о нём или о чём-то другом.</td>
+        </tr>
+        <tr>
+          <td><b>Реквизиты и счета банка / confidentiality</b></td>
+          <td><span class="pill part">Частично</span></td>
+          <td>Есть счёт клиента в магазине с имитацией банка. Реквизитов (IBAN, БИК, БИН, КБе) нет.
+            По конфиденциальности прибавилось: 2FA админа, журнал действий, менеджер видит только свою команду.</td>
+        </tr>
+        <tr>
+          <td><b>Admin panel / clearing the timer</b></td>
+          <td><span class="pill ok">Готово</span></td>
+          <td>Блокировка входа после неверных паролей, админ видит её и снимает кнопкой Clear timer — на сайте и в приложении.
+            Админ-панель есть и на сайте (<code>/admin</code>). Время блокировки показывается живым таймером до секунды.</td>
+        </tr>
+        <tr>
+          <td><b>Possibility to enter the barcode</b></td>
+          <td><span class="pill ok">Готово</span></td>
+          <td>Штрихкод можно ввести вручную или отсканировать камерой. Сервер проверяет формат EAN-13.</td>
+        </tr>
+        <tr>
+          <td><b>Change the role / activate / disable</b></td>
+          <td><span class="pill ok">Готово</span></td>
+          <td>Админ меняет роль и команду, блокирует и разблокирует, одобряет и блокирует телефоны.
+            Менеджер блокирует своих работников и одобряет их телефоны — в приложении и на сайте (<code>/manage</code>).</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Сделано на этой неделе</h2>
+  <div class="card tbl">
+    <table>
+      <thead><tr><th>Фича</th><th>Что именно</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Защита от подбора пароля</b><div class="commit">27dce70</div></td>
+          <td>5 неверных паролей на email или 20 с одного IP за 15 минут — вход закрыт, даже с верным паролем.
+            Ограничены регистрации и письма с кодом. Админ снимает блокировку кнопкой Clear timer.</td>
+        </tr>
+        <tr>
+          <td><b>Журнал действий</b><div class="commit">32ebd3f</div></td>
+          <td>Кто, что, кому, когда, с какого IP: блокировки, роли, команды, телефоны, Clear timer, входы админа, приглашения, смена пароля.
+            Записи нельзя изменить или удалить — это запрещает сама база. Просмотр с фильтрами на сайте.</td>
+        </tr>
+        <tr>
+          <td><b>2FA для админа (обязательная)</b><div class="commit">e50af11</div></td>
+          <td>После пароля 6-значный код уходит <b>только</b> на одну корпоративную почту (<code>ADMIN_2FA_EMAIL</code>).
+            Код живёт 6 минут и работает один раз; после 5 неверных кодов сам уходит новый; «Отправить ещё раз» — раз в минуту;
+            не больше 3 кодов за 15 минут. На сайте сессия жёстко заканчивается через 4 часа. В приложении код спрашивается один раз на телефон.</td>
+        </tr>
+        <tr>
+          <td><b>Смена пароля админа</b><div class="commit">a6e3f4e</div></td>
+          <td>Раз в 180 дней, новый пароль не может совпадать с предыдущим (проверяется только на сервере).
+            Смена пароля выкидывает все остальные сессии этого аккаунта.</td>
+        </tr>
+        <tr>
+          <td><b>Админ-панель на сайте</b><div class="commit">0cded66</div></td>
+          <td>Ограничение «админ только с телефона» снято. На сайте: пользователи, приглашения, телефоны, показатели команд, журнал, смена пароля.
+            Код админки загружается только при открытии <code>/admin</code>, покупатели его не скачивают.</td>
+        </tr>
+        <tr>
+          <td><b>Приглашения вместо заявок</b><div class="commit">1629352</div></td>
+          <td>Самостоятельная регистрация персонала убрана. Менеджер приглашает Worker в свою команду или Manager (тот получает свою команду) — не выше своего звания.
+            Код приглашения живёт 48 часов. Менеджер видит и управляет только своей командой: участники, их телефоны, свои приглашения.
+            Админ в обычный процесс не вмешивается, но видит всё, может отозвать приглашение и пригласить первого менеджера, если в системе нет ни одного.</td>
+        </tr>
+        <tr>
+          <td><b>Мобильное приложение</b><div class="commit">98f1803</div></td>
+          <td>Шаг с кодом для админа, «У меня есть приглашение», принудительная смена пароля, экраны менеджера (приглашения, участники и телефоны),
+            приглашения всех команд у админа. <span class="muted">Код написан и покрыт unit-тестами, но в этой сессии не собран — нужно собрать в Android Studio.</span></td>
+        </tr>
+        <tr>
+          <td><b>Верный код сбрасывает счётчик</b><div class="commit">8dee6a0</div></td>
+          <td>Успешные входы больше не тратят лимит «3 кода за 15 минут»: админ, вошедший дважды подряд, не блокируется на третьем входе.
+            Подбор кода ограничен как раньше. Текст ошибки говорит, что именно случилось.</td>
+        </tr>
+        <tr>
+          <td><b>Живой таймер блокировки</b><div class="commit">2e97cb1 · cd4e464</div></td>
+          <td>На сайте и в приложении: «Try again in 8:59» идёт до секунды. Сервер присылает время один раз, дальше считает сам браузер или телефон,
+            к серверу ничего не ходит. На 0:00 кнопки снова работают.</td>
+        </tr>
+        <tr>
+          <td><b>Вход на сайт с подтверждением на телефоне (как Steam)</b><div class="commit">df92a20 · a43e5fb · 48a93ff</div></td>
+          <td>Админ и менеджер входят на <code>/staff/login</code>: пароль → сайт показывает число → на телефоне «Это вы?» с тремя числами → нажал верное, вошёл.
+            Неверное число или «Нет» отклоняют вход. Сессия на сайте 4 часа. У админа запасной вариант — код на корпоративную почту.
+            Менеджер без одобренного телефона на сайт не войдёт; работники — только приложение.</td>
+        </tr>
+        <tr>
+          <td><b>Панель менеджера на сайте</b><div class="commit">7f4a5cd</div></td>
+          <td><code>/manage</code>: дашборд, заказы, дозаказ, отчёты с Excel/PDF, товары, категории, поставщики, клиенты, показатели команды,
+            моя команда (участники и телефоны), приглашения, смена пароля. Сканирование осталось в приложении.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Как проверено</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Автотесты</h3>
+      <ul>
+        <li>Бэкенд: 206 тестов, включая краевые случаи (истёкший код, чужой код, повтор кода, приглашение в чужую команду, неверное число на телефоне)</li>
+        <li>Сайт: 54 теста (Vitest + Testing Library), добавлены в CI</li>
+        <li>Мобилка: unit-тесты логики входа, приглашений, таймера и подтверждения (<code>FlowsTest</code>), ещё не запускались</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Проверка самих тестов</h3>
+      <ul>
+        <li>Каждую защиту ломал нарочно и проверял, что тесты падают: на бэкенде пойманы все 59 поломок, на сайте 18 из 19
+          (оставшаяся безвредна: опрос статуса и так останавливается при уходе со страницы)</li>
+        <li>Прошёл весь путь в браузере: вход админа с кодом, Clear timer, журнал, приглашения, вход менеджера с подтверждением на телефоне, все страницы панели менеджера</li>
+        <li>Найдено и исправлено 5 реальных багов — тестами, ручной проверкой и ревью кода</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Чего нет и что ещё должно быть</h2>
+  <div class="card">
+    <ul class="todo">
+      <li><span class="prio no pill">Срочно</span><b>Настроить Render.</b> Без <code>ADMIN_2FA_EMAIL</code> и отправки писем (ключ Brevo) коды админа и приглашения не уходят.
+        Проверить, что после деплоя применились миграции (новые таблицы приглашений и входов с телефона). После деплоя все входят заново.</li>
+      <li><span class="prio no pill">Срочно</span><b>Собрать мобилку и прогнать её тесты</b> в Android Studio (<code>gradlew testDebugUnitTest</code>), пройти новые экраны на эмуляторе.</li>
+      <li><span class="prio part pill">Решить</span><b>Кто одобряет телефон нового менеджера.</b> Сейчас — админ, как раньше; телефон работника одобряет его менеджер.</li>
+      <li><span class="prio no pill">Важно</span><b>Уведомления</b> — договориться, что нужно (письма о заказах, низкий остаток, новые телефоны).</li>
+      <li><span class="prio no pill">Важно</span><b>Банковские реквизиты</b> — где хранить, кто видит, как маскировать номера счетов.</li>
+      <li><span class="prio part pill">Желательно</span><b>Восстановление пароля</b> («Забыли пароль?» по коду из письма) — пока нет.</li>
+      <li><span class="prio part pill">Желательно</span><b>Сброс блокировки по IP</b> — Clear timer снимает только блокировку по email.</li>
+      <li><span class="prio vague pill">Позже</span><b>Система званий</b> — менеджер пока не меняет роли, это нужно обсудить с бизнесом.</li>
+      <li><span class="prio vague pill">Позже</span><b>Счётчики попыток в памяти сервера</b> обнуляются при перезапуске; при нескольких серверах их нужно перенести в базу или Redis.</li>
+      <li><span class="prio vague pill">Позже</span><b>Сборка мобилки в CI</b> — сейчас CI собирает только бэкенд и сайт.</li>
+    </ul>
+  </div>
+
+  <h2>Решения, принятые на этой неделе</h2>
+  <div class="card">
+    <ul>
+      <li>Телефон нового <b>менеджера</b> одобряет админ, как и раньше; телефон <b>работника</b> — его менеджер.</li>
+      <li>Вход на сайт для админа и менеджера подтверждается на телефоне (как Steam) со сверкой числа; неверное число отклоняет вход.</li>
+      <li>Сессия на сайте 4 часа и для менеджера (как у админа).</li>
+      <li>Успешный вход сбрасывает счётчики попыток; таймеры блокировки считаются на устройстве, без опроса сервера.</li>
+      <li>Сессия сайта на токенах (не cookie), с жёстким концом через 4 часа.</li>
+      <li>Модель команд прежняя: команда — это менеджер (<code>manager_id</code>), без отдельной таблицы команд.</li>
+      <li>Старые заявки на регистрацию, если остались, админ может одобрить в «Пользователях».</li>
+    </ul>
+  </div>
+
+  <h2>Мелочи по окружению</h2>
+  <div class="card">
+    <ul>
+      <li>В <code>backend/.env</code> база указана на порту 5434, а локальный PostgreSQL слушает 5432.</li>
+      <li>Ветки <code>feat/*</code> и <code>add-login-rate-limit</code> уже в <code>main</code>, их можно удалить.</li>
+      <li>Локально без настроенной почты код админа и приглашения пишутся в лог сервера.</li>
+      <li>Приложение по умолчанию ходит на бэкенд на Render; для локального — поле Server: <code>http://10.0.2.2:8000</code>.</li>
+      <li>В локальной базе после проверки остался тестовый менеджер <code>e2e.manager@wms.kz</code> и два одобренных тестовых «телефона».</li>
+    </ul>
+  </div>
+
+  <footer>Составлено по коду репозитория. Пункты «нужно уточнить» требуют решения команды, а не кода.</footer>
+</main>
+</body>
+</html>
