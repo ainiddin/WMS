@@ -1,6 +1,7 @@
 import { api } from "./client";
 import type {
   Account,
+  CardInput,
   AdminUser,
   AllPerformance,
   AuditAction,
@@ -85,6 +86,8 @@ export const customersApi = {
 export const accountApi = {
   get: () => get<Account>("/account/"),
   topUp: (amount: number) => post<Account>("/account/top-up/", { amount }),
+  saveCard: (card: CardInput) => api.put<Account>("/account/card/", card).then((r) => r.data),
+  removeCard: () => api.delete<Account>("/account/card/").then((r) => r.data),
 };
 
 // ---- Orders ----

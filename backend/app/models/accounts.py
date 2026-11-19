@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Numeric, SmallInteger, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -13,16 +13,27 @@ class Account(Base):
     """The customer's money in the shop (KZT). Topped up from a bank (simulated), spent on orders.
 
     The balance can never go below zero: PostgreSQL itself refuses it.
+    The saved bank card keeps only what can be shown back: holder, brand, last 4 digits and expiry.
+    The full number is checked on entry and thrown away; the CVV is never asked.
     """
 
     __tablename__ = "accounts"
-    __table_args__ = (CheckConstraint("balance >= 0", name="chk_accounts_balance"),)
+    __table_args__ = (
+        CheckConstraint("balance >= 0", name="chk_accounts_balance"),
+        CheckConstraint("card_last4 IS NULL OR card_last4 ~ '^[0-9]{4}$'", name="chk_accounts_card_last4"),
+        CheckConstraint("card_exp_month IS NULL OR card_exp_month BETWEEN 1 AND 12", name="chk_accounts_card_exp_month"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = code_column("A", 4)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="RESTRICT"), unique=True)
     balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), server_default="0")
     created_at: Mapped[datetime] = created_at_column()
+    card_holder: Mapped[str | None] = mapped_column(String(100))
+    card_brand: Mapped[str | None] = mapped_column(String(20))
+    card_last4: Mapped[str | None] = mapped_column(String(4))
+    card_exp_month: Mapped[int | None] = mapped_column(SmallInteger)
+    card_exp_year: Mapped[int | None] = mapped_column(SmallInteger)
 
     customer: Mapped[Customer] = relationship(back_populates="account")
     transactions: Mapped[list["AccountTransaction"]] = relationship(back_populates="account")

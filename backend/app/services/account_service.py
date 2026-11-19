@@ -71,6 +71,24 @@ def refund_order(db: Session, order: Order, at: datetime | None = None) -> Accou
     return _record(db, account, TransactionType.REFUND, paid.amount, order, f"Refund for order {order.code}", at)
 
 
+def save_card(db: Session, customer: Customer, holder: str, number: str, exp_month: int, exp_year: int,
+              brand: str) -> Account:
+    """Replaces the saved card. Only the last 4 digits of the number are kept."""
+    account = get_account(db, customer.id)
+    account.card_holder, account.card_brand, account.card_last4 = holder, brand, number[-4:]
+    account.card_exp_month, account.card_exp_year = exp_month, exp_year
+    db.flush()
+    return account
+
+
+def remove_card(db: Session, customer: Customer) -> Account:
+    account = get_account(db, customer.id)
+    account.card_holder = account.card_brand = account.card_last4 = None
+    account.card_exp_month = account.card_exp_year = None
+    db.flush()
+    return account
+
+
 def history(db: Session, account: Account, limit: int = 100) -> list[AccountTransaction]:
     stmt = (select(AccountTransaction).where(AccountTransaction.account_id == account.id)
             .order_by(AccountTransaction.created_at.desc(), AccountTransaction.id.desc()).limit(limit))

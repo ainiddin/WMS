@@ -84,3 +84,28 @@ def test_only_customers_have_an_account(client, api, team):
 def test_managers_see_customer_balances(client, api, team):
     rows = client.get("/api/customers/", headers=team["manager"]).json()
     assert rows[0]["balance"] == 100_000
+
+
+def test_card_is_saved_without_the_full_number(client, api):
+    c = api.customer("card@mail.kz", money=0)
+    card = {"holder": "  aigerim  nurlanova ", "number": "4242 4242 4242 4242", "exp_month": 12, "exp_year": 2099}
+    r = client.put("/api/account/card/", json=card, headers=c)
+    assert r.status_code == 200
+    assert r.json()["card"] == {"holder": "AIGERIM NURLANOVA", "brand": "Visa", "last4": "4242",
+                                "exp_month": 12, "exp_year": 2099}
+    assert "4242424242424242" not in r.text
+    assert client.get("/api/account/", headers=c).json()["card"]["last4"] == "4242"
+
+    r = client.put("/api/account/card/", json={**card, "number": "5555555555554444"}, headers=c)
+    assert r.json()["card"]["brand"] == "Mastercard" and r.json()["card"]["last4"] == "4444"
+
+    assert client.delete("/api/account/card/", headers=c).json()["card"] is None
+
+
+def test_card_details_are_checked(client, api):
+    c = api.customer("badcard@mail.kz", money=0)
+    good = {"holder": "TEST USER", "number": "4242424242424242", "exp_month": 1, "exp_year": 2099}
+    for bad in ({"number": "4242424242424241"}, {"number": "1234"}, {"number": "4242abcd42424242"},
+                {"exp_month": 13}, {"exp_year": 2001}, {"holder": " "}):
+        assert client.put("/api/account/card/", json={**good, **bad}, headers=c).status_code == 422, bad
+    assert client.get("/api/account/", headers=c).json()["card"] is None

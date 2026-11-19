@@ -133,10 +133,26 @@ export interface AccountTransaction {
   created_at: string;
 }
 
+export interface SavedCard {
+  holder: string;
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+}
+
+export interface CardInput {
+  holder: string;
+  number: string;
+  exp_month: number;
+  exp_year: number;
+}
+
 export interface Account {
   code: string;
   balance: number;
   bank: string;
+  card: SavedCard | null;
   transactions: AccountTransaction[];
 }
 
