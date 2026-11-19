@@ -17,6 +17,7 @@ import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import {
   AppBar,
+  Badge,
   Box,
   Chip,
   Container,
@@ -30,9 +31,11 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { PASSWORD_EXPIRED_EVENT, sessionEndsAt, tokens } from '@/api/client'
+import { reportsApi } from '@/api/staff'
 import { useAuth } from '@/auth/AuthContext'
 import { ThemeToggle } from '@/components/Layout'
 import { formatDateTime } from '@/format'
@@ -80,11 +83,31 @@ export function AdminLayout() {
 }
 
 export function ManagerLayout() {
-  return <StaffLayout title="KeyFive Manager" nav={MANAGER_NAV} passwordPath="/manage/password" />
+  // Same query as the Restock page, so the number and the list stay in step; refreshed every minute.
+  const restock = useQuery({ queryKey: ['reports', 'restock'], queryFn: reportsApi.restock, refetchInterval: 60_000 })
+  return (
+    <StaffLayout
+      title="KeyFive Manager"
+      nav={MANAGER_NAV}
+      passwordPath="/manage/password"
+      badges={{ '/manage/restock': restock.data?.length ?? 0 }}
+    />
+  )
 }
 
 /** Website frame for staff. Only the right role gets here (ProtectedRoute); the server checks every call anyway. */
-export function StaffLayout({ title, nav: items, passwordPath }: { title: string; nav: NavItem[]; passwordPath: string }) {
+export function StaffLayout({
+  title,
+  nav: items,
+  passwordPath,
+  badges = {},
+}: {
+  title: string
+  nav: NavItem[]
+  passwordPath: string
+  /** Counters next to menu items, by path; 0 shows nothing. */
+  badges?: Record<string, number>
+}) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -119,6 +142,7 @@ export function StaffLayout({ title, nav: items, passwordPath }: { title: string
         >
           <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
           <ListItemText primary={item.label} />
+          {!!badges[item.to] && <Badge badgeContent={badges[item.to]} color="error" max={99} sx={{ mr: 1.5 }} />}
         </ListItemButton>
       ))}
     </List>

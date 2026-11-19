@@ -38,12 +38,17 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -129,6 +134,12 @@ fun StaffApp(session: Session, user: User) {
 
     WebLoginRequests(session, user.role) // "Is this you?" for website sign ins (Admin, Manager)
 
+    // Products below the minimum, shown next to "Restock list"; re-counted each time the menu opens.
+    var restockCount by remember { mutableStateOf(0) }
+    LaunchedEffect(drawer.isOpen) {
+        if (user.role in MANAGERS && drawer.isOpen) runCatching { restockCount = session.api.restock().size }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
@@ -149,6 +160,9 @@ fun StaffApp(session: Session, user: User) {
                         NavigationDrawerItem(
                             label = { Text(screen.title) },
                             icon = { Icon(screen.icon, null) },
+                            badge = if (screen.route == "restock" && restockCount > 0) {
+                                { Badge { Text(if (restockCount > 99) "99+" else "$restockCount") } }
+                            } else null,
                             selected = screen.route == route,
                             onClick = {
                                 nav.go(screen.route)

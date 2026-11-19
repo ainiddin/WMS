@@ -3,7 +3,7 @@ import { Route } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { tokens } from '@/api/client'
 import { authApi } from '@/api/endpoints'
-import { teamApi, type TeamMember } from '@/api/staff'
+import { reportsApi, teamApi, type RestockRow, type TeamMember } from '@/api/staff'
 import type { Invitation, StaffDevice } from '@/api/types'
 import { ProtectedRoute } from '@/auth/ProtectedRoute'
 import { MANAGER_NAV, ManagerLayout } from '@/pages/admin/AdminLayout'
@@ -70,6 +70,14 @@ describe('Manager panel', () => {
     renderAt('/manage', routes)
     expect(await screen.findByText('DASHBOARD')).toBeInTheDocument()
     expect(screen.getByText('KeyFive Manager')).toBeInTheDocument()
+  })
+
+  it('shows how many products need restocking next to the Restock list', async () => {
+    signedInAs(manager)
+    vi.spyOn(reportsApi, 'restock').mockResolvedValue([{ product_id: 1 }, { product_id: 2 }, { product_id: 3 }] as RestockRow[])
+    renderAt('/manage', routes)
+    const item = (await screen.findAllByRole('link', { name: /Restock list/ }))[0]
+    await waitFor(() => expect(within(item).getByText('3')).toBeInTheDocument())
   })
 })
 
