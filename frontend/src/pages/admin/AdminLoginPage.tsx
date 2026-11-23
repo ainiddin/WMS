@@ -39,7 +39,7 @@ function codeLabel(challenge: TwoFactorRequired | null) {
 
 /**
  * Staff sign in on the website (Admin, Manager): the password, then "Is this you?" on the approved phone, where
- * the person taps the number shown here. An Admin can use the 6-digit code from the corporate mailbox instead.
+ * the person taps the number shown here. Admins and Managers can use the 6-digit sign in code instead.
  */
 export function StaffLoginPage() {
   const { user, acceptTokens } = useAuth()
@@ -133,7 +133,7 @@ export function StaffLoginPage() {
       if (req.phone_available) {
         setPhone({ req, until: Date.now() + req.seconds * 1000 })
       } else {
-        // An Admin with no approving phone yet: straight to the email code.
+        // No approving phone yet (Admin or Manager): straight to the sign in code.
         setChallenge(await staffAuthApi.emailCode(req.request_token))
         setSentAt(Date.now())
       }
@@ -267,11 +267,9 @@ export function StaffLoginPage() {
               <Typography variant="body2" color="text.secondary" role="timer">
                 Waiting for the phone · {formatClock(phoneLeft)}
               </Typography>
-              {phone.req.role === 'ADMIN' && (
-                <Button onClick={switchToEmailCode} disabled={busy}>
-                  Use the email code instead
-                </Button>
-              )}
+              <Button onClick={switchToEmailCode} disabled={busy}>
+                Use the email code instead
+              </Button>
               <Button color="inherit" size="small" onClick={restart}>
                 Cancel
               </Button>

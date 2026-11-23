@@ -199,7 +199,7 @@ private fun Login(session: Session, initialEmail: String, openInvitation: () -> 
     }
 }
 
-/** Admin, first sign in on this phone: the 6-digit code from the corporate mailbox. */
+/** Admin or Manager, first sign in on this phone: the 6-digit sign in code. */
 @Composable
 private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChallenge: (TwoFactorChallenge) -> Unit, onRestart: () -> Unit) {
     val scope = rememberCoroutineScope()

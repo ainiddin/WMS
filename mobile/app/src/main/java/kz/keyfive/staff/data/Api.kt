@@ -14,7 +14,7 @@ import retrofit2.http.Streaming
 /** The FastAPI endpoints used by staff (base URL = server + "/api/"). */
 interface Api {
     // ---- Auth ----
-    /** 200 = tokens, 202 = Admin must enter the email code (see parseStaffLogin). */
+    /** 200 = tokens, 202 = Admin/Manager must enter the sign in code (see parseStaffLogin). */
     @POST("auth/staff/login/")
     suspend fun staffLogin(@Body body: StaffLoginRequest): Response<ResponseBody>
 

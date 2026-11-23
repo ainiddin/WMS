@@ -327,18 +327,23 @@ describe('StaffLoginPage: confirm on the phone', () => {
     expect(emailCode).toHaveBeenCalledWith(started.request_token)
   })
 
-  it('a Manager has no email-code way around the phone', async () => {
+  it('a Manager can switch to the code too', async () => {
     vi.spyOn(staffAuthApi, 'status').mockResolvedValue({ status: 'PENDING', tokens: null })
+    const emailCode = vi.spyOn(staffAuthApi, 'emailCode').mockResolvedValue(challenge)
     await toPhoneStep('MANAGER')
-    expect(screen.queryByRole('button', { name: 'Use the email code instead' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Use the email code instead' }))
+    expect(await screen.findByLabelText(/^Code from the email/)).toBeInTheDocument()
+    expect(emailCode).toHaveBeenCalledWith(started.request_token)
   })
 
-  it('a Manager without an approved phone is told to use the app first', async () => {
-    vi.spyOn(staffAuthApi, 'webLogin').mockRejectedValue(
-      apiError(409, 'Sign in in the KeyFive Staff app on your work phone first: website sign ins are approved there.'))
+  it('a Manager without an approving phone goes straight to the code', async () => {
+    vi.spyOn(staffAuthApi, 'webLogin').mockResolvedValue({ ...started, role: 'MANAGER', phone_available: false })
+    const emailCode = vi.spyOn(staffAuthApi, 'emailCode').mockResolvedValue(challenge)
     renderLogin()
     typePassword()
-    expect(await screen.findByText(/KeyFive Staff app on your work phone first/)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/^Code from the email/)).toBeInTheDocument()
+    expect(emailCode).toHaveBeenCalledWith(started.request_token)
+    expect(screen.queryByTestId('phone-number')).toBeNull()
   })
 
   it('cancel stops waiting', async () => {

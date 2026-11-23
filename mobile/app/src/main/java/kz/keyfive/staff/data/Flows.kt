@@ -11,11 +11,11 @@ import kotlin.math.max
 sealed interface LoginStep {
     data class Done(val pair: TokenPair) : LoginStep
 
-    /** Admin: the password was right, now the code from the corporate mailbox is needed. */
+    /** Admin or Manager: the password was right, now the sign in code is needed. */
     data class NeedsCode(val challenge: TwoFactorChallenge) : LoginStep
 }
 
-/** 200 = tokens; 202 = an Admin who must enter the email code (once per phone). Anything else is a bug. */
+/** 200 = tokens; 202 = an Admin or Manager who must enter the sign in code (once per phone). Anything else is a bug. */
 fun parseStaffLogin(code: Int, body: String): LoginStep = when (code) {
     200 -> LoginStep.Done(json.decodeFromString(TokenPair.serializer(), body))
     202 -> LoginStep.NeedsCode(json.decodeFromString(TwoFactorChallenge.serializer(), body))

@@ -81,7 +81,7 @@ class Session(context: Context) {
     var api: Api = buildApi()
         private set
 
-    /** Password + this phone. An Admin also needs the email code the first time on a phone (NeedsCode). */
+    /** Password + this phone. An Admin or Manager also needs the sign in code the first time on a phone (NeedsCode). */
     suspend fun login(email: String, password: String): LoginStep {
         val response = api.staffLogin(StaffLoginRequest(email.trim(), password, deviceSecret, deviceName))
         if (!response.isSuccessful) throw HttpException(response)
