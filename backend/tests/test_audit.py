@@ -86,7 +86,7 @@ def test_team_change_and_joining_are_logged(client, api):
 def test_phone_approval_and_block_are_logged(client, api):
     admin = api.admin
     api.staff("boss@wms.kz", "MANAGER")
-    assert staff_login(client, "boss@wms.kz", PASSWORD, phone="second phone").status_code == 403  # new phone waits
+    assert staff_login(client, "boss@wms.kz", PASSWORD, phone="second phone").status_code == 202  # code asked
     pending = client.get("/api/admin/devices/?status=PENDING", headers=admin).json()
     device = next(d for d in pending if d["user_email"] == "boss@wms.kz")
 

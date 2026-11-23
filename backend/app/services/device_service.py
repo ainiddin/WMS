@@ -39,6 +39,8 @@ def check_in(db: Session, user: User, secret: str, device_name: str) -> StaffDev
             device.approved_at = utcnow()
         db.add(device)
         db.flush()
+    if device.status == DeviceStatus.PENDING and user.role == Role.MANAGER:
+        return device  # a Manager approves his new phone himself with the sign in code (see approve_by_code)
     if device.status == DeviceStatus.PENDING:
         db.commit()  # keep the request so the Admin sees it
         raise HTTPException(status.HTTP_403_FORBIDDEN,
@@ -47,6 +49,23 @@ def check_in(db: Session, user: User, secret: str, device_name: str) -> StaffDev
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This phone is blocked for your account")
     device.last_seen_at = utcnow()
     return device
+
+
+def may_pass_code(device: StaffDevice, user: User) -> bool:
+    """A phone may take the sign in code if it is approved, or if it is a Manager's new phone."""
+    if device.status == DeviceStatus.APPROVED:
+        return True
+    return device.status == DeviceStatus.PENDING and user.role == Role.MANAGER
+
+
+def approve_by_code(device: StaffDevice, user: User) -> bool:
+    """The right code on a Manager's new phone approves it (no Admin needed). True if it was approved now."""
+    if device.status != DeviceStatus.PENDING or user.role != Role.MANAGER:
+        return False
+    device.status = DeviceStatus.APPROVED
+    device.approved_by_id = user.id
+    device.approved_at = utcnow()
+    return True
 
 
 def get_device(db: Session, device_id: int) -> StaffDevice:

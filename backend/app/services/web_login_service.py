@@ -6,12 +6,15 @@
 3. Browser: asks the status every few seconds while it waits; once approved it gets a website session
    (ADMIN_WEB_SESSION_HOURS, hard end), exactly once.
 
-Admins keep the email code as a fallback (no phone at hand). Workers have nothing on the website.
+Admins and Managers can use the sign in code instead (no phone at hand). Workers have nothing on the website.
+
+Session length: Admin ADMIN_WEB_SESSION_HOURS with a hard end; Manager REFRESH_TOKEN_DAYS, renewed by every
+refresh (see session_end).
 """
 
 import hashlib
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, update
@@ -47,12 +50,10 @@ def _choices(number: int) -> list[int]:
 
 
 def approving_phones(db: Session, user: User) -> list[StaffDevice]:
-    """Phones that may approve: approved, and for an Admin also past the email code once."""
-    stmt = select(StaffDevice).where(StaffDevice.user_id == user.id, StaffDevice.status == DeviceStatus.APPROVED)
-    phones = list(db.scalars(stmt))
-    if user.role == Role.ADMIN:
-        phones = [p for p in phones if p.two_factor_at is not None]
-    return phones
+    """Phones that may approve: approved and past the sign in code once."""
+    stmt = select(StaffDevice).where(StaffDevice.user_id == user.id, StaffDevice.status == DeviceStatus.APPROVED,
+                                     StaffDevice.two_factor_at.is_not(None))
+    return list(db.scalars(stmt))
 
 
 def start(db: Session, user: User, ip: str | None, user_agent: str | None) -> tuple[str, WebLoginRequest, bool]:
@@ -61,10 +62,6 @@ def start(db: Session, user: User, ip: str | None, user_agent: str | None) -> tu
     if user.role not in WEB_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Workers use only the KeyFive Staff app")
     has_phone = bool(approving_phones(db, user))
-    if not has_phone and user.role == Role.MANAGER:
-        raise HTTPException(status.HTTP_409_CONFLICT,
-                            "Sign in in the KeyFive Staff app on your work phone first: website sign ins are "
-                            "approved there.")
     rate_limit.check_web_login(user.email)
     now = utcnow()
     db.execute(update(WebLoginRequest)  # a new sign in cancels the unfinished ones
@@ -83,6 +80,14 @@ def start(db: Session, user: User, ip: str | None, user_agent: str | None) -> tu
     audit_service.log(db, AuditAction.WEB_LOGIN_REQUESTED, user, user, ip, request_id=request.id,
                       phone=has_phone)
     return token, request, has_phone
+
+
+def session_end(user: User, current: datetime | None = None) -> datetime:
+    """End of a website session. Admin: a hard end, set once at sign in (`current` is kept on refresh).
+    Manager: REFRESH_TOKEN_DAYS from now, so every refresh renews it."""
+    if user.role == Role.ADMIN:
+        return current or utcnow() + timedelta(hours=settings.ADMIN_WEB_SESSION_HOURS)
+    return utcnow() + timedelta(days=settings.REFRESH_TOKEN_DAYS)
 
 
 def by_token(db: Session, token: str) -> WebLoginRequest:
@@ -152,12 +157,12 @@ def decide(db: Session, request_id: int, user: User, device_id: int | None, numb
 
 
 def close_for_email_code(db: Session, request: WebLoginRequest, ip: str | None) -> User:
-    """Admin without the phone at hand: this request is closed and the email code is used instead."""
+    """No phone at hand: this request is closed and the sign in code is used instead."""
     if current_status(request) != PENDING:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, _GONE)
     user = request.user
-    if user.role != Role.ADMIN:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only Admins can use the email code instead")
+    if user.role not in WEB_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
     request.status = CLOSED
     request.decided_at = utcnow()
     audit_service.log(db, AuditAction.WEB_LOGIN_EMAIL_FALLBACK, user, user, ip, request_id=request.id)

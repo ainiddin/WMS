@@ -1,6 +1,6 @@
 """Staff work only in the KeyFive Staff app, and only on a phone an Admin approved."""
 
-from tests.conftest import ADMIN, PASSWORD, admin_login, staff_login
+from tests.conftest import ADMIN, OUTBOX, PASSWORD, admin_login, staff_login
 
 
 def devices(client, api, status=None):
@@ -33,10 +33,12 @@ def test_leaked_password_is_useless_without_an_approved_phone(client, api):
     headers, _ = api.staff("m@wms.kz", "MANAGER")  # signed in on own phone
     assert client.get("/api/orders/", headers=headers).status_code == 200
 
-    # Someone else knows the email and password and tries from another phone.
+    # Someone else knows the email and password and tries from another phone: the code is asked, and it goes
+    # only to the owner's channel (never to the Manager's own mailbox), so the phone stays unapproved.
     r = staff_login(client, "m@wms.kz", phone="stranger")
-    assert r.status_code == 403
-    assert "waiting for admin approval" in r.json()["detail"]
+    assert r.status_code == 202
+    assert "access_token" not in r.text
+    assert not any("sign in code" in text for text in OUTBOX["m@wms.kz"])  # only the invitation
     pending = devices(client, api, "PENDING")
     assert [d["user_email"] for d in pending] == ["m@wms.kz"]
 

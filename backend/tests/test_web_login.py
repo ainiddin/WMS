@@ -69,7 +69,8 @@ def test_manager_signs_in_on_the_website_by_tapping_the_number_on_his_phone(clie
     assert r.json()["status"] == "APPROVED" and tokens["user"]["role"] == "MANAGER"
     claims = jwt.decode(tokens["access_token"], options={"verify_signature": False})
     assert "web" in claims and "dev" not in claims  # a website session, not a phone token
-    assert claims["web"] - claims["iat"] <= settings.ADMIN_WEB_SESSION_HOURS * 3600
+    # A Manager's website session lives as long as the refresh token (renewed by refresh), not 4 hours.
+    assert claims["web"] - claims["iat"] == pytest.approx(settings.REFRESH_TOKEN_DAYS * 86400, abs=5)
     web = {"Authorization": f"Bearer {tokens['access_token']}"}
     assert client.get("/api/orders/", headers=web).status_code == 200
     assert client.get("/api/team/members/", headers=web).status_code == 200
@@ -144,18 +145,30 @@ def test_numbers_outside_two_digits_are_refused(client, boss, number):
 
 
 # ---------------- who may ----------------
-def test_a_manager_must_sign_in_on_the_phone_first(client, api, boss):
+def test_a_manager_without_a_phone_signs_in_with_the_code(client, api, boss):
     assert api.invite(boss["phone"], "fresh@wms.kz", "MANAGER").status_code == 201
     assert api.accept("fresh@wms.kz").status_code == 201  # account exists, never signed in on a phone
     r = start(client, "fresh@wms.kz")
-    assert r.status_code == 409 and "KeyFive Staff app" in r.json()["detail"]
+    assert r.status_code == 200 and r.json()["phone_available"] is False
+    r = client.post("/api/auth/web/email-code/", json={"request_token": r.json()["request_token"]})
+    assert r.status_code == 200, r.text
+    r = client.post("/api/auth/2fa/verify/",
+                    json={"challenge_token": r.json()["challenge_token"], "code": last_code(CORPORATE)})
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["role"] == "MANAGER"
 
 
-def test_a_manager_whose_phone_is_still_waiting_cannot_sign_in_on_the_website(client, api, boss):
+def test_a_manager_phone_that_never_passed_the_code_cannot_approve(client, api, boss):
+    """Phones approved by an Admin before Managers had the code: they approve nothing until the code is entered."""
     api.invite(boss["phone"], "fresh@wms.kz", "MANAGER")
     api.accept("fresh@wms.kz")
-    assert staff_login(client, "fresh@wms.kz").status_code == 403  # phone waits for approval
-    assert start(client, "fresh@wms.kz").status_code == 409
+    assert staff_login(client, "fresh@wms.kz").status_code == 202  # code asked, not entered
+    admin = api.admin
+    pending_phones = client.get("/api/admin/devices/?status=PENDING", headers=admin).json()
+    device = next(d for d in pending_phones if d["user_email"] == "fresh@wms.kz")
+    assert client.post(f"/api/admin/devices/{device['id']}/approve/", headers=admin).status_code == 200
+    assert start(client, "fresh@wms.kz").json()["phone_available"] is False
+    assert staff_login(client, "fresh@wms.kz").status_code == 202  # the code is still asked once on it
 
 
 def test_workers_and_customers_have_no_website_staff_sign_in(client, api, boss):
@@ -247,10 +260,15 @@ def test_admin_with_a_phone_may_still_choose_the_email_code(client):
     assert status_of(client, started["request_token"]).status_code == 400  # the phone request is closed
 
 
-def test_only_an_admin_has_the_email_code_fallback(client, boss):
+def test_a_manager_may_use_the_code_instead_of_the_phone(client, boss):
     started = start(client, "boss@wms.kz").json()
+    assert started["phone_available"] is True
     r = client.post("/api/auth/web/email-code/", json={"request_token": started["request_token"]})
-    assert r.status_code == 403
+    assert r.status_code == 200, r.text
+    assert pending(client, boss["phone"]) == []  # the phone request is closed
+    r = client.post("/api/auth/2fa/verify/",
+                    json={"challenge_token": r.json()["challenge_token"], "code": last_code(CORPORATE)})
+    assert r.status_code == 200 and r.json()["user"]["role"] == "MANAGER"
 
 
 def test_the_email_code_fallback_works_once_and_only_while_waiting(client):

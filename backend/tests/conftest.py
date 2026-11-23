@@ -133,8 +133,11 @@ class Api:
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     def staff_login(self, email: str, password: str = PASSWORD) -> dict:
-        """Staff app login. A new phone waits for the Admin, so the Admin approves it and the login is repeated."""
+        """Staff app login. A Worker's new phone waits for approval: the Admin approves it and the login is repeated.
+        A Manager's new phone is approved by the sign in code (202 -> the code from the outbox)."""
         r = staff_login(self.c, email, password)
+        if r.status_code == 202:
+            r = two_factor(self.c, r)
         if r.status_code == 403 and "waiting for admin approval" in r.text:
             pending = self.c.get("/api/admin/devices/?status=PENDING", headers=self.admin).json()
             device = next(d for d in pending if d["user_email"] == email.lower())

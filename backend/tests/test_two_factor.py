@@ -209,6 +209,7 @@ def test_five_wrong_codes_with_no_codes_left_burns_the_code_and_locks(client, db
 
 
 def test_blocked_or_demoted_while_the_code_travels(client, api):
+    _, lead_id = api.staff("lead@wms.kz", "MANAGER")
     boss, _ = api.staff("boss2@wms.kz", "MANAGER")
     admin = api.admin
     users = client.get("/api/admin/users/?search=boss2", headers=admin).json()
@@ -224,8 +225,9 @@ def test_blocked_or_demoted_while_the_code_travels(client, api):
     assert client.post(f"/api/admin/users/{second_id}/unblock/", headers=admin).status_code == 200
     token = web_login(client, "boss2@wms.kz", PASSWORD).json()["challenge_token"]
     code = last_code(CORPORATE)
+    # Demoted to a role that has no code sign in (a Worker) while the code travels.
     assert client.patch(f"/api/admin/users/{second_id}/role/", headers=admin,
-                        json={"role": "MANAGER", "manager_id": None}).status_code == 200
+                        json={"role": "WORKER", "manager_id": lead_id}).status_code == 200
     assert verify(client, token, code).status_code == 403
 
 

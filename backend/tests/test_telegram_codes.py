@@ -145,7 +145,7 @@ def test_telegram_failure_is_502_and_the_token_never_leaks(client, tg, caplog, a
     assert r.json()["detail"] == "Could not send the code email, try again later"
     assert TOKEN not in r.text
     assert TOKEN not in caplog.text, "the bot token reached the log"
-    assert "Could not send the admin 2FA code" in caplog.text
+    assert "Could not send the 2FA code" in caplog.text
 
 
 def test_a_failed_send_does_not_use_up_the_code_limit(client, tg):

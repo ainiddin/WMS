@@ -157,7 +157,7 @@ def two_factor_verify(data: TwoFactorVerify, db: DB, request: Request):
     db.commit()
     if challenge.device is not None:
         return _tokens(challenge.user, challenge.device.id)
-    return _tokens(challenge.user, session_ends=utcnow() + timedelta(hours=settings.ADMIN_WEB_SESSION_HOURS))
+    return _web_session(challenge.user)
 
 
 @router.post("/2fa/resend/", response_model=TwoFactorRequired)
@@ -196,8 +196,10 @@ def refresh(data: RefreshRequest, db: DB):
     if user is None or user.status != UserStatus.ACTIVE or token_older_than_password(payload, user):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
     check_staff_device(db, user, payload.get("dev"), payload.get("web"))
-    # A website Admin session keeps its hard end: refresh never makes it longer.
-    session_ends = datetime.fromtimestamp(payload["web"], UTC) if "web" in payload else None
+    # Website session: an Admin keeps the hard end, a Manager's is renewed (web_login_service.session_end).
+    session_ends = None
+    if "web" in payload:
+        session_ends = web_login_service.session_end(user, datetime.fromtimestamp(payload["web"], UTC))
     return _tokens(user, payload.get("dev"), session_ends)
 
 
@@ -227,7 +229,7 @@ def change_password(data: ChangePassword, db: DB, user: CurrentUser, request: Re
 
 # ---- Website sign in approved on the phone (Admin, Manager) ----
 def _web_session(user: User) -> TokenPair:
-    return _tokens(user, session_ends=utcnow() + timedelta(hours=settings.ADMIN_WEB_SESSION_HOURS))
+    return _tokens(user, session_ends=web_login_service.session_end(user))
 
 
 @router.post("/web/login/", response_model=WebLoginStarted)

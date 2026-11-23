@@ -1,4 +1,4 @@
-"""Admin two-factor sign in: password, then a 6-digit code sent to the one corporate mailbox (ADMIN_2FA_EMAIL),
+"""Two-factor sign in of Admins and Managers: password, then a 6-digit code sent to the one corporate mailbox (ADMIN_2FA_EMAIL),
 or, when TG_BOT_TOKEN and TG_OWNER_CHAT_ID are set (demo), to the owner's Telegram chat.
 
 Rules:
@@ -29,7 +29,7 @@ from app.core.config import settings
 from app.core.security import hash_password, verify_password
 from app.models import AuditAction, Role, StaffDevice, TwoFactorChallenge, User, UserStatus
 from app.models.common import utcnow
-from app.services import audit_service, email_service, telegram_service
+from app.services import audit_service, device_service, email_service, telegram_service
 
 log = logging.getLogger("keyfive")
 
@@ -38,6 +38,9 @@ DEVICE = "DEVICE"
 
 EMAIL = "email"
 TELEGRAM = "telegram"
+
+# Who signs in with a code: on the website always (or the phone approves), in the app once per phone.
+ROLES = (Role.ADMIN, Role.MANAGER)
 
 _SIGN_IN_AGAIN = "This sign in is no longer valid. Sign in again with your password."
 
@@ -88,11 +91,12 @@ def _send_code(db: Session, challenge: TwoFactorChallenge, ip: str | None) -> No
     challenge.attempts = 0
     where = "the website" if challenge.channel == WEB else f"the phone \"{challenge.device.device_name}\""
     minutes = settings.TWO_FACTOR_CODE_SECONDS // 60
-    subject = f"KeyFive WMS admin sign in: code {code}"
-    text = (f"Admin sign in code: {code}\n\n"
+    who = str(user.role).capitalize()  # Admin / Manager
+    subject = f"KeyFive WMS {who.lower()} sign in: code {code}"
+    text = (f"{who} sign in code: {code}\n\n"
             f"Account: {user.email}\nWhere: {where}\nIP: {ip or 'unknown'}\n"
             f"The code is valid for {minutes} minutes and works once.\n\n"
-            "If nobody from the management is signing in right now, someone knows the Admin password: "
+            f"If nobody is signing in right now, someone knows the {who} password: "
             "change it and check the audit log.")
     try:
         if channel() == TELEGRAM:
@@ -100,15 +104,15 @@ def _send_code(db: Session, challenge: TwoFactorChallenge, ip: str | None) -> No
         else:
             email_service.send_email(corporate_email(), subject, text)
     except (telegram_service.TelegramError, httpx.HTTPError, smtplib.SMTPException, OSError) as exc:
-        log.error("Could not send the admin 2FA code: %s", exc)
+        log.error("Could not send the 2FA code: %s", exc)
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not send the code email, try again later") from None
     rate_limit.two_factor_code_sent(user.email)
     audit_service.log(db, AuditAction.TWO_FACTOR_CODE_SENT, user, user, ip, channel=challenge.channel)
 
 
 def needs_challenge(user: User, device: StaffDevice | None) -> bool:
-    """Admin on the website: always. Admin in the app: until the code was entered once on that phone."""
-    if user.role != Role.ADMIN:
+    """Admin/Manager on the website: always. In the app: until the code was entered once on that phone."""
+    if user.role not in ROLES:
         return False
     return device is None or device.two_factor_at is None
 
@@ -181,9 +185,9 @@ def _open_challenge(db: Session, token: str) -> TwoFactorChallenge:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, _SIGN_IN_AGAIN)
     user = challenge.user
     # The account may have been blocked or demoted, or the phone blocked, while the code was on its way.
-    if user.status != UserStatus.ACTIVE or user.role != Role.ADMIN:
+    if user.status != UserStatus.ACTIVE or user.role not in ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
-    if challenge.device is not None and challenge.device.status != "APPROVED":
+    if challenge.device is not None and not device_service.may_pass_code(challenge.device, user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This phone is blocked for your account")
     return challenge
 
@@ -221,6 +225,9 @@ def verify(db: Session, token: str, code: str, ip: str | None) -> TwoFactorChall
     rate_limit.two_factor_passed(user.email)
     if challenge.device is not None:
         challenge.device.two_factor_at = now
+        if device_service.approve_by_code(challenge.device, user):
+            audit_service.log(db, AuditAction.DEVICE_APPROVED, user, user, ip, device_id=challenge.device.id,
+                              device_name=challenge.device.device_name, by="two_factor_code")
     audit_service.log(db, AuditAction.TWO_FACTOR_PASSED, user, user, ip, channel=challenge.channel)
     return challenge
 

@@ -36,7 +36,7 @@ def check_staff_device(db: Session, user: User, device_id: object, web_session: 
     was promoted) or from a phone the Admin has blocked stops working at once.
 
     Admin is the exception on the website: a token with a `web` session end (only issued after the email code).
-    Admin tokens from a phone also need that phone to have passed the email code once.
+    Admin and Manager tokens from a phone also need that phone to have passed the sign in code once.
     """
     if user.role not in STAFF_ROLES:
         return
@@ -47,7 +47,7 @@ def check_staff_device(db: Session, user: User, device_id: object, web_session: 
     device = db.get(StaffDevice, device_id) if isinstance(device_id, int) else None
     if device is None or device.user_id != user.id or device.status != DeviceStatus.APPROVED:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff access is allowed only from an approved phone")
-    if user.role == Role.ADMIN and device.two_factor_at is None:
+    if user.role in (Role.ADMIN, Role.MANAGER) and device.two_factor_at is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Sign in again: this phone has not passed the email code")
 
 
