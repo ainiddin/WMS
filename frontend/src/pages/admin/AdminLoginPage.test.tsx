@@ -14,7 +14,6 @@ const started: WebLoginStarted = {
   seconds: 120,
   phone_available: true,
   role: 'MANAGER',
-  confirmed: false,
 }
 
 const challenge: TwoFactorRequired = {
@@ -350,18 +349,5 @@ describe('StaffLoginPage: confirm on the phone', () => {
     await tick(3 * STATUS_EVERY_MS)
     expect(status).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
-  })
-})
-
-describe('StaffLoginPage: phone confirmation switched off for Managers', () => {
-  it('goes straight to the Manager panel without showing a number', async () => {
-    vi.spyOn(staffAuthApi, 'webLogin').mockResolvedValue({ ...started, phone_available: false, confirmed: true })
-    const status = vi.spyOn(staffAuthApi, 'status')
-      .mockResolvedValue({ status: 'APPROVED', tokens: tokenPair({ ...admin, role: 'MANAGER' }) })
-    renderLogin()
-    typePassword()
-    expect(await screen.findByText('MANAGER HOME')).toBeInTheDocument()
-    expect(status).toHaveBeenCalledTimes(1)
-    expect(screen.queryByTestId('phone-number')).toBeNull()
   })
 })

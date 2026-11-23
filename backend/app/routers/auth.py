@@ -239,8 +239,7 @@ def web_login(data: AdminLogin, db: DB, request: Request):
                                                     request.headers.get("user-agent"))
     db.commit()
     return WebLoginStarted(request_token=token, number=req.number, expires_at=req.expires_at,
-                           seconds=settings.WEB_LOGIN_SECONDS, phone_available=has_phone, role=user.role,
-                           confirmed=req.status == web_login_service.APPROVED)
+                           seconds=settings.WEB_LOGIN_SECONDS, phone_available=has_phone, role=user.role)
 
 
 @router.post("/web/status/", response_model=WebLoginState)

@@ -276,33 +276,3 @@ def test_an_admin_phone_that_never_passed_the_email_code_does_not_count(client):
     assert staff_login(client, *ADMIN).status_code == 202  # phone approved automatically, code not entered yet
     r = start(client, ADMIN[0], ADMIN[1])
     assert r.status_code == 200 and r.json()["phone_available"] is False
-
-
-
-# ---------------- the demo switch (Managers without phones) ----------------
-def test_by_default_a_manager_never_skips_the_phone(client, boss):
-    assert settings.MANAGER_WEB_PHONE_CONFIRM is True
-    assert start(client, "boss@wms.kz").json()["confirmed"] is False
-
-
-def test_switched_off_a_manager_signs_in_with_the_password_alone(client, api, boss, monkeypatch):
-    monkeypatch.setattr(settings, "MANAGER_WEB_PHONE_CONFIRM", False)
-    api.invite(boss["phone"], "nophone@wms.kz", "MANAGER")
-    api.accept("nophone@wms.kz")  # never signed in on a phone
-    r = start(client, "nophone@wms.kz")
-    assert r.status_code == 200 and r.json()["confirmed"] is True
-    r = status_of(client, r.json()["request_token"])
-    assert r.json()["status"] == "APPROVED" and r.json()["tokens"]["user"]["role"] == "MANAGER"
-    web = {"Authorization": f"Bearer {r.json()['tokens']['access_token']}"}
-    assert client.get("/api/orders/", headers=web).status_code == 200
-    rows = client.get("/api/admin/audit/?action=WEB_LOGIN_APPROVED", headers=api.admin).json()
-    assert rows[0]["details"]["phone_confirmation"] == "off"  # visible in the audit log
-
-
-def test_the_switch_never_touches_admins_or_workers(client, api, boss, monkeypatch):
-    monkeypatch.setattr(settings, "MANAGER_WEB_PHONE_CONFIRM", False)
-    r = start(client, ADMIN[0], ADMIN[1])
-    assert r.status_code == 200 and r.json()["confirmed"] is False  # Admin still needs the phone or the code
-    api.staff("w@wms.kz", "WORKER", boss["id"])
-    assert start(client, "w@wms.kz").status_code == 403
-    assert start(client, "boss@wms.kz", "wrong-password").status_code == 401  # the password still matters

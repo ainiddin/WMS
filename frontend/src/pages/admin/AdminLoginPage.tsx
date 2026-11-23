@@ -130,10 +130,7 @@ export function StaffLoginPage() {
       const req = await staffAuthApi.webLogin(email.trim(), password)
       setPassword('') // not kept in memory longer than needed
       setInfo(null)
-      if (req.confirmed) {
-        const state = await staffAuthApi.status(req.request_token)
-        if (state.tokens) onApproved.current(state.tokens)
-      } else if (req.phone_available) {
+      if (req.phone_available) {
         setPhone({ req, until: Date.now() + req.seconds * 1000 })
       } else {
         // An Admin with no approving phone yet: straight to the email code.

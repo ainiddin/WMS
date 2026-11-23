@@ -61,8 +61,7 @@ def start(db: Session, user: User, ip: str | None, user_agent: str | None) -> tu
     if user.role not in WEB_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Workers use only the KeyFive Staff app")
     has_phone = bool(approving_phones(db, user))
-    skip_phone = user.role == Role.MANAGER and not settings.MANAGER_WEB_PHONE_CONFIRM
-    if not has_phone and user.role == Role.MANAGER and not skip_phone:
+    if not has_phone and user.role == Role.MANAGER:
         raise HTTPException(status.HTTP_409_CONFLICT,
                             "Sign in in the KeyFive Staff app on your work phone first: website sign ins are "
                             "approved there.")
@@ -78,17 +77,11 @@ def start(db: Session, user: User, ip: str | None, user_agent: str | None) -> tu
         status=PENDING, ip=ip, user_agent=(user_agent or "")[:200] or None,
         expires_at=now + timedelta(seconds=settings.WEB_LOGIN_SECONDS),
     )
-    if skip_phone:  # demo switch: no phone step, the request is approved at once (and logged as such)
-        request.status = APPROVED
-        request.decided_at = now
     db.add(request)
     db.flush()
     rate_limit.web_login_requested(user.email)
     audit_service.log(db, AuditAction.WEB_LOGIN_REQUESTED, user, user, ip, request_id=request.id,
                       phone=has_phone)
-    if skip_phone:
-        audit_service.log(db, AuditAction.WEB_LOGIN_APPROVED, user, user, ip, request_id=request.id,
-                          phone_confirmation="off")
     return token, request, has_phone
 
 
