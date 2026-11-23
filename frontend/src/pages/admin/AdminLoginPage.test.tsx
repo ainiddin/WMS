@@ -82,6 +82,15 @@ describe('AdminLoginPage', () => {
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument() // the password field is gone
   })
 
+  it('says the code went to Telegram when the server sent it there', async () => {
+    vi.spyOn(staffAuthApi, 'emailCode').mockResolvedValue({ ...challenge, sent_to: 'Telegram', sent_via: 'telegram' })
+    renderLogin()
+    typePassword()
+    expect(await screen.findByText('We sent a 6-digit code to Telegram.')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Code from Telegram/)).toBeInTheDocument()
+    expect(screen.queryByText(/corporate mailbox/)).not.toBeInTheDocument()
+  })
+
   it('accepts only digits, at most 6, and enables Sign in only with 6', async () => {
     renderLogin()
     typePassword()

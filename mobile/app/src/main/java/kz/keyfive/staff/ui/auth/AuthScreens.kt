@@ -42,6 +42,8 @@ import kz.keyfive.staff.data.LoginStep
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.TwoFactorChallenge
 import kz.keyfive.staff.data.acceptProblem
+import kz.keyfive.staff.data.codeFieldLabel
+import kz.keyfive.staff.data.codeSentHint
 import kz.keyfive.staff.data.digitsOnly
 import kz.keyfive.staff.data.formatWait
 import kz.keyfive.staff.data.lockMessage
@@ -236,11 +238,11 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
     }
 
     Text("Enter the code", style = MaterialTheme.typography.titleLarge)
-    Hint("We sent a 6-digit code to the corporate mailbox ${challenge.sentTo}. It is asked once on this phone.")
+    Hint(codeSentHint(challenge.sentVia, challenge.sentTo))
     val locked = LockBanner(lock)
     error?.let { ErrorCard(it) }
     info?.let { Hint(it) }
-    OutlinedTextField(code, { code = digitsOnly(it) }, label = { Text("Code from the email") }, singleLine = true,
+    OutlinedTextField(code, { code = digitsOnly(it) }, label = { Text(codeFieldLabel(challenge.sentVia)) }, singleLine = true,
         modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         supportingText = { Text(if (codeLeft > 0) "Works for ${formatWait(codeLeft)} more" else "Expired: send a new one") })
     Button(onClick = { call { session.verifyCode(challenge.challengeToken, code) } },

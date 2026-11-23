@@ -32,6 +32,11 @@ export function homeOf(role: Role | undefined): string | null {
 /** How often the browser asks whether the phone has answered (only while it waits). */
 export const STATUS_EVERY_MS = 2000
 
+/** Where the Admin code went decides the field label (Telegram in the demo setup). */
+function codeLabel(challenge: TwoFactorRequired | null) {
+  return challenge?.sent_via === 'telegram' ? 'Code from Telegram' : 'Code from the email'
+}
+
 /**
  * Staff sign in on the website (Admin, Manager): the password, then "Is this you?" on the approved phone, where
  * the person taps the number shown here. An Admin can use the 6-digit code from the corporate mailbox instead.
@@ -226,7 +231,9 @@ export function StaffLoginPage() {
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {challenge
-                ? `We sent a 6-digit code to the corporate mailbox ${challenge.sent_to}.`
+                ? challenge.sent_via === 'telegram'
+                  ? 'We sent a 6-digit code to Telegram.'
+                  : `We sent a 6-digit code to the corporate mailbox ${challenge.sent_to}.`
                 : phone
                   ? 'Open KeyFive Staff on your work phone and tap this number:'
                   : 'For Admins and Managers. After the password, you confirm the sign in on your work phone.'}
@@ -294,13 +301,13 @@ export function StaffLoginPage() {
           ) : (
             <Stack component="form" spacing={2} onSubmit={submitCode}>
               <TextField
-                label="Code from the email"
+                label={codeLabel(challenge)}
                 required
                 autoFocus
                 autoComplete="one-time-code"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                slotProps={{ htmlInput: { inputMode: 'numeric', 'aria-label': 'Code from the email' } }}
+                slotProps={{ htmlInput: { inputMode: 'numeric', 'aria-label': codeLabel(challenge) } }}
                 helperText={codeLeft > 0 ? `The code works for ${formatWait(codeLeft)} more` : 'The code has expired: send a new one'}
               />
               <Button type="submit" variant="contained" size="large" disabled={busy || code.length !== 6}>

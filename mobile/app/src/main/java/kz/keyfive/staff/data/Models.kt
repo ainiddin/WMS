@@ -44,6 +44,8 @@ data class RefreshRequest(@SerialName("refresh_token") val refreshToken: String)
 data class TwoFactorChallenge(
     @SerialName("challenge_token") val challengeToken: String,
     @SerialName("sent_to") val sentTo: String,
+    /** "telegram" in the demo setup (the code went to the owner's Telegram chat). Older servers: "email". */
+    @SerialName("sent_via") val sentVia: String = "email",
     @SerialName("code_seconds") val codeSeconds: Int,
     @SerialName("resend_seconds") val resendSeconds: Int,
     @SerialName("expires_at") val expiresAt: String,

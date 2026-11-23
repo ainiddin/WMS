@@ -164,6 +164,8 @@ export interface TwoFactorRequired {
   two_factor_required: true;
   challenge_token: string;
   sent_to: string;
+  /** "telegram" in the demo setup: the code went to the owner's Telegram chat. */
+  sent_via?: "email" | "telegram";
   code_seconds: number;
   resend_seconds: number;
   expires_at: string;

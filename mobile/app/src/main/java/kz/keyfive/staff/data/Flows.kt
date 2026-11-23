@@ -142,3 +142,11 @@ fun cameraMode(hasCamera: Boolean, permissionGranted: Boolean): CameraMode = whe
 
 /** A typed barcode: digits only, at most 14 (EAN-13, EAN-8, UPC-A, GTIN-14). */
 fun barcodeInput(typed: String): String = typed.filter(Char::isDigit).take(14)
+
+/** Admin code screen: where the code went ("telegram" in the demo setup, else the corporate mailbox). */
+fun codeSentHint(sentVia: String, sentTo: String): String =
+    if (sentVia == "telegram") "We sent a 6-digit code to Telegram. It is asked once on this phone."
+    else "We sent a 6-digit code to the corporate mailbox $sentTo. It is asked once on this phone."
+
+fun codeFieldLabel(sentVia: String): String =
+    if (sentVia == "telegram") "Code from Telegram" else "Code from the email"

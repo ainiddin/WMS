@@ -232,4 +232,15 @@ class FlowsTest {
         assertEquals("12345678901234", barcodeInput("123456789012345678"))
         assertEquals("", barcodeInput("abc"))
     }
+
+    @Test
+    fun `the admin code screen names Telegram or the masked mailbox`() {
+        assertEquals("We sent a 6-digit code to Telegram. It is asked once on this phone.",
+            codeSentHint("telegram", "Telegram"))
+        assertEquals("We sent a 6-digit code to the corporate mailbox c***@keyfive.kz. It is asked once on this phone.",
+            codeSentHint("email", "c***@keyfive.kz"))
+        assertEquals("Code from Telegram", codeFieldLabel("telegram"))
+        assertEquals("Code from the email", codeFieldLabel("email"))
+        assertEquals("Code from the email", codeFieldLabel("something new")) // unknown channel: the old text
+    }
 }
