@@ -5,12 +5,16 @@ Rules:
 - the code lives TWO_FACTOR_CODE_SECONDS; a whole sign in lives TWO_FACTOR_WINDOW_SECONDS;
 - after TWO_FACTOR_MAX_ATTEMPTS wrong codes a new code is sent automatically (the old one stops working);
 - "Send again" works once per TWO_FACTOR_RESEND_SECONDS;
+- signing in again (same account, same website/phone) within TWO_FACTOR_RESEND_SECONDS of the last code sends
+  no new code: the same sign in continues with a new token, so going back and retrying cannot burn the limit;
+- parallel requests for one account wait for each other (row locks), so a double click sends one code;
 - on top of that, at most TWO_FACTOR_MAX_CODES codes per account per window (rate_limit), then 429;
 - a code works once and only for its own sign in; a new sign in cancels the previous unfinished one.
 """
 
 import hashlib
 import logging
+import math
 import secrets
 import smtplib
 from datetime import datetime, timedelta
@@ -113,12 +117,18 @@ def start(db: Session, user: User, ip: str | None, device: StaffDevice | None = 
     """Password was right: open a challenge and mail the code. Returns (challenge token for the client, row).
     The caller commits."""
     channel()  # fail before anything is created if 2FA cannot work
+    # Parallel sign ins of one account run one after another (a double click must not send two codes).
+    db.execute(select(User.id).where(User.id == user.id).with_for_update())
     now = utcnow()
-    # A new sign in cancels the unfinished ones: their codes stop working.
-    db.execute(update(TwoFactorChallenge)
-               .where(TwoFactorChallenge.user_id == user.id, TwoFactorChallenge.used_at.is_(None))
-               .values(used_at=now))
     token = secrets.token_urlsafe(32)
+    recent = _recent_challenge(db, user, device, now)
+    if recent is not None:
+        # Same sign in again right after a code was sent: keep that code, only the token is new
+        # (the old tab/screen stops working, as with any new sign in). Wrong attempts are kept too.
+        recent.token_hash = _hash_token(token)
+        return token, recent
+    # A new sign in cancels the unfinished ones: their codes stop working.
+    _cancel_unfinished(db, user, now)
     challenge = TwoFactorChallenge(
         token_hash=_hash_token(token),
         user=user,
@@ -135,9 +145,37 @@ def start(db: Session, user: User, ip: str | None, device: StaffDevice | None = 
     return token, challenge
 
 
+def _recent_challenge(db: Session, user: User, device: StaffDevice | None, now: datetime) -> TwoFactorChallenge | None:
+    """The unfinished sign in of this account on the same website/phone (device None = website) whose code went
+    out less than TWO_FACTOR_RESEND_SECONDS ago, or None. Runs under the user lock taken in start()."""
+    return db.scalars(
+        select(TwoFactorChallenge)
+        .where(TwoFactorChallenge.user_id == user.id,
+               TwoFactorChallenge.used_at.is_(None),
+               TwoFactorChallenge.device_id == device.id if device else TwoFactorChallenge.device_id.is_(None),
+               TwoFactorChallenge.code_sent_at > now - timedelta(seconds=settings.TWO_FACTOR_RESEND_SECONDS))
+        .order_by(TwoFactorChallenge.code_sent_at.desc())
+        .limit(1)
+    ).one_or_none()
+
+
+def _cancel_unfinished(db: Session, user: User, now: datetime) -> None:
+    db.execute(update(TwoFactorChallenge)
+               .where(TwoFactorChallenge.user_id == user.id, TwoFactorChallenge.used_at.is_(None))
+               .values(used_at=now))
+
+
+def seconds_left(challenge: TwoFactorChallenge) -> tuple[int, int]:
+    """(how long the current code still works, how soon "Send again" works), counted from code_sent_at."""
+    passed = (utcnow() - challenge.code_sent_at).total_seconds()
+    return (max(0, math.ceil(settings.TWO_FACTOR_CODE_SECONDS - passed)),
+            max(0, math.ceil(settings.TWO_FACTOR_RESEND_SECONDS - passed)))
+
+
 def _open_challenge(db: Session, token: str) -> TwoFactorChallenge:
+    # Locked until commit: parallel "Send again" / code checks of one sign in wait for each other.
     challenge = db.scalars(
-        select(TwoFactorChallenge).where(TwoFactorChallenge.token_hash == _hash_token(token))
+        select(TwoFactorChallenge).where(TwoFactorChallenge.token_hash == _hash_token(token)).with_for_update()
     ).one_or_none()
     if challenge is None or challenge.used_at is not None or challenge.expires_at <= utcnow():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, _SIGN_IN_AGAIN)

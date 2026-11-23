@@ -102,8 +102,8 @@ class TwoFactorRequired(BaseModel):
     challenge_token: ChallengeToken
     sent_to: str  # masked: c***@corp.kz, or "Telegram"
     sent_via: Literal["email", "telegram"] = "email"
-    code_seconds: int  # how long one code lives
-    resend_seconds: int  # how soon "Send again" works
+    code_seconds: int  # how long the current code still works
+    resend_seconds: int  # how soon "Send again" works (less than 60 when a sign in continues the last one)
     expires_at: datetime  # end of this whole sign in
 
 

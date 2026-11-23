@@ -397,20 +397,24 @@ def test_send_again_after_successful_sign_ins_still_works(client, db):
     assert resend(client, token).status_code == 200
 
 
-def test_unfinished_sign_ins_still_hit_the_limit(client):
+def test_unfinished_sign_ins_still_hit_the_limit(client, db):
     """Only a right code clears the counter: someone who knows the password but not the code is still limited."""
     for _ in range(settings.TWO_FACTOR_MAX_CODES):
         assert web_login(client).status_code == 200
+        age_code(db, settings.TWO_FACTOR_RESEND_SECONDS + 1)  # a quick retry would reuse the code, not send one
+    assert len(OUTBOX[CORPORATE]) == settings.TWO_FACTOR_MAX_CODES
     r = web_login(client)
     assert r.status_code == 429
     assert r.json()["detail"].startswith("Too many codes were sent to the corporate mailbox.")
     assert 0 < int(r.headers["Retry-After"]) <= settings.TWO_FACTOR_WINDOW_SECONDS
 
 
-def test_wrong_codes_never_clear_the_counter(client):
+def test_wrong_codes_never_clear_the_counter(client, db):
     token = web_login(client).json()["challenge_token"]
     code = last_code(CORPORATE)
     verify(client, token, wrong(code))
-    web_login(client)
-    web_login(client)
+    for _ in range(2):
+        age_code(db, settings.TWO_FACTOR_RESEND_SECONDS + 1)
+        web_login(client)
+    age_code(db, settings.TWO_FACTOR_RESEND_SECONDS + 1)
     assert web_login(client).status_code == 429
