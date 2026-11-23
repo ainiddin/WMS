@@ -53,6 +53,7 @@ export function StaffLoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sending, setSending] = useState(false) // "Send again" is on its way
   const [sentAt, setSentAt] = useState<number | null>(null)
   // A 429: when it ends (computed once from Retry-After) and the server's text. Counted down here, never polled.
   const [lock, setLock] = useState<{ until: number; text: string } | null>(null)
@@ -193,6 +194,7 @@ export function StaffLoginPage() {
   const resend = async () => {
     if (!challenge) return
     setBusy(true)
+    setSending(true)
     setError(null)
     try {
       setChallenge(await adminAuthApi.resend(challenge.challenge_token))
@@ -203,6 +205,7 @@ export function StaffLoginPage() {
       fail(err)
     } finally {
       setBusy(false)
+      setSending(false)
     }
   }
 
@@ -314,7 +317,7 @@ export function StaffLoginPage() {
                 Sign in
               </Button>
               <Button onClick={resend} disabled={busy || resendIn > 0 || lockLeft > 0}>
-                {resendIn > 0 ? `Send again in ${resendIn} s` : 'Send again'}
+                {sending ? 'Sending…' : resendIn > 0 ? `Send again in ${resendIn} s` : 'Send again'}
               </Button>
               <Button color="inherit" size="small" onClick={restart}>
                 Use another account

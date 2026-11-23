@@ -209,6 +209,28 @@ describe('AdminLoginPage', () => {
     expect(vi.getTimerCount()).toBe(0) // and the countdown stopped ticking
   })
 
+  it('"Send again" says Sending… while the request is on its way, then counts down again', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let answer: (c: TwoFactorRequired) => void = () => {}
+    vi.spyOn(adminAuthApi, 'resend').mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    renderLogin()
+    typePassword()
+    await screen.findByLabelText(/^Code from the email/)
+    await tick(60_000)
+    fireEvent.click(screen.getByRole('button', { name: 'Send again' }))
+    expect(await screen.findByRole('button', { name: 'Sending…' })).toBeDisabled()
+    await act(async () => answer(challenge))
+    expect(await screen.findByRole('button', { name: /Send again in 60 s/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Sending…' })).toBeNull()
+  })
+
+  it('a second sign in that continues the last one starts the wait from what the server says', async () => {
+    vi.spyOn(staffAuthApi, 'emailCode').mockResolvedValue({ ...challenge, resend_seconds: 25, code_seconds: 325 })
+    renderLogin()
+    typePassword()
+    expect(await screen.findByRole('button', { name: /Send again in 25 s/ })).toBeDisabled()
+  })
+
   it('a too-early "Send again" shows its own countdown and the button comes back', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.spyOn(adminAuthApi, 'resend').mockRejectedValue(

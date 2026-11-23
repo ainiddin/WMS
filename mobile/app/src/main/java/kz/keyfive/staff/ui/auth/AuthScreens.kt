@@ -210,6 +210,7 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
     var sentAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val now = rememberNow(active = true)
     val resendIn = secondsLeft(sentAt, challenge.resendSeconds, now)
+    var sending by remember { mutableStateOf(false) } // "Send again" is on its way
     val codeLeft = secondsLeft(sentAt, challenge.codeSeconds, now)
     val lock = remember { Lock() }
 
@@ -250,14 +251,19 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
     OutlinedButton(
         onClick = {
             call {
-                onChallenge(session.resendCode(challenge.challengeToken))
-                sentAt = System.currentTimeMillis()
-                info = "A new code was sent. The previous one no longer works."
+                sending = true
+                try {
+                    onChallenge(session.resendCode(challenge.challengeToken))
+                    sentAt = System.currentTimeMillis()
+                    info = "A new code was sent. The previous one no longer works."
+                } finally {
+                    sending = false
+                }
             }
         },
         enabled = !busy && !locked && resendIn == 0,
         modifier = Modifier.fillMaxWidth(),
-    ) { Text(if (resendIn > 0) "Send again in $resendIn s" else "Send again") }
+    ) { Text(if (sending) "Sending…" else if (resendIn > 0) "Send again in $resendIn s" else "Send again") }
     TextButton(onClick = onRestart) { Text("Use another account") }
 }
 
