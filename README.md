@@ -193,7 +193,9 @@ backend/app/
     (one corporate mailbox for Admin and CEO; demo: the owner's Telegram chat when `TG_BOT_TOKEN` and
     `TG_OWNER_CHAT_ID` are set). A code lives 6 min and works once; 5 wrong codes → a new code is
     sent automatically; "Send again" once a minute; at most 3 codes per account in 15 min, then 429 (cleared by
-    Clear timer). Website: `POST /api/auth/admin/login/` → `POST /api/auth/2fa/verify/`, the session ends hard after
+    Clear timer). Signing in again on the same website/phone within that minute sends no new code (the same code
+    keeps working with the new screen), and parallel requests of one account wait for each other, so retries and
+    double clicks cannot use up the limit. Website: `POST /api/auth/admin/login/` → `POST /api/auth/2fa/verify/`, the session ends hard after
     4 hours. App: the code is asked once per phone (`/staff/login/` answers 202). Every step is in the audit log.
 12. Passwords: `POST /api/auth/password/` (current + new; the new one must differ from the previous, checked only
     on the server). A change signs out every older session. An Admin must change the password every 180 days;
