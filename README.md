@@ -82,7 +82,8 @@ npm run dev            # http://localhost:5173
 - `npm test` — unit tests (Vitest + Testing Library): Admin sign in, session, password, audit view
 
 **Admin panel:** http://localhost:5173/admin — password, then the 6-digit code from the corporate mailbox
-(`ADMIN_2FA_EMAIL`; locally without email delivery the code is in the backend log). Users (role, team, block,
+(`ADMIN_2FA_EMAIL`; locally without email delivery the code is in the backend log). Demo setup: with
+`TG_BOT_TOKEN` and `TG_OWNER_CHAT_ID` set, the code goes to the owner's Telegram chat instead. Users (role, team, block,
 Clear timer), Staff requests, Staff phones, Performance, Audit log, Change password. The session ends after 4 hours.
 The panel is loaded only when /admin is opened, so shop visitors never download it.
 ### Pages
@@ -189,7 +190,8 @@ backend/app/
     Limits are in `config.py`. Both logins (website and Staff app) are counted. An Admin sees the timer of each
     account in Users and can clear it (`POST /api/admin/users/{id}/clear-login-timer/`) to let the user in at once.
 11. Admin two-factor sign in, always on. After the password a 6-digit code goes **only** to `ADMIN_2FA_EMAIL`
-    (one corporate mailbox for Admin and CEO). A code lives 6 min and works once; 5 wrong codes → a new code is
+    (one corporate mailbox for Admin and CEO; demo: the owner's Telegram chat when `TG_BOT_TOKEN` and
+    `TG_OWNER_CHAT_ID` are set). A code lives 6 min and works once; 5 wrong codes → a new code is
     sent automatically; "Send again" once a minute; at most 3 codes per account in 15 min, then 429 (cleared by
     Clear timer). Website: `POST /api/auth/admin/login/` → `POST /api/auth/2fa/verify/`, the session ends hard after
     4 hours. App: the code is asked once per phone (`/staff/login/` answers 202). Every step is in the audit log.

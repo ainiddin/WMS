@@ -14,7 +14,8 @@ uvicorn app.main:app --reload --port 8000
 ```
 - `--host 0.0.0.0` to reach it from phones / other laptops on the same network.
 - `.env`: `DATABASE_URL` must point to the PostgreSQL that runs (here usually port **5432**). `ADMIN_2FA_EMAIL`
-  must be set, otherwise no Admin can sign in (503). Without `BREVO_API_KEY` / `SMTP_HOST` no email is sent:
+  must be set, otherwise no Admin can sign in (503). Demo: with `TG_BOT_TOKEN` + `TG_OWNER_CHAT_ID` Admin codes
+  go to the owner's Telegram chat instead (`telegram_service`; the token is in the URL, never log it). Without `BREVO_API_KEY` / `SMTP_HOST` no email is sent:
   Admin codes and invitation codes are printed in the server log.
 - Demo data: `python -m app.seed --demo` (`--reset` wipes everything first).
 - Tests: `python -m pytest -q`. They need `TEST_DATABASE_URL` (a database whose name contains "test"; wiped on

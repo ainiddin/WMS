@@ -27,6 +27,11 @@ services:
       # The one corporate mailbox (Admin + CEO) for Admin sign-in codes. Without it no Admin can sign in.
       - key: ADMIN_2FA_EMAIL
         sync: false
+      # Demo: when both are set, Admin codes go to this Telegram chat instead (token from BotFather)
+      - key: TG_BOT_TOKEN
+        sync: false
+      - key: TG_OWNER_CHAT_ID
+        sync: false
       # true = fill an empty database with the demo shop on the first start
       - key: SEED_DEMO
         value: "true"
