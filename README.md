@@ -109,7 +109,8 @@ never gets the warehouse screens, and a staff password that leaks is not enough 
    (key in the Android Keystore, excluded from backups). The server stores only its SHA-256 hash (`staff_devices`).
 2. `POST /api/auth/staff/login/` needs the right password **and** an approved phone. A new phone is saved as
    PENDING and refused; the Admin approves or blocks it in **Staff phones**. The first Admin phone is approved
-   automatically (otherwise nobody could approve anything).
+   automatically (otherwise nobody could approve anything). A Manager's new phone is approved by the sign in code
+   instead (the login answers 202, the code goes to the owner's channel); a blocked phone never gets a code.
 3. Staff tokens carry the phone id (`dev`). Every request checks that the phone is still approved, so blocking a
    phone (lost, stolen, unknown request) signs it out at once. A token without a phone gives no staff access.
 4. Release builds forbid screenshots (`FLAG_SECURE`) and plain `http`.
@@ -197,6 +198,8 @@ backend/app/
     keeps working with the new screen), and parallel requests of one account wait for each other, so retries and
     double clicks cannot use up the limit. Website: `POST /api/auth/admin/login/` → `POST /api/auth/2fa/verify/`, the session ends hard after
     4 hours. App: the code is asked once per phone (`/staff/login/` answers 202). Every step is in the audit log.
+    Managers sign in the same way (phone or code on the website, code once per phone in the app); their website
+    session lasts `REFRESH_TOKEN_DAYS` and every refresh renews it.
 12. Passwords: `POST /api/auth/password/` (current + new; the new one must differ from the previous, checked only
     on the server). A change signs out every older session. An Admin must change the password every 180 days;
     with an expired password only `/api/auth/me/` and `/api/auth/password/` work (403 + `X-Password-Expired`).

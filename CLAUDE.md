@@ -32,12 +32,13 @@ Work as a senior backend engineer who will maintain this code next year:
 ## Security invariants (never break)
 - Staff join **only by invitation**; a Manager invites up to his own rank (never ADMIN).
 - A Manager sees and manages **only his own team**.
-- Admin/Manager website sign-in is confirmed on the approved phone (Admin: or the code to `ADMIN_2FA_EMAIL`);
-  Workers use only the app. Website sessions end hard after 4 hours.
+- Admins and Managers sign in with two factors: on the website the approved phone confirms, or the sign in code
+  (goes to the owner: Telegram or `ADMIN_2FA_EMAIL`, never to the person); in the app the code once per phone, and
+  a Manager's new phone is approved by that code. Workers use only the app; their phones wait for approval.
+- Website sessions: Admin ends hard after 4 hours; Manager lasts `REFRESH_TOKEN_DAYS`, renewed by refresh.
 - Every security-relevant action goes to the append-only `audit_log`.
 - **A full card number never reaches our server** — payments only via a gateway's own page + signed webhook.
 - Secrets (passwords, codes, tokens) only hashed; never returned or logged.
-- `MANAGER_WEB_PHONE_CONFIRM=false` is demo-only; never the default.
 
 ## Before saying "done"
 ```bash

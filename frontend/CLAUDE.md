@@ -19,7 +19,7 @@ npm run build
 ## Three websites in one app
 - **Shop** (customers): `/`, `/catalog`, `/cart`, `/checkout`, `/my-orders`, `/account`. Sign in at `/login`.
 - **Admin panel** `/admin/*` and **Manager panel** `/manage/*`: sign in at `/staff/login` (password, then
-  confirmation on the phone; Admin may use the email code). Both are lazy-loaded so shop visitors never download them.
+  confirmation on the phone, or the sign in code). Both are lazy-loaded so shop visitors never download them.
 - The pages hide what a role cannot do, but **the server is the real protection** — never rely on the UI for it.
 
 ## Where code goes
