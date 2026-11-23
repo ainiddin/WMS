@@ -13,6 +13,9 @@ os.environ["ADMIN_PASSWORD"] = "admin-test-pass"
 os.environ["BCRYPT_ROUNDS"] = "4"  # fast hashing, tests only
 os.environ["JWT_SECRET"] = "test-secret-" + "x" * 40
 os.environ["ADMIN_2FA_EMAIL"] = "ceo-office@keyfive.kz"  # the one corporate mailbox for Admin codes
+# Never the real bot from .env: tests that need Telegram switch it on themselves with a fake.
+os.environ["TG_BOT_TOKEN"] = ""
+os.environ["TG_OWNER_CHAT_ID"] = ""
 
 import base64  # noqa: E402
 import hashlib  # noqa: E402

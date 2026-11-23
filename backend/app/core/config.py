@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Admin two-factor sign in (always on). The code goes ONLY to this one corporate mailbox, agreed in advance
     # (Admin and CEO). Without it no Admin can sign in.
     ADMIN_2FA_EMAIL: str | None = None
+    # Demo channel: when BOTH are set, Admin codes go to this Telegram chat instead of ADMIN_2FA_EMAIL.
+    # Token from BotFather. Only from the environment, never in code or logs.
+    TG_BOT_TOKEN: str | None = None
+    TG_OWNER_CHAT_ID: str | None = None
     TWO_FACTOR_CODE_SECONDS: int = 6 * 60       # a code lives 6 minutes
     TWO_FACTOR_MAX_ATTEMPTS: int = 5            # wrong codes before a new code is sent automatically
     TWO_FACTOR_RESEND_SECONDS: int = 60         # the "Send again" button: once a minute

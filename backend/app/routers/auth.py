@@ -58,9 +58,11 @@ def _tokens(user: User, device_id: int | None = None, session_ends: datetime | N
 
 
 def _challenge_out(token: str, challenge) -> TwoFactorRequired:
+    sent_via, sent_to = two_factor_service.sent_to()
     return TwoFactorRequired(
         challenge_token=token,
-        sent_to=two_factor_service.mask_email(two_factor_service.corporate_email()),
+        sent_to=sent_to,
+        sent_via=sent_via,
         code_seconds=settings.TWO_FACTOR_CODE_SECONDS,
         resend_seconds=settings.TWO_FACTOR_RESEND_SECONDS,
         expires_at=challenge.expires_at,

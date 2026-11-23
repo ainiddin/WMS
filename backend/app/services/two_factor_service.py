@@ -1,4 +1,5 @@
-"""Admin two-factor sign in: password, then a 6-digit code sent to the one corporate mailbox (ADMIN_2FA_EMAIL).
+"""Admin two-factor sign in: password, then a 6-digit code sent to the one corporate mailbox (ADMIN_2FA_EMAIL),
+or, when TG_BOT_TOKEN and TG_OWNER_CHAT_ID are set (demo), to the owner's Telegram chat.
 
 Rules:
 - the code lives TWO_FACTOR_CODE_SECONDS; a whole sign in lives TWO_FACTOR_WINDOW_SECONDS;
@@ -24,12 +25,15 @@ from app.core.config import settings
 from app.core.security import hash_password, verify_password
 from app.models import AuditAction, Role, StaffDevice, TwoFactorChallenge, User, UserStatus
 from app.models.common import utcnow
-from app.services import audit_service, email_service
+from app.services import audit_service, email_service, telegram_service
 
 log = logging.getLogger("keyfive")
 
 WEB = "WEB"
 DEVICE = "DEVICE"
+
+EMAIL = "email"
+TELEGRAM = "telegram"
 
 _SIGN_IN_AGAIN = "This sign in is no longer valid. Sign in again with your password."
 
@@ -42,6 +46,24 @@ def mask_email(email: str) -> str:
     """c***@corp.kz: enough to recognise the mailbox, not enough to learn it."""
     local, _, domain = email.partition("@")
     return f"{local[:1]}***@{domain}"
+
+
+def channel() -> str:
+    """Telegram when both TG_* variables are set, else the corporate mailbox. 503 if neither can work."""
+    if telegram_service.is_half_configured():
+        log.error("Only one of TG_BOT_TOKEN / TG_OWNER_CHAT_ID is set: no Admin can sign in")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                            "Admin sign in is not configured (Telegram is half set up). Contact the system owner.")
+    if telegram_service.is_configured():
+        return TELEGRAM
+    corporate_email()
+    return EMAIL
+
+
+def sent_to() -> tuple[str, str]:
+    """(channel, what the screen shows): ("email", "c***@corp.kz") or ("telegram", "Telegram")."""
+    via = channel()
+    return via, ("Telegram" if via == TELEGRAM else mask_email(corporate_email()))
 
 
 def corporate_email() -> str:
@@ -62,17 +84,18 @@ def _send_code(db: Session, challenge: TwoFactorChallenge, ip: str | None) -> No
     challenge.attempts = 0
     where = "the website" if challenge.channel == WEB else f"the phone \"{challenge.device.device_name}\""
     minutes = settings.TWO_FACTOR_CODE_SECONDS // 60
-    try:
-        email_service.send_email(
-            corporate_email(),
-            f"KeyFive WMS admin sign in: code {code}",
-            f"Admin sign in code: {code}\n\n"
+    subject = f"KeyFive WMS admin sign in: code {code}"
+    text = (f"Admin sign in code: {code}\n\n"
             f"Account: {user.email}\nWhere: {where}\nIP: {ip or 'unknown'}\n"
             f"The code is valid for {minutes} minutes and works once.\n\n"
             "If nobody from the management is signing in right now, someone knows the Admin password: "
-            "change it and check the audit log.",
-        )
-    except (httpx.HTTPError, smtplib.SMTPException, OSError) as exc:
+            "change it and check the audit log.")
+    try:
+        if channel() == TELEGRAM:
+            telegram_service.send_to_owner(f"{subject}\n\n{text}")
+        else:
+            email_service.send_email(corporate_email(), subject, text)
+    except (telegram_service.TelegramError, httpx.HTTPError, smtplib.SMTPException, OSError) as exc:
         log.error("Could not send the admin 2FA code: %s", exc)
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not send the code email, try again later") from None
     rate_limit.two_factor_code_sent(user.email)
@@ -89,7 +112,7 @@ def needs_challenge(user: User, device: StaffDevice | None) -> bool:
 def start(db: Session, user: User, ip: str | None, device: StaffDevice | None = None) -> tuple[str, TwoFactorChallenge]:
     """Password was right: open a challenge and mail the code. Returns (challenge token for the client, row).
     The caller commits."""
-    corporate_email()  # fail before anything is created if 2FA cannot work
+    channel()  # fail before anything is created if 2FA cannot work
     now = utcnow()
     # A new sign in cancels the unfinished ones: their codes stop working.
     db.execute(update(TwoFactorChallenge)

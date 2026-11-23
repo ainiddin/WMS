@@ -100,7 +100,8 @@ class TwoFactorRequired(BaseModel):
 
     two_factor_required: Literal[True] = True
     challenge_token: ChallengeToken
-    sent_to: str  # masked: c***@corp.kz
+    sent_to: str  # masked: c***@corp.kz, or "Telegram"
+    sent_via: Literal["email", "telegram"] = "email"
     code_seconds: int  # how long one code lives
     resend_seconds: int  # how soon "Send again" works
     expires_at: datetime  # end of this whole sign in
