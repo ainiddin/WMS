@@ -54,6 +54,9 @@ function typePassword() {
 }
 
 /** Moves the fake clock like a real one: a quarter second at a time, letting React render in between. */
+// A minute of simulated waiting is ~240 small React renders: 5-7 s of real time on a slow machine.
+vi.setConfig({ testTimeout: 20_000 })
+
 /** Moves the (fake) clock forward by exactly `ms`, in small steps so React renders in between.
  * With shouldAdvanceTime the clock also moves by the real time the steps take, so we aim at the end time
  * instead of adding up steps: otherwise a slow machine drifts by seconds. */
