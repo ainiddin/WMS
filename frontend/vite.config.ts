@@ -24,6 +24,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: { '/api': { target: 'http://localhost:8000', changeOrigin: true } },
+    // /fakepay = the CardPay Fake demo gateway's own pages, served by the backend
+    proxy: {
+      '/api': { target: 'http://localhost:8000', changeOrigin: true },
+      '/fakepay': { target: 'http://localhost:8000', changeOrigin: true },
+    },
   },
 })

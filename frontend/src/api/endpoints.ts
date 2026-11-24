@@ -1,7 +1,9 @@
 import { api } from "./client";
 import type {
   Account,
-  CardInput,
+  Payment,
+  PaymentsSummary,
+  TopUpStarted,
   AdminUser,
   AllPerformance,
   AuditAction,
@@ -82,12 +84,15 @@ export const customersApi = {
   ) => patch<Customer>("/customers/me/", data),
 };
 
-// ---- Customer account (simulated bank top-ups) ----
+// ---- Customer account; top-ups by card through the gateway (CardPay Fake) ----
 export const accountApi = {
   get: () => get<Account>("/account/"),
-  topUp: (amount: number) => post<Account>("/account/top-up/", { amount }),
-  saveCard: (card: CardInput) => api.put<Account>("/account/card/", card).then((r) => r.data),
-  removeCard: () => api.delete<Account>("/account/card/").then((r) => r.data),
+};
+
+export const paymentsApi = {
+  /** Opens a payment; the card is typed on the gateway's page (`checkout_url`), never sent to our API. */
+  topUp: (amount: number) => post<TopUpStarted>("/payments/top-up/", { amount }),
+  status: (code: string) => get<Payment>(`/payments/${encodeURIComponent(code)}/`),
 };
 
 // ---- Orders ----
@@ -158,6 +163,7 @@ export const adminApi = {
   approveDevice: (id: number) => post<StaffDevice>(`/admin/devices/${id}/approve/`),
   revokeDevice: (id: number) => post<StaffDevice>(`/admin/devices/${id}/revoke/`),
   audit: (filters: AuditFilters = {}) => get<AuditRow[]>("/admin/audit/", filters),
+  payments: () => get<PaymentsSummary>("/admin/payments/"),
   invitations: (status?: InvitationStatus) =>
     get<Invitation[]>("/admin/invitations/", status ? { status } : {}),
   resendInvitation: (id: number) => post<Invitation>(`/admin/invitations/${id}/resend/`),

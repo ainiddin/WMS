@@ -22,6 +22,7 @@ import {
 const AdminLayout = lazy(() => import("@/pages/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })));
 const StaffLoginPage = lazy(() => import("@/pages/admin/AdminLoginPage").then((m) => ({ default: m.StaffLoginPage })));
 const AuditPage = lazy(() => import("@/pages/admin/AuditPage").then((m) => ({ default: m.AuditPage })));
+const PaymentsPage = lazy(() => import("@/pages/admin/PaymentsPage").then((m) => ({ default: m.PaymentsPage })));
 const DevicesPage = lazy(() => import("@/pages/admin/DevicesPage").then((m) => ({ default: m.DevicesPage })));
 const PasswordPage = lazy(() => import("@/pages/admin/PasswordPage").then((m) => ({ default: m.PasswordPage })));
 const AdminPerformancePage = lazy(() =>
@@ -87,6 +88,7 @@ export default function App() {
         <Route path="devices" element={admin(<DevicesPage />)} />
         <Route path="performance" element={admin(<AdminPerformancePage />)} />
         <Route path="teams/:managerId" element={admin(<TeamPerformancePage />)} />
+        <Route path="payments" element={admin(<PaymentsPage />)} />
         <Route path="audit" element={admin(<AuditPage />)} />
         <Route path="password" element={admin(<PasswordPage />)} />
       </Route>

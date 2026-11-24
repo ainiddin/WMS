@@ -133,27 +133,46 @@ export interface AccountTransaction {
   created_at: string;
 }
 
-export interface SavedCard {
-  holder: string;
-  brand: string;
-  last4: string;
-  exp_month: number;
-  exp_year: number;
-}
-
-export interface CardInput {
-  holder: string;
-  number: string;
-  exp_month: number;
-  exp_year: number;
-}
-
 export interface Account {
   code: string;
   balance: number;
-  bank: string;
-  card: SavedCard | null;
+  /** Who takes the card for top-ups (CardPay Fake). The card is typed only on its page. */
+  gateway: string;
   transactions: AccountTransaction[];
+}
+
+export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
+
+/** A top-up started: open `checkout_url` (the gateway's page); the result comes back by webhook. */
+export interface TopUpStarted {
+  code: string;
+  amount: number;
+  checkout_url: string;
+  expires_at: string;
+}
+
+export interface Payment {
+  code: string;
+  amount: number;
+  status: PaymentStatus;
+  card_brand: string | null;
+  card_last4: string | null;
+  failure_reason: string | null;
+  created_at: string;
+  expires_at: string;
+  completed_at: string | null;
+}
+
+export interface AdminPayment extends Payment {
+  account_code: string;
+  customer_name: string;
+}
+
+export interface PaymentsSummary {
+  gateway: string;
+  total: number;
+  today: number;
+  payments: AdminPayment[];
 }
 
 // ---- Admin (website Admin panel) ----

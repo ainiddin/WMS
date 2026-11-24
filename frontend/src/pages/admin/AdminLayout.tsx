@@ -14,6 +14,7 @@ import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined'
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined'
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined'
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import {
   AppBar,
@@ -52,6 +53,7 @@ export const ADMIN_NAV: NavItem[] = [
   { to: '/admin/invitations', label: 'Invitations', icon: <ForwardToInboxOutlinedIcon /> },
   { to: '/admin/devices', label: 'Staff phones', icon: <PhoneAndroidOutlinedIcon /> },
   { to: '/admin/performance', label: 'Performance', icon: <EmojiEventsOutlinedIcon /> },
+  { to: '/admin/payments', label: 'Payments', icon: <PaymentsOutlinedIcon /> },
   { to: '/admin/audit', label: 'Audit log', icon: <ReceiptLongOutlinedIcon /> },
   { to: '/admin/password', label: 'Change password', icon: <KeyOutlinedIcon /> },
 ]
