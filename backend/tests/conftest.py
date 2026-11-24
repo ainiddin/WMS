@@ -15,11 +15,13 @@ os.environ["JWT_SECRET"] = "test-secret-" + "x" * 40
 os.environ["ADMIN_2FA_EMAIL"] = "ceo-office@keyfive.kz"  # the one corporate mailbox for Admin codes
 # Never the real bot from .env: tests that need Telegram switch it on themselves with a fake.
 os.environ["TG_BOT_TOKEN"] = ""
+os.environ["FAKEPAY_SECRET"] = "test-fakepay-secret-" + "y" * 20  # signs links and webhooks
 os.environ["TG_OWNER_CHAT_ID"] = ""
 
 import base64  # noqa: E402
 import hashlib  # noqa: E402
 import re  # noqa: E402
+from urllib.parse import parse_qs, urlparse  # noqa: E402
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -64,6 +66,34 @@ def outbox(monkeypatch):
     # No DNS lookups in tests: every domain "accepts mail".
     monkeypatch.setattr("app.services.email_service.has_mail_server", lambda domain: True)
     return OUTBOX
+
+
+@pytest.fixture(autouse=True)
+def fakepay_webhooks(monkeypatch):
+    """CardPay Fake delivers its webhook over HTTP; in tests it goes straight into the app (no network).
+    Returns the list of delivered (body, signature) so tests can replay or inspect them."""
+    delivered: list[tuple[bytes, str]] = []
+
+    def deliver(body: bytes, signature: str) -> bool:
+        delivered.append((body, signature))
+        r = TestClient(app).post("/api/payments/fakepay/webhook/", content=body,
+                                 headers={"Content-Type": "application/json", "FakePay-Signature": signature})
+        return r.is_success
+
+    monkeypatch.setattr("app.fakepay.delivery.deliver", deliver)
+    return delivered
+
+
+TEST_CARD = {"holder": "TEST CUSTOMER", "number": "4242 4242 4242 4242", "exp_month": 12, "exp_year": 2099,
+             "cvc": "123"}
+
+
+def checkout_link(checkout_url: str) -> dict:
+    """The signed fields of a CardPay Fake link (what its page sends back when paying)."""
+    query = parse_qs(urlparse(checkout_url).query)
+    link = {k: v[0] for k, v in query.items()}
+    link["expires"] = int(link["expires"])
+    return link
 
 
 def last_code(email: str) -> str:
@@ -189,12 +219,27 @@ class Api:
         })
         assert r.status_code == 201, r.text
         headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
-        if money:
-            assert self.top_up(headers, money).status_code == 201
+        while money > 0:  # one top-up is at most PAYMENT_MAX
+            part = min(money, 300_000)
+            self.top_up(headers, part)
+            money -= part
         return headers
 
-    def top_up(self, headers: dict, amount: int):
-        return self.c.post("/api/account/top-up/", headers=headers, json={"amount": amount})
+    def start_top_up(self, headers: dict, amount):
+        return self.c.post("/api/payments/top-up/", headers=headers, json={"amount": amount})
+
+    def pay(self, checkout_url: str, card: dict | None = None):
+        """Pay on the CardPay Fake page (as the customer's browser would)."""
+        return self.c.post("/fakepay/api/pay", json={**checkout_link(checkout_url), **(card or TEST_CARD)})
+
+    def top_up(self, headers: dict, amount):
+        """The whole way: open the payment, pay with a test card, the gateway's webhook credits the account.
+        Returns the account after it (asserts every step went through)."""
+        r = self.start_top_up(headers, amount)
+        assert r.status_code == 201, r.text
+        r = self.pay(r.json()["checkout_url"])
+        assert r.status_code == 200, r.text
+        return self.c.get("/api/account/", headers=headers).json()
 
     def balance(self, headers: dict) -> float:
         return self.c.get("/api/account/", headers=headers).json()["balance"]

@@ -1,4 +1,4 @@
-"""Customer account: top up from the (simulated) bank, pay for orders, refunds."""
+"""Customer account: top up by card (CardPay Fake), pay for orders, refunds."""
 
 
 def test_new_customer_has_an_empty_account(client, api):
@@ -12,24 +12,12 @@ def test_new_customer_has_an_empty_account(client, api):
 
 def test_top_up_adds_money_and_is_logged(client, api):
     c = api.customer("top@mail.kz", money=0)
-    r = api.top_up(c, 25_000)
-    assert r.status_code == 201
-    account = r.json()
+    account = api.top_up(c, 25_000)
     assert account["balance"] == 25_000
     tx = account["transactions"][0]
     assert tx["tx_type"] == "TOPUP" and tx["amount"] == 25_000 and tx["balance_after"] == 25_000
-    assert "Demo Bank" in tx["note"]
+    assert "Visa .. 4242" in tx["note"] and "CardPay Fake" in tx["note"]
     assert client.get("/api/customers/me/", headers=c).json()["balance"] == 25_000
-
-
-def test_top_up_amount_is_checked(client, api):
-    c = api.customer("limits@mail.kz", money=0)
-    for bad in (0, -500, 99, 1_000_001, 150.5):
-        assert api.top_up(c, bad).status_code == 422, bad
-    for _ in range(10):
-        assert api.top_up(c, 1_000_000).status_code == 201
-    r = api.top_up(c, 100)  # 10 000 000 is the limit
-    assert r.status_code == 409
 
 
 def test_order_is_paid_from_the_account(client, api, team):
@@ -78,7 +66,8 @@ def test_shipped_order_stays_paid(client, api, team):
 
 def test_only_customers_have_an_account(client, api, team):
     assert client.get("/api/account/", headers=team["manager"]).status_code == 403
-    assert client.post("/api/account/top-up/", json={"amount": 1000}).status_code == 401
+    assert client.post("/api/payments/top-up/", json={"amount": 1000}).status_code == 401
+    assert client.post("/api/payments/top-up/", headers=team["manager"], json={"amount": 1000}).status_code == 403
 
 
 def test_managers_see_customer_balances(client, api, team):
@@ -86,26 +75,10 @@ def test_managers_see_customer_balances(client, api, team):
     assert rows[0]["balance"] == 100_000
 
 
-def test_card_is_saved_without_the_full_number(client, api):
-    c = api.customer("card@mail.kz", money=0)
-    card = {"holder": "  aigerim  nurlanova ", "number": "4242 4242 4242 4242", "exp_month": 12, "exp_year": 2099}
-    r = client.put("/api/account/card/", json=card, headers=c)
-    assert r.status_code == 200
-    assert r.json()["card"] == {"holder": "AIGERIM NURLANOVA", "brand": "Visa", "last4": "4242",
-                                "exp_month": 12, "exp_year": 2099}
-    assert "4242424242424242" not in r.text
-    assert client.get("/api/account/", headers=c).json()["card"]["last4"] == "4242"
-
-    r = client.put("/api/account/card/", json={**card, "number": "5555555555554444"}, headers=c)
-    assert r.json()["card"]["brand"] == "Mastercard" and r.json()["card"]["last4"] == "4444"
-
-    assert client.delete("/api/account/card/", headers=c).json()["card"] is None
-
-
-def test_card_details_are_checked(client, api):
-    c = api.customer("badcard@mail.kz", money=0)
-    good = {"holder": "TEST USER", "number": "4242424242424242", "exp_month": 1, "exp_year": 2099}
-    for bad in ({"number": "4242424242424241"}, {"number": "1234"}, {"number": "4242abcd42424242"},
-                {"exp_month": 13}, {"exp_year": 2001}, {"holder": " "}):
-        assert client.put("/api/account/card/", json={**good, **bad}, headers=c).status_code == 422, bad
-    assert client.get("/api/account/", headers=c).json()["card"] is None
+def test_the_old_top_up_and_card_endpoints_are_gone(client, api):
+    """Money only through the gateway; a card number is never sent to the shop API."""
+    c = api.customer("old@mail.kz", money=0)
+    assert client.post("/api/account/top-up/", headers=c, json={"amount": 5000}).status_code in (404, 405)
+    card = {"holder": "TEST USER", "number": "4242424242424242", "exp_month": 1, "exp_year": 2099}
+    assert client.put("/api/account/card/", headers=c, json=card).status_code in (404, 405)
+    assert client.get("/api/account/", headers=c).json()["balance"] == 0

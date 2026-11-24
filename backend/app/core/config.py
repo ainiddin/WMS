@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
 
+    # Top-ups go through CardPay Fake (app/fakepay): a pretend gateway, no real money. FAKEPAY_SECRET signs the
+    # payment links and webhooks (shop <-> gateway); without it top-ups are off (503).
+    FAKEPAY_SECRET: str | None = None
+    FAKEPAY_WEBHOOK_URL: str | None = None      # default: this server on its own port
+    FAKEPAY_EVENT_MAX_AGE_SECONDS: int = 300    # older webhooks are refused (replays)
+    PAYMENT_MIN: int = 100                      # KZT per top-up
+    PAYMENT_MAX: int = 300_000                  # KZT per top-up
+    PAYMENT_DAILY_MAX: int = 1_000_000          # KZT per customer per calendar day (APP_TIMEZONE)
+    PAYMENT_LINK_MINUTES: int = 15              # a payment link not paid in time expires
+
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     # Used to group dates into days/weeks/months for charts.

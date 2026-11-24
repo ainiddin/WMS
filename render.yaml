@@ -32,6 +32,9 @@ services:
         sync: false
       - key: TG_OWNER_CHAT_ID
         sync: false
+      # Signs CardPay Fake payment links and webhooks; without it top-ups are off
+      - key: FAKEPAY_SECRET
+        generateValue: true
       # true = fill an empty database with the demo shop on the first start
       - key: SEED_DEMO
         value: "true"

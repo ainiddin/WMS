@@ -25,6 +25,13 @@ class DeviceStatus(StrEnum):
     REVOKED = "REVOKED"
 
 
+class PaymentStatus(StrEnum):
+    PENDING = "PENDING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    EXPIRED = "EXPIRED"
+
+
 class OrderStatus(StrEnum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"

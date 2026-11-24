@@ -1,83 +1,55 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field
 
 from app.schemas.common import Money, ORMModel
-from app.services.timeutil import local_tz
 
 
 class TopUpRequest(BaseModel):
-    """Whole tenge, 100 ... 1 000 000 KZT per top-up."""
+    """Whole tenge; the limits (min, max, per day) are checked by payment_service."""
 
-    amount: Decimal = Field(ge=100, le=1_000_000, decimal_places=0)
-
-
-def luhn_ok(number: str) -> bool:
-    """The check digit every real card number has; catches typos."""
-    total = 0
-    for i, ch in enumerate(reversed(number)):
-        d = int(ch)
-        if i % 2:
-            d = d * 2 - 9 if d > 4 else d * 2
-        total += d
-    return total % 10 == 0
+    amount: Decimal = Field(gt=0, le=100_000_000, decimal_places=0)
 
 
-def card_brand(number: str) -> str:
-    if number.startswith("4"):
-        return "Visa"
-    if 51 <= int(number[:2]) <= 55 or 2221 <= int(number[:4]) <= 2720:
-        return "Mastercard"
-    if number[:2] in ("34", "37"):
-        return "American Express"
-    if 2200 <= int(number[:4]) <= 2204:
-        return "Mir"
-    if number.startswith("62"):
-        return "UnionPay"
-    return "Card"
+class TopUpStarted(BaseModel):
+    """Open `checkout_url` (the gateway's page) in the browser; the result comes back by webhook."""
+
+    code: str
+    amount: Money
+    checkout_url: str
+    expires_at: datetime
 
 
-class CardIn(BaseModel):
-    """The full number is only checked here; the server keeps the last 4 digits. No CVV is asked."""
+class PaymentOut(ORMModel):
+    code: str
+    amount: Money
+    status: str
+    card_brand: str | None
+    card_last4: str | None
+    failure_reason: str | None
+    created_at: datetime
+    expires_at: datetime
+    completed_at: datetime | None
 
-    holder: str = Field(min_length=2, max_length=100)
-    number: str
-    exp_month: int = Field(ge=1, le=12)
-    exp_year: int = Field(ge=2000, le=2100)
 
-    @field_validator("holder")
+class AdminPaymentOut(PaymentOut):
+    account_code: str
+    customer_name: str
+
     @classmethod
-    def holder_clean(cls, v: str) -> str:
-        v = " ".join(v.split()).upper()
-        if len(v) < 2:
-            raise ValueError("Enter the name as written on the card")
-        return v
-
-    @field_validator("number")
-    @classmethod
-    def number_ok(cls, v: str) -> str:
-        v = v.replace(" ", "").replace("-", "")
-        if not v.isdigit() or not 13 <= len(v) <= 19:
-            raise ValueError("A card number has 13 to 19 digits")
-        if not luhn_ok(v):
-            raise ValueError("The card number is wrong, check the digits")
-        return v
-
-    @model_validator(mode="after")
-    def not_expired(self) -> "CardIn":
-        today = datetime.now(local_tz()).date()
-        if (self.exp_year, self.exp_month) < (today.year, today.month):
-            raise ValueError("The card has expired")
-        return self
+    def from_payment(cls, p) -> "AdminPaymentOut":
+        return cls(**PaymentOut.model_validate(p).model_dump(), account_code=p.account.code,
+                   customer_name=p.account.customer.full_name)
 
 
-class CardOut(BaseModel):
-    holder: str
-    brand: str
-    last4: str
-    exp_month: int
-    exp_year: int
+class PaymentsSummaryOut(BaseModel):
+    """Read only: there is no withdrawal for anybody."""
+
+    gateway: str
+    total: Money
+    today: Money
+    payments: list[AdminPaymentOut]
 
 
 class TransactionOut(ORMModel):
@@ -103,6 +75,5 @@ class TransactionOut(ORMModel):
 class AccountOut(BaseModel):
     code: str
     balance: Money
-    bank: str
-    card: CardOut | None = None
+    gateway: str  # who takes the card for top-ups
     transactions: list[TransactionOut]

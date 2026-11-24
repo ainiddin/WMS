@@ -43,7 +43,8 @@ from app.models import (
 )
 from app.schemas.catalog import ean13_check_digit
 from app.schemas.orders import OrderCreate, OrderItemIn
-from app.services import account_service, order_service
+from app.fakepay import router as fakepay_router
+from app.services import account_service, order_service, payment_gateway, payment_service
 from app.services.movement_service import record_movement
 from app.services.timeutil import local_tz
 from app.services.user_service import ensure_first_admin
@@ -169,14 +170,35 @@ class Simulation:
         weights = [self.activity[w.manager_id] for w in pool]
         return self.rng.choices(pool, weights)[0]
 
-    def create_order(self, customer: Customer, items: list[OrderItemIn], at: datetime, comment: str | None = None) -> Order:
-        """Orders are paid from the account, so a customer short of money first tops up from the bank."""
+    def top_up(self, customer: Customer, amount: Decimal, at: datetime) -> bool:
+        """The same way as a customer: a payment, then CardPay Fake's signed webhook (the demo acts as the gateway).
+        False if the daily limit stops it."""
+        try:
+            payment, _ = payment_service.start_top_up(self.db, customer, amount, now=at)
+        except HTTPException:
+            return False
+        card = {"brand": self.rng.choice(["Visa", "Mastercard"]), "last4": f"{self.rng.randint(0, 9999):04d}"}
+        body, signature = fakepay_router.make_event(payment.code, f"{amount:.2f}", payment_gateway.CURRENCY,
+                                                    "payment.succeeded", card, int(at.timestamp()))
+        payment_service.handle_webhook(self.db, body, signature, now=at + timedelta(seconds=40))
+        return True
+
+    def create_order(self, customer: Customer, items: list[OrderItemIn], at: datetime, comment: str | None = None) -> Order | None:
+        """Orders are paid from the account, so a customer short of money first tops up by card.
+        None if the money could not be found within the top-up limits (the order is skipped)."""
         total = sum((self.db.get(Product, i.product_id).unit_price * i.quantity for i in items), Decimal("0"))
         account = account_service.get_account(self.db, customer.id)
         if account.balance < total:
             needed = ((total - account.balance) / 5000).to_integral_value(ROUND_CEILING) * 5000
             amount = max(needed, Decimal(self.rng.choice([10_000, 20_000, 30_000, 50_000, 100_000])))
-            account_service.top_up(self.db, customer, amount, at - timedelta(minutes=self.rng.randint(3, 40)))
+            paid_at = at - timedelta(minutes=self.rng.randint(3, 40))
+            while amount > 0:
+                part = min(amount, Decimal(settings.PAYMENT_MAX))
+                if not self.top_up(customer, part, paid_at):
+                    self.stats["orders_skipped"] = self.stats.get("orders_skipped", 0) + 1
+                    return None
+                amount -= part
+            self.db.refresh(account)
         self.stats["orders"] += 1
         return order_service.create_order(self.db, customer, OrderCreate(items=items, comment=comment), at=at)
 
@@ -221,7 +243,7 @@ class Simulation:
             customer = self.rng.choice(self.customers)
             order = self.create_order(customer, [OrderItemIn(product_id=p.id, quantity=qty)], at,
                                       comment="Bulk purchase for an office")
-            if order.status == OrderStatus.APPROVED:
+            if order is not None and order.status == OrderStatus.APPROVED:
                 self.ship(order, at + timedelta(hours=2), self.db.get(Employee, order.assigned_to_id))
         # A few fresh orders: approved by the system and waiting in the Workers' queues.
         in_stock = [p for p in self.products if p.quantity >= 8]
@@ -268,6 +290,8 @@ class Simulation:
         items = [OrderItemIn(product_id=p.id, quantity=self.rng.choices([1, 2, 3, 4], [55, 28, 12, 5])[0])
                  for p in picks]
         order = self.create_order(customer, items, at)
+        if order is None:
+            return
         if self.rng.random() < 0.03:
             self.schedule(at + timedelta(hours=self.rng.uniform(0.2, 3)), "customer_cancel", order.id)
         elif self.rng.random() < 0.02:

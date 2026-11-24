@@ -18,7 +18,9 @@ from app.schemas.people import (
     TeamChangeRequest,
 )
 from app.schemas.team import InvitationCreate, InvitationOut
-from app.services import audit_service, device_service, invitation_service, user_service
+from app.schemas.accounts import AdminPaymentOut, PaymentsSummaryOut
+from app.services import (audit_service, device_service, invitation_service, payment_gateway, payment_service,
+                          user_service)
 from app.services.timeutil import local_tz
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -158,6 +160,14 @@ def revoke_device(device_id: int, db: DB, admin: Admin, ip: ClientIP):
 
 
 # ---- Audit log ----
+@router.get("/payments/", response_model=PaymentsSummaryOut)
+def payments(db: DB, _: Admin):
+    """Money received by card top-ups (read only; nobody can withdraw)."""
+    data = payment_service.summary(db)
+    return PaymentsSummaryOut(gateway=payment_gateway.NAME, total=data["total"], today=data["today"],
+                              payments=[AdminPaymentOut.from_payment(p) for p in data["payments"]])
+
+
 @router.get("/audit/", response_model=list[AuditLogOut])
 def audit_log(
     db: DB,
