@@ -146,7 +146,8 @@ email, code, new password → first sign in → the phone waits for approval (a 
 plus a free PostgreSQL database, region Frankfurt.
 
 1. render.com → sign in with GitHub → **New → Blueprint** → choose `ainiddin/WMS`.
-2. Fill the two secret values Render asks for: `ADMIN_PASSWORD` and `DEMO_PASSWORD`. `JWT_SECRET` is generated.
+2. Fill the two secret values Render asks for: `ADMIN_PASSWORD` and `DEMO_PASSWORD`. `JWT_SECRET` and
+   `FAKEPAY_SECRET` are generated.
 3. **Apply**. The first build takes ~5 min. On start the container runs `alembic upgrade head`, creates the first
    admin and (because `SEED_DEMO=true`) fills an empty database with the demo shop.
 4. Every push to `main` redeploys automatically.
@@ -170,7 +171,8 @@ backend/app/
 ├── schemas/           Pydantic request / response models
 ├── services/          movement_service (record_movement), order_service (auto-approval + stock queue),
 │                      assignment_service (least loaded Worker, rebalance), eta_service (expected wait),
-│                      account_service (top-up / payment / refund), user_service, email_service,
+│                      account_service (ledger: top-up / payment / refund), payment_service + payment_gateway
+│                      (card top-ups, webhook), user_service, email_service,
 │                      report_service, performance_service, export_service
 ├── routers/           auth, admin, catalog, customers, movements, orders, reports, performance
 └── seed.py            first admin + demo data
@@ -210,6 +212,19 @@ backend/app/
     and manages only his own team (`/api/team/members/`, `/api/team/devices/`); anything else answers 404.
 14. Audit log (`audit_log`, `GET /api/admin/audit/`): who did what to whom, when, from which IP. Append-only:
     PostgreSQL refuses UPDATE and DELETE.
+15. Top-ups by card through **CardPay Fake** (`app/fakepay/`, a pretend gateway: no real money, nothing stored).
+    `POST /api/payments/top-up/` opens a PENDING payment and returns a signed link to the gateway's own page; the
+    card is typed only there, never sent to `/api`. The gateway sends a webhook signed with HMAC-SHA256
+    (`FAKEPAY_SECRET`); the shop credits the money only if the signature is right, the event is fresh, the amount
+    matches and the payment is still open (the same event again changes nothing). The return to the site proves
+    nothing: the page asks `GET /api/payments/{code}/`. Limits: 100 … 300 000 KZT per top-up, 1 000 000 KZT per
+    customer per calendar day (open links count), a link lives 15 min. Test cards: `4242 4242 4242 4242` paid,
+    `4000 0000 0000 0002` declined, `4000 0000 0000 9995` not enough money. Admin: `GET /api/admin/payments/`,
+    read only; nobody can withdraw.
+16. Money in PostgreSQL: `account_transactions` is append-only and the only way a balance moves (a trigger sets
+    `balance_after` and the balance; a direct `UPDATE accounts SET balance` is refused); a TOPUP needs a SUCCEEDED
+    payment of the same account and amount, credited once; a REFUND needs the payment of that order; a finished
+    payment never changes and no payment is deleted. (The database owner can still disable triggers.)
 
 Codes like `P001`, `O0001`, `M0001` are PostgreSQL generated columns built from the integer id, so they never collide.
 

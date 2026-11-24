@@ -43,7 +43,13 @@ uvicorn app.main:app --reload --port 8000
 - **Secrets:** bcrypt for passwords and codes, SHA-256 for random tokens. Never return or log them.
 - **Errors a wrong guess can see:** unknown email and wrong code get the same answer (no probing who exists).
 - **Time:** use `utcnow()` / `utcnow_seconds()` from the app (not the DB clock) when comparing with JWT `iat`.
-- **Money and cards:** never accept a full card number in an endpoint meant for payments; use a gateway.
+- **Money and cards:** never accept a full card number in the shop API; cards are typed only on the gateway's
+  page (`app/fakepay/`, CardPay Fake). Money moves only by inserting into `account_transactions`
+  (`account_service._record`); PostgreSQL triggers refuse any other change of a balance. Credit a top-up only
+  from the gateway's signed webhook (`payment_service.handle_webhook`), never from the browser's return.
+- **CardPay Fake** imports nothing from the shop; the shop talks to it only through
+  `services/payment_gateway.py` (a real gateway = a new adapter there). Tests deliver its webhooks in-process
+  (`fakepay_webhooks` fixture); `api.top_up(headers, amount)` goes the whole way.
 
 ## Schema changes
 Every model change needs an Alembic migration in `alembic/versions/` (one head only). Check
