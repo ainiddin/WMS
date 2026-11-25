@@ -9,7 +9,7 @@ os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or _env.get("TE
     "postgresql+psycopg://postgres@localhost:5432/wms_test"
 )
 os.environ["ADMIN_EMAIL"] = "Admin001@wms.kz"
-os.environ["ADMIN_PASSWORD"] = "admin-test-pass"
+os.environ["ADMIN_PASSWORD"] = "admin-test-pass-1"
 os.environ["BCRYPT_ROUNDS"] = "4"  # fast hashing, tests only
 os.environ["JWT_SECRET"] = "test-secret-" + "x" * 40
 os.environ["ADMIN_2FA_EMAIL"] = "ceo-office@keyfive.kz"  # the one corporate mailbox for Admin codes
@@ -29,8 +29,8 @@ from app.core import rate_limit  # noqa: E402
 from app.db.session import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 
-ADMIN = ("admin001@wms.kz", "admin-test-pass")
-PASSWORD = "password123"
+ADMIN = ("admin001@wms.kz", "admin-test-pass-1")
+PASSWORD = "password_123"
 CORPORATE = "ceo-office@keyfive.kz"
 
 

@@ -216,6 +216,20 @@ describe('PasswordPage', () => {
     expect(change).not.toHaveBeenCalled()
   })
 
+  it('says what the new password still needs and sends nothing until it follows the rule', async () => {
+    const change = vi.spyOn(adminAuthApi, 'changePassword')
+    await open()
+    fill('old-password', 'kettle2026', 'kettle2026')
+    expect(screen.getByText('Still needed: a special character (@ _ - $ …)')).toBeInTheDocument()
+    expect(submit()).toBeDisabled()
+    fill('old-password', 'kettle', 'kettle')
+    expect(screen.getByText(/Still needed: at least 8 characters, a digit, a special character/)).toBeInTheDocument()
+    fill('old-password', 'kettle_2026', 'kettle_2026')
+    expect(screen.queryByText(/Still needed/)).toBeNull()
+    expect(submit()).toBeEnabled()
+    expect(change).not.toHaveBeenCalled()
+  })
+
   it('changes it, keeps the new tokens and returns to the panel', async () => {
     const pair = tokenPair()
     const change = vi.spyOn(adminAuthApi, 'changePassword').mockResolvedValue(pair)

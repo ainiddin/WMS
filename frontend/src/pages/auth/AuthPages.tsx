@@ -22,6 +22,7 @@ import { authApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import { ThemeToggle } from "@/components/Layout";
 import { PHONE_HINT, phoneError } from "@/format";
+import { PASSWORD_RULE, passwordHint } from "@/password";
 
 const RESEND_SECONDS = 60;
 
@@ -129,6 +130,8 @@ function signUpError(form: {
 }) {
   if (!/^\d{6}$/.test(form.code))
     return "Enter the 6-digit code from the email";
+  const weak = passwordHint(form.password);
+  if (weak) return `Password: ${weak.toLowerCase()}`;
   if (form.password !== form.confirm) return "Passwords do not match";
   return phoneError(form.phone);
 }
@@ -364,8 +367,8 @@ export function SignUpPage() {
           value={form.password}
           onChange={set("password")}
           autoComplete="new-password"
-          helperText="At least 8 characters"
-          slotProps={{ htmlInput: { minLength: 8 } }}
+          error={!!form.password && !!passwordHint(form.password)}
+          helperText={(form.password && passwordHint(form.password)) || PASSWORD_RULE}
         />
         <TextField
           label="Repeat password"

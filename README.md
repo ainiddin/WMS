@@ -203,6 +203,10 @@ backend/app/
 12. Passwords: `POST /api/auth/password/` (current + new; the new one must differ from the previous, checked only
     on the server). A change signs out every older session. An Admin must change the password every 180 days;
     with an expired password only `/api/auth/me/` and `/api/auth/password/` work (403 + `X-Password-Expired`).
+    Every NEW password (sign up, invitation, change; customers and staff) needs at least 8 characters, a letter,
+    a digit and a special character (`@ _ - $ ...`, not a space): `schemas/common.py` `password_problems`,
+    the same rule on the website (`src/password.ts`) and in the app (`Flows.kt`), each says what is missing.
+    Old passwords keep working for sign in.
 13. Staff join only by invitation (`invitations`, `/api/team/invitations/`): a Manager invites a WORKER into his
     team or a MANAGER (new team) — never above his rank. The code lives 48 h; 5 wrong codes burn it (and count as
     failed logins); "Send again" once a minute; one open invitation per email (partial unique index). The Admin
