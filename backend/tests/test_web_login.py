@@ -294,3 +294,16 @@ def test_an_admin_phone_that_never_passed_the_email_code_does_not_count(client):
     assert staff_login(client, *ADMIN).status_code == 202  # phone approved automatically, code not entered yet
     r = start(client, ADMIN[0], ADMIN[1])
     assert r.status_code == 200 and r.json()["phone_available"] is False
+
+
+def test_a_manager_receives_goods_from_the_website(client, api, boss):
+    """Stock IN on the website (Manager panel): the same endpoint as the app, recorded on the Manager."""
+    web = {"Authorization": f"Bearer {sign_in(client, 'boss@wms.kz', boss['phone'])['access_token']}"}
+    product = api.product(web, name="Kettle", barcode="4870000000036")
+    r = client.post("/api/movements/in/", headers=web, json={"product_id": product["id"], "quantity": 12,
+                                                             "note": "Invoice 55"})
+    assert r.status_code == 201, r.text
+    assert r.json()["employee_name"] == client.get("/api/auth/me/", headers=web).json()["full_name"]
+    assert client.get("/api/products/by-barcode/4870000000036/", headers=web).json()["quantity"] == 12
+    rows = client.get("/api/movements/", headers=web, params={"type": "IN", "limit": 8}).json()
+    assert [(m["quantity"], m["note"]) for m in rows] == [(12, "Invoice 55")]

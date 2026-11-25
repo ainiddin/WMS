@@ -1,6 +1,7 @@
 import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined'
 import ForwardToInboxOutlinedIcon from '@mui/icons-material/ForwardToInboxOutlined'
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined'
+import MoveToInboxOutlinedIcon from '@mui/icons-material/MoveToInboxOutlined'
 import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline'
@@ -56,10 +57,11 @@ export const ADMIN_NAV: NavItem[] = [
   { to: '/admin/password', label: 'Change password', icon: <KeyOutlinedIcon /> },
 ]
 
-/** The Manager's desk work. Scanning screens (Stock IN, shipping) stay in the phone app. */
+/** The Manager's work on the website. Stock IN is here too (barcode typed or from a USB scanner). */
 export const MANAGER_NAV: NavItem[] = [
   { to: '/manage', label: 'Dashboard', icon: <DashboardOutlinedIcon />, end: true },
   { to: '/manage/orders', label: 'Orders', icon: <ShoppingCartOutlinedIcon /> },
+  { to: '/manage/stock-in', label: 'Stock IN', icon: <MoveToInboxOutlinedIcon /> },
   { to: '/manage/restock', label: 'Restock list', icon: <ReportProblemOutlinedIcon /> },
   { to: '/manage/reports', label: 'Reports', icon: <AssessmentOutlinedIcon /> },
   { to: '/manage/products', label: 'Products', icon: <Inventory2OutlinedIcon /> },
