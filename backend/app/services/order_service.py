@@ -15,7 +15,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Customer, Employee, MovementType, Order, OrderItem, OrderStatus, Product
+from app.models import Customer, Employee, MovementType, Order, OrderItem, OrderStatus, Product, Role
 from app.models.common import utcnow
 from app.schemas.orders import OrderCreate
 from app.services import account_service, assignment_service
@@ -189,12 +189,27 @@ def reject_order(db: Session, order: Order, manager: Employee, reason: str | Non
     return order
 
 
+def may_ship(order: Order, shipper: Employee) -> bool:
+    """Who may ship an approved order:
+    - any Worker, any order (e.g. a colleague is ill); the order then becomes his;
+    - a Manager, only an order of his own team (given to one of his Workers, or to himself)."""
+    if shipper.role == Role.WORKER:
+        return True
+    if shipper.role == Role.MANAGER:
+        owner = order.assigned_to
+        return owner is not None and (owner.id == shipper.id or owner.manager_id == shipper.id)
+    return False
+
+
 def ship_order(db: Session, order: Order, worker: Employee, at: datetime | None = None) -> Order:
     """Rule 5: one OUT per line + status SHIPPED. If any line fails, the caller's session is rolled back entirely.
 
-    Any Worker may ship any approved order (e.g. a colleague is ill); the order then becomes his.
+    See may_ship for who may. A Manager shipping for his Worker is recorded as the shipper; the order stays in
+    the Worker's queue history (assigned_to is not moved to the Manager).
     """
     _require_status(order, OrderStatus.APPROVED)
+    if not may_ship(order, worker):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This order belongs to another team")
     when = at or utcnow()
     # Lock products in id order so two shipments never deadlock each other.
     for item in sorted(order.items, key=lambda i: i.product_id):
@@ -212,7 +227,7 @@ def ship_order(db: Session, order: Order, worker: Employee, at: datetime | None 
     order.status = OrderStatus.SHIPPED
     order.shipped_by_id = worker.id
     order.shipped_at = when
-    if order.assigned_to_id != worker.id:
+    if worker.role == Role.WORKER and order.assigned_to_id != worker.id:
         order.assigned_to_id, order.assigned_at = worker.id, when
     return order
 

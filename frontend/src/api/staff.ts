@@ -181,6 +181,8 @@ export const ordersApi = {
   approve: (id: number) => post<Order>(`/orders/${id}/approve/`),
   reject: (id: number, reason?: string) => post<Order>(`/orders/${id}/reject/`, { reason: reason || null }),
   cancel: (id: number) => post<Order>(`/orders/${id}/cancel/`),
+  /** One transaction: OUT for every line. A Manager may ship only his own team's orders (server rule). */
+  ship: (id: number) => post<Order>(`/orders/${id}/ship/`),
   workload: () => get<WorkerLoad[]>('/orders/workload/'),
   rebalance: () => post<{ moved: number; workload: WorkerLoad[] }>('/orders/rebalance/'),
 }

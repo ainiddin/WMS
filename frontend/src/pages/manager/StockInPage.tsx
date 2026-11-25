@@ -18,12 +18,10 @@ import { useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
 import { errorMessage } from '@/api/client'
 import { catalogApi, movementsApi, type ProductStaff } from '@/api/staff'
+import { barcodeInput } from '@/barcode'
 import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
 import { formatDateTime } from '@/format'
-
-/** Typed or from a USB scanner (it types the digits and Enter): keep digits only, like the Staff app. */
-export const barcodeInput = (typed: string) => typed.replace(/\D/g, '').slice(0, 14)
 
 const MAX_QUANTITY = 100_000
 

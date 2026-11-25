@@ -4,7 +4,8 @@ import { Route } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { catalogApi, movementsApi, type ProductStaff, type StockMovement } from '@/api/staff'
 import { renderAt } from '@/test/render'
-import { StockInPage, barcodeInput } from './StockInPage'
+import { barcodeInput } from '@/barcode'
+import { StockInPage } from './StockInPage'
 
 const kettle = {
   id: 7, code: 'P007', product_name: 'Electric kettle', is_active: true, quantity: 3, min_quantity: 5,

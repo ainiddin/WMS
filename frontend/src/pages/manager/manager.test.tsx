@@ -40,7 +40,7 @@ describe('Manager panel', () => {
   it('has the Manager screens, Stock IN included, and nothing of the Admin', () => {
     const labels = MANAGER_NAV.map((n) => n.label)
     expect(labels).toEqual(
-      expect.arrayContaining(['Dashboard', 'Orders', 'Stock IN', 'Reports', 'Products', 'My team', 'Invitations']),
+      expect.arrayContaining(['Dashboard', 'Orders', 'Orders to ship', 'Stock IN', 'Reports', 'Products', 'My team', 'Invitations']),
     )
     expect(labels.join(' ')).not.toMatch(/Admin|Users|Audit/i)
     expect(MANAGER_NAV.every((n) => n.to.startsWith('/manage'))).toBe(true)

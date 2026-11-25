@@ -182,7 +182,9 @@ backend/app/
 2. OUT always has a customer, IN never (`chk_customer_for_out`).
 3. Rows with history cannot be deleted (`ON DELETE RESTRICT` → HTTP 409); use `is_active = false`.
 4. Approve checks that every line fits in stock.
-5. Ship is one transaction: OUT for every line + SHIPPED; any shortage rolls everything back.
+5. Ship is one transaction: OUT for every line + SHIPPED; any shortage rolls everything back. Any Worker may ship
+   any approved order (it becomes his); a Manager (website: Orders to ship) only an order of his own team, and
+   the order stays the Worker's (the Manager is recorded as the shipper). Every unit is checked by its barcode.
 6. Order line price is frozen at order time; 7. the total is calculated by the server.
 8. Only `ACTIVE` accounts can log in (checked on every request, so blocking works at once).
 9. A Worker always has a Manager (`chk_employees_manager`); a team = Manager + his Workers.
