@@ -3,7 +3,7 @@
 Old open invitations cannot work any more (they had no link), so the table is created again in the new shape.
 
 Revision ID: b8d0f2a4c6e8
-Revises: c9d1e3f5a7b2
+Revises: a7c9e1b3d5f6
 Create Date: 2026-11-25 12:00:00
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'b8d0f2a4c6e8'
-down_revision: Union[str, Sequence[str], None] = 'c9d1e3f5a7b2'
+down_revision: Union[str, Sequence[str], None] = 'a7c9e1b3d5f6'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
