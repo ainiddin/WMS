@@ -37,10 +37,12 @@ describe('Manager panel', () => {
     expect(homeOf(undefined)).toBeNull()
   })
 
-  it('has the desk screens and none of the phone scanning screens', () => {
+  it('has the Manager screens, Stock IN included, and nothing of the Admin', () => {
     const labels = MANAGER_NAV.map((n) => n.label)
-    expect(labels).toEqual(expect.arrayContaining(['Dashboard', 'Orders', 'Reports', 'Products', 'My team', 'Invitations']))
-    expect(labels.join(' ')).not.toMatch(/Stock IN|to ship|Admin|Users|Audit/i)
+    expect(labels).toEqual(
+      expect.arrayContaining(['Dashboard', 'Orders', 'Orders to ship', 'Stock IN', 'Reports', 'Products', 'My team', 'Invitations']),
+    )
+    expect(labels.join(' ')).not.toMatch(/Admin|Users|Audit/i)
     expect(MANAGER_NAV.every((n) => n.to.startsWith('/manage'))).toBe(true)
   })
 

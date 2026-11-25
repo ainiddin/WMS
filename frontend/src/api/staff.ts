@@ -38,6 +38,25 @@ export interface ProductStaff extends ProductPublic {
   supplier: { id: number; code: string; supplier_name: string; phone: string | null }
 }
 
+/** A row of the movement history (IN = received, OUT = shipped to a customer). */
+export interface StockMovement {
+  id: number
+  code: string
+  movement_type: 'IN' | 'OUT'
+  quantity: number
+  movement_time: string
+  note: string | null
+  product_id: number
+  product_code: string
+  product_name: string
+  employee_id: number
+  employee_name: string
+  customer_id: number | null
+  customer_name: string | null
+  order_id: number | null
+  order_code: string | null
+}
+
 export interface ProductInput {
   product_name: string
   description: string | null
@@ -136,9 +155,18 @@ export const catalogApi = {
   deleteSupplier: (id: number) => del(`/suppliers/${id}/`),
 
   staffProducts: (filters: ProductFilters = {}) => get<ProductStaff[]>('/products/', filters),
+  byBarcode: (barcode: string) => get<ProductStaff>(`/products/by-barcode/${encodeURIComponent(barcode)}/`),
   createProduct: (data: ProductInput) => post<ProductStaff>('/products/', data),
   updateProduct: (id: number, data: Partial<ProductInput>) => patch<ProductStaff>(`/products/${id}/`, data),
   deleteProduct: (id: number) => del(`/products/${id}/`),
+}
+
+// ---- Stock movements ----
+export const movementsApi = {
+  /** Goods received. The server approves orders that waited for this product. */
+  stockIn: (data: { product_id: number; quantity: number; note?: string }) =>
+    post<StockMovement>('/movements/in/', data),
+  list: (filters: { type?: 'IN' | 'OUT'; limit?: number } = {}) => get<StockMovement[]>('/movements/', filters),
 }
 
 export const customersApi = {
@@ -153,6 +181,8 @@ export const ordersApi = {
   approve: (id: number) => post<Order>(`/orders/${id}/approve/`),
   reject: (id: number, reason?: string) => post<Order>(`/orders/${id}/reject/`, { reason: reason || null }),
   cancel: (id: number) => post<Order>(`/orders/${id}/cancel/`),
+  /** One transaction: OUT for every line. A Manager may ship only his own team's orders (server rule). */
+  ship: (id: number) => post<Order>(`/orders/${id}/ship/`),
   workload: () => get<WorkerLoad[]>('/orders/workload/'),
   rebalance: () => post<{ moved: number; workload: WorkerLoad[] }>('/orders/rebalance/'),
 }

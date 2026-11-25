@@ -38,6 +38,8 @@ const ManagerLayout = lazy(() => import("@/pages/admin/AdminLayout").then((m) =>
 const DashboardPage = lazy(() => import("@/pages/manager/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 const OrdersPage = lazy(() => import("@/pages/manager/OrdersPage").then((m) => ({ default: m.OrdersPage })));
 const RestockPage = lazy(() => import("@/pages/manager/ReportsPages").then((m) => ({ default: m.RestockPage })));
+const StockInPage = lazy(() => import("@/pages/manager/StockInPage").then((m) => ({ default: m.StockInPage })));
+const ShipPage = lazy(() => import("@/pages/manager/ShipPage").then((m) => ({ default: m.ShipPage })));
 const ReportsPage = lazy(() => import("@/pages/manager/ReportsPages").then((m) => ({ default: m.ReportsPage })));
 const ProductsPage = lazy(() => import("@/pages/manager/CatalogAdminPages").then((m) => ({ default: m.ProductsPage })));
 const CategoriesPage = lazy(() => import("@/pages/manager/CatalogAdminPages").then((m) => ({ default: m.CategoriesPage })));
@@ -104,6 +106,8 @@ export default function App() {
       >
         <Route index element={admin(<DashboardPage />)} />
         <Route path="orders" element={admin(<OrdersPage />)} />
+        <Route path="ship" element={admin(<ShipPage />)} />
+        <Route path="stock-in" element={admin(<StockInPage />)} />
         <Route path="restock" element={admin(<RestockPage />)} />
         <Route path="reports" element={admin(<ReportsPage />)} />
         <Route path="products" element={admin(<ProductsPage />)} />

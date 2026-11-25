@@ -101,7 +101,7 @@ export function RestockPage() {
                           size="small"
                           startIcon={<MoveToInboxOutlinedIcon />}
                           component={RouterLink}
-                          to={`/stock-in?product=${r.product_id}`}
+                          to={`/manage/stock-in?product=${r.product_id}`}
                         >
                           Stock IN
                         </Button>
