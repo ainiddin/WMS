@@ -150,3 +150,28 @@ fun codeSentHint(sentVia: String, sentTo: String): String =
 
 fun codeFieldLabel(sentVia: String): String =
     if (sentVia == "telegram") "Code from Telegram" else "Code from the email"
+
+/** What one barcode means while picking an order (see pickScan). */
+sealed interface PickScan {
+    /** The right product: this unit is counted, `picked` is the new count of that line. */
+    data class Counted(val item: OrderItem, val picked: Int) : PickScan
+
+    /** No line of this order has this barcode: the wrong product is in hand. */
+    data class WrongProduct(val code: String) : PickScan
+
+    /** The line is already complete: one unit too many. */
+    data class AlreadyComplete(val item: OrderItem) : PickScan
+}
+
+/**
+ * The one check for a barcode while picking, the same whether it came from the camera or was typed by hand:
+ * the code is cleaned the same way (digits only, see barcodeInput), must belong to a line of this order, and that
+ * line must not be complete yet. `picked` = units counted so far per order line id.
+ */
+fun pickScan(raw: String, items: List<OrderItem>, picked: Map<Int, Int>): PickScan {
+    val code = barcodeInput(raw)
+    val item = items.find { it.barcode != null && it.barcode == code } ?: return PickScan.WrongProduct(code)
+    val now = picked[item.id] ?: 0
+    return if (now >= item.quantity) PickScan.AlreadyComplete(item) else PickScan.Counted(item, now + 1)
+}
+

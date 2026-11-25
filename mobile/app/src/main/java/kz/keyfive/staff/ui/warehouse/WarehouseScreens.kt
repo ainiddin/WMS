@@ -50,11 +50,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kz.keyfive.staff.data.Order
 import kz.keyfive.staff.data.OrderItem
+import kz.keyfive.staff.data.PickScan
 import kz.keyfive.staff.data.Product
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.StockInRequest
 import kz.keyfive.staff.data.User
 import kz.keyfive.staff.data.message
+import kz.keyfive.staff.data.pickScan
 import kz.keyfive.staff.ui.Badge
 import kz.keyfive.staff.ui.BarcodeField
 import kz.keyfive.staff.ui.ChipRow
@@ -292,14 +294,15 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
         picked[item.id] = n.coerceIn(min, item.quantity)
     }
 
+    // Camera and typed codes both come here: one check (pickScan in Flows.kt, unit-tested).
     fun onScan(code: String) {
-        val item = order.items.find { it.barcode == code }
-        message = when {
-            item == null -> false to "Barcode $code is not in this order — wrong product"
-            count(item) >= item.quantity -> false to "All ${item.quantity} × ${item.productName} are already picked — put this one back"
-            else -> {
-                picked[item.id] = count(item) + 1
-                true to "${item.productName}: ${count(item)} of ${item.quantity}"
+        message = when (val result = pickScan(code, order.items, picked)) {
+            is PickScan.WrongProduct -> false to "Barcode ${result.code} is not in this order — wrong product"
+            is PickScan.AlreadyComplete ->
+                false to "All ${result.item.quantity} × ${result.item.productName} are already picked — put this one back"
+            is PickScan.Counted -> {
+                picked[result.item.id] = result.picked
+                true to "${result.item.productName}: ${result.picked} of ${result.item.quantity}"
             }
         }
     }
