@@ -1,12 +1,14 @@
+import LinkIcon from '@mui/icons-material/Link'
 import { Alert, Button, Card, CardContent, Chip, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { errorMessage } from '@/api/client'
 import { teamApi, type TeamMember } from '@/api/staff'
-import type { DeviceStatus, Invitation, StaffDevice } from '@/api/types'
+import type { DeviceStatus, Invitation, InvitationCreated, StaffDevice } from '@/api/types'
 import { ConfirmDialog, EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
-import { formatDateTime, roleLabel } from '@/format'
+import { formatDateTime } from '@/format'
+import { InvitationRows, NewLink } from '@/pages/admin/invitationParts'
 import { Section, UserStatusChip } from '@/pages/admin/parts'
 
 function useRun() {
@@ -184,111 +186,57 @@ export function TeamPage() {
   )
 }
 
-const INVITE_COLOR = { PENDING: 'warning', ACCEPTED: 'success', REVOKED: 'default', EXPIRED: 'error' } as const
-
-/** Invite a Worker into my team, or a Manager (who gets his own team). Never above my rank. */
+/** Invite a Worker into my team, or a Manager (who gets his own team), by a one-time link. Never above my rank. */
 export function ManagerInvitationsPage() {
   const invitations = useQuery({ queryKey: ['team', 'invitations'], queryFn: teamApi.invitations })
   const { busy, run } = useRun()
-  const notify = useNotify()
-  const [email, setEmail] = useState('')
-  const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'WORKER' | 'MANAGER'>('WORKER')
   const [error, setError] = useState<string | null>(null)
+  const [created, setCreated] = useState<InvitationCreated | null>(null)
   const [revoking, setRevoking] = useState<Invitation | null>(null)
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
+  const create = async () => {
     setError(null)
     try {
-      const inv = await teamApi.invite(email.trim(), fullName.trim(), role)
-      notify.success(`Invitation sent to ${inv.email}`)
-      setEmail('')
-      setFullName('')
+      setCreated(await teamApi.invite(role))
       await invitations.refetch()
     } catch (err) {
       setError(errorMessage(err))
     }
   }
 
-  const open = (status: Invitation['status']) => status === 'PENDING' || status === 'EXPIRED'
-
   return (
     <>
-      <PageHeader title="Invitations" subtitle="Staff join only by invitation. The person gets a code by email and joins in the KeyFive Staff app." />
+      <PageHeader
+        title="Invitations"
+        subtitle="Make a link and send it to the person. They type their name, work email, phone and a password, get an employee id and sign in in the KeyFive Staff app; you approve their phone."
+      />
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          <Stack component="form" direction={{ xs: 'column', md: 'row' }} spacing={2} onSubmit={submit}>
-            <TextField select label="Role" value={role} onChange={(e) => setRole(e.target.value as 'WORKER' | 'MANAGER')} sx={{ minWidth: 220 }}>
-              <MenuItem value="WORKER">Worker (joins my team)</MenuItem>
-              <MenuItem value="MANAGER">Manager (gets own team)</MenuItem>
-            </TextField>
-            <TextField label="Full name" required value={fullName} onChange={(e) => setFullName(e.target.value)} sx={{ flex: 1 }} />
-            <TextField label="Work email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} sx={{ flex: 1 }} />
-            <Button type="submit" variant="contained" disabled={busy || !email.includes('@') || !fullName.trim()}>
-              Send invitation
-            </Button>
+          <Stack spacing={2}>
+            {error && <Alert severity="error">{error}</Alert>}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField select label="Role" value={role} onChange={(e) => setRole(e.target.value as 'WORKER' | 'MANAGER')} sx={{ minWidth: 240 }}>
+                <MenuItem value="WORKER">Worker (joins my team)</MenuItem>
+                <MenuItem value="MANAGER">Manager (gets own team)</MenuItem>
+              </TextField>
+              <Button variant="contained" startIcon={<LinkIcon />} disabled={busy} onClick={create}>
+                Create invitation link
+              </Button>
+            </Stack>
+            {created && <NewLink path={created.link} expiresAt={created.expires_at} />}
           </Stack>
         </CardContent>
       </Card>
       <Card>
         <QueryState isLoading={invitations.isLoading} error={invitations.error}>
-          {invitations.data?.length ? (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Invited</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Code valid until</TableCell>
-                    <TableCell align="right" />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {invitations.data.map((inv) => (
-                    <TableRow key={inv.id} hover>
-                      <TableCell>
-                        {inv.full_name}
-                        <Typography variant="caption" color="text.secondary" component="div">
-                          {inv.email}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{roleLabel[inv.role]}</TableCell>
-                      <TableCell>
-                        <Chip size="small" variant="outlined" color={INVITE_COLOR[inv.status]} label={inv.status} />
-                      </TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, whiteSpace: 'nowrap' }}>
-                        {inv.status === 'PENDING' ? formatDateTime(inv.expires_at) : '—'}
-                      </TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                        {open(inv.status) && (
-                          <>
-                            <Button size="small" disabled={busy}
-                              onClick={() => run(() => teamApi.resendInvitation(inv.id), `Sent again to ${inv.email}`)}>
-                              Send again
-                            </Button>
-                            <Button size="small" color="error" disabled={busy} onClick={() => setRevoking(inv)}>
-                              Revoke
-                            </Button>
-                          </>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          ) : (
-            <EmptyState title="No invitations yet" />
-          )}
+          <InvitationRows invitations={invitations.data ?? []} busy={busy} onRevoke={setRevoking} />
         </QueryState>
       </Card>
       <ConfirmDialog
         open={Boolean(revoking)}
-        title={`Revoke the invitation of ${revoking?.full_name}?`}
-        text="The code stops working at once."
+        title="Revoke this invitation link?"
+        text="The link stops working at once."
         confirmLabel="Revoke"
         color="error"
         loading={busy}

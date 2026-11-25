@@ -37,11 +37,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kz.keyfive.staff.BuildConfig
-import kz.keyfive.staff.data.InviteAcceptRequest
 import kz.keyfive.staff.data.LoginStep
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.TwoFactorChallenge
-import kz.keyfive.staff.data.acceptProblem
 import kz.keyfive.staff.data.codeFieldLabel
 import kz.keyfive.staff.data.codeSentHint
 import kz.keyfive.staff.data.digitsOnly
@@ -55,21 +53,11 @@ import kz.keyfive.staff.ui.Hint
 
 @Composable
 fun AuthScreens(session: Session) {
-    var invited by rememberSaveable { mutableStateOf(false) }
-    var email by rememberSaveable { mutableStateOf("") }
     Page {
         Text("KeyFive Staff", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary)
         Hint("Warehouse app for Workers, Managers and Admins")
-        if (invited) {
-            AcceptInvitation(session) { acceptedEmail ->
-                email = acceptedEmail
-                invited = false
-            }
-            TextButton(onClick = { invited = false }) { Text("I already have an account") }
-        } else {
-            Login(session, email) { invited = true }
-        }
+        Login(session, "")
     }
 }
 
@@ -135,7 +123,7 @@ private fun LockBanner(lock: Lock): Boolean {
 }
 
 @Composable
-private fun Login(session: Session, initialEmail: String, openInvitation: () -> Unit) {
+private fun Login(session: Session, initialEmail: String) {
     val scope = rememberCoroutineScope()
     var email by rememberSaveable { mutableStateOf(initialEmail) }
     var password by remember { mutableStateOf("") }
@@ -188,7 +176,8 @@ private fun Login(session: Session, initialEmail: String, openInvitation: () -> 
                 "alone is not enough, so nobody can enter the warehouse system with it from another phone.")
         }
     }
-    OutlinedButton(onClick = openInvitation, modifier = Modifier.fillMaxWidth()) { Text("I have an invitation") }
+    Hint("New here? Open the invitation link your Manager sent you in a browser, fill in the form there, then sign " +
+        "in here with that email and password.")
 
     TextButton(onClick = { showServer = !showServer }) { Text("Server") }
     if (showServer) {
@@ -265,65 +254,6 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
         modifier = Modifier.fillMaxWidth(),
     ) { Text(if (sending) "Sending…" else if (resendIn > 0) "Send again in $resendIn s" else "Send again") }
     TextButton(onClick = onRestart) { Text("Use another account") }
-}
-
-/** Staff join only by invitation: email, the code from the invitation email and a new password. */
-@Composable
-private fun AcceptInvitation(session: Session, done: (String) -> Unit) {
-    val scope = rememberCoroutineScope()
-    var email by rememberSaveable { mutableStateOf("") }
-    var code by rememberSaveable { mutableStateOf("") }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var repeat by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var joined by rememberSaveable { mutableStateOf(false) }
-    val problem = acceptProblem(email, code, password, repeat)
-    val lock = remember { Lock() }
-
-    if (joined) {
-        Text("Your account is ready", style = MaterialTheme.typography.titleLarge)
-        Hint("Sign in now on this phone. The phone then waits for approval: a Worker's phone is approved by his Manager.")
-        Button(onClick = { done(email.trim()) }, modifier = Modifier.fillMaxWidth()) { Text("Go to sign in") }
-        return
-    }
-
-    Text("Join by invitation", style = MaterialTheme.typography.titleLarge)
-    Hint("Your Manager invited you by email. Enter that email, the 6-digit code from it and choose a password.")
-    OutlinedTextField(email, { email = it }, label = { Text("Work email") }, singleLine = true,
-        modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-    OutlinedTextField(code, { code = digitsOnly(it) }, label = { Text("6-digit invitation code") }, singleLine = true,
-        modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-    OutlinedTextField(phone, { phone = it }, label = { Text("Phone (optional, +7 7XX XXX XX XX)") }, singleLine = true,
-        modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-    OutlinedTextField(password, { password = it }, label = { Text("New password (8+ characters)") }, singleLine = true,
-        visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(repeat, { repeat = it }, label = { Text("Repeat the password") }, singleLine = true,
-        visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-    if (problem != null && (code.isNotEmpty() || password.isNotEmpty())) Hint(problem)
-    val locked = LockBanner(lock)
-    error?.let { ErrorCard(it) }
-    Button(
-        onClick = {
-            busy = true
-            error = null
-            scope.launch {
-                try {
-                    session.api.acceptInvitation(InviteAcceptRequest(email.trim(), code, password, phone.trim().ifEmpty { null }))
-                    password = ""
-                    repeat = ""
-                    joined = true
-                } catch (e: Exception) {
-                    if (!lock.take(e)) error = e.message()
-                } finally {
-                    busy = false
-                }
-            }
-        },
-        enabled = !busy && !locked && problem == null,
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text("Create my account") }
 }
 
 /** Change the password. `forced`: an Admin whose password expired cannot do anything else until it is done. */

@@ -193,6 +193,5 @@ def test_no_admin_action_happens_without_a_log_row(client, api):
         ("PATCH", "/api/admin/employees/{employee_id}/team/"), ("POST", "/api/admin/devices/{device_id}/approve/"),
         ("POST", "/api/admin/devices/{device_id}/revoke/"), ("POST", "/api/admin/invitations/"),
         ("POST", "/api/admin/invitations/{invitation_id}/revoke/"),
-        ("POST", "/api/admin/invitations/{invitation_id}/resend/"),
     }
     assert changing == logged, "a state-changing admin endpoint was added or removed: log it and update this list"

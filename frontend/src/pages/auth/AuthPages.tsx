@@ -16,12 +16,15 @@ import {
   Navigate,
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router";
 import { errorMessage } from "@/api/client";
-import { authApi } from "@/api/endpoints";
+import { authApi, joinApi } from "@/api/endpoints";
+import type { JoinInfo, User } from "@/api/types";
 import { useAuth } from "@/auth/AuthContext";
 import { ThemeToggle } from "@/components/Layout";
 import { PHONE_HINT, phoneError } from "@/format";
+import { PASSWORD_RULE, passwordHint } from "@/password";
 
 const RESEND_SECONDS = 60;
 
@@ -129,6 +132,8 @@ function signUpError(form: {
 }) {
   if (!/^\d{6}$/.test(form.code))
     return "Enter the 6-digit code from the email";
+  const weak = passwordHint(form.password);
+  if (weak) return `Password: ${weak.toLowerCase()}`;
   if (form.password !== form.confirm) return "Passwords do not match";
   return phoneError(form.phone);
 }
@@ -364,8 +369,8 @@ export function SignUpPage() {
           value={form.password}
           onChange={set("password")}
           autoComplete="new-password"
-          helperText="At least 8 characters"
-          slotProps={{ htmlInput: { minLength: 8 } }}
+          error={!!form.password && !!passwordHint(form.password)}
+          helperText={(form.password && passwordHint(form.password)) || PASSWORD_RULE}
         />
         <TextField
           label="Repeat password"
@@ -384,6 +389,118 @@ export function SignUpPage() {
             Sign in
           </Link>
         </Typography>
+      </Stack>
+    </AuthCard>
+  );
+}
+
+/**
+ * The page of an invitation link (/join/<token>): the person types first and last name, the work email, phone and
+ * a password; the account is made at once in the link's role and team, with an employee id. The link works once.
+ */
+export function JoinPage() {
+  const { token = "" } = useParams();
+  const [info, setInfo] = useState<JoinInfo | null>(null);
+  const [gone, setGone] = useState<string | null>(null);
+  const [joined, setJoined] = useState<User | null>(null);
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", password: "", confirm: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  useEffect(() => {
+    joinApi.info(token).then(setInfo, (e) => setGone(errorMessage(e)));
+  }, [token]);
+
+  const weak = form.password ? passwordHint(form.password) : null;
+  const problem =
+    !form.first_name.trim() || !form.last_name.trim()
+      ? "Enter your first and last name"
+      : !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())
+        ? "Enter your work email"
+        : !form.phone.trim() || phoneError(form.phone)
+          ? (phoneError(form.phone) ?? "Enter your phone number")
+          : passwordHint(form.password)
+            ? `Password: ${passwordHint(form.password)!.toLowerCase()}`
+            : form.password !== form.confirm
+              ? "The passwords do not match"
+              : null;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (problem) return setError(problem);
+    setBusy(true);
+    setError(null);
+    try {
+      setJoined(
+        await joinApi.join(token, {
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          password: form.password,
+        }),
+      );
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (gone) {
+    return (
+      <AuthCard title="Invitation link">
+        <Alert severity="warning">{gone}</Alert>
+      </AuthCard>
+    );
+  }
+  if (joined) {
+    return (
+      <AuthCard title={`Welcome, ${joined.full_name}!`}>
+        <Stack spacing={2}>
+          <Alert severity="success">
+            Your employee ID: <b>{joined.employee_code}</b>. Keep it: you may be asked for it at work.
+          </Alert>
+          <Typography>
+            Next: install the <b>KeyFive Staff</b> app on your work phone and sign in with <b>{joined.email}</b> and
+            your password. Your Manager approves the phone, then you can work.
+          </Typography>
+        </Stack>
+      </AuthCard>
+    );
+  }
+  if (!info) {
+    return (
+      <AuthCard title="Invitation link">
+        <Typography color="text.secondary">Checking the link…</Typography>
+      </AuthCard>
+    );
+  }
+  return (
+    <AuthCard
+      title={info.role === "MANAGER" ? "Join KeyFive as a Manager" : "Join KeyFive"}
+      subtitle={`${info.invited_by} invites you${info.team_name ? ` to ${info.team_name}` : ""}. The link works once.`}
+    >
+      <Stack component="form" spacing={2} onSubmit={submit} noValidate>
+        {error && <Alert severity="error">{error}</Alert>}
+        <Stack direction="row" spacing={2}>
+          <TextField label="First name" required fullWidth value={form.first_name} onChange={set("first_name")} autoComplete="given-name" />
+          <TextField label="Last name" required fullWidth value={form.last_name} onChange={set("last_name")} autoComplete="family-name" />
+        </Stack>
+        <TextField label="Work email" type="email" required value={form.email} onChange={set("email")} autoComplete="email"
+          helperText="You sign in to the KeyFive Staff app with it" />
+        <TextField label="Phone" type="tel" required value={form.phone} onChange={set("phone")} autoComplete="tel"
+          placeholder={PHONE_HINT} error={!!form.phone && !!phoneError(form.phone)} helperText={(form.phone && phoneError(form.phone)) || " "} />
+        <TextField label="Password" type="password" required value={form.password} onChange={set("password")}
+          autoComplete="new-password" error={!!weak} helperText={weak ?? PASSWORD_RULE} />
+        <TextField label="Repeat password" type="password" required value={form.confirm} onChange={set("confirm")}
+          autoComplete="new-password" error={!!form.confirm && form.confirm !== form.password}
+          helperText={form.confirm && form.confirm !== form.password ? "The passwords do not match" : " "} />
+        <Button type="submit" variant="contained" size="large" disabled={busy || !!problem}>
+          Join
+        </Button>
       </Stack>
     </AuthCard>
   );

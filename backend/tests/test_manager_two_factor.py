@@ -59,7 +59,7 @@ def test_a_new_manager_phone_is_approved_by_the_code_not_by_the_admin(client, ap
 
     text = OUTBOX[CORPORATE][-1]
     assert "Manager sign in code:" in text and "Account: fresh@wms.kz" in text and 'the phone "Test phone"' in text
-    assert not any("sign in code" in t for t in OUTBOX["fresh@wms.kz"])  # never to the Manager himself
+    assert not any("sign in code" in t for t in OUTBOX.get("fresh@wms.kz", []))  # never to the Manager himself
     code = last_code(CORPORATE)
     wrong = f"{(int(code) + 1) % 1_000_000:06d}"
     challenge = r.json()["challenge_token"]

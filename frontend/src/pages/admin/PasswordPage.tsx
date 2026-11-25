@@ -9,6 +9,7 @@ import { useNotify } from '@/components/Notify'
 import { formatDate } from '@/format'
 import { passwordExpired } from './AdminLayout'
 import { homeOf } from './AdminLoginPage'
+import { PASSWORD_RULE, passwordHint } from '@/password'
 
 /** Change the Admin password. Required every 180 days; the new one must differ from the previous. */
 export function PasswordPage() {
@@ -23,7 +24,7 @@ export function PasswordPage() {
   const expired = passwordExpired(user?.password_expires_at)
 
   const mismatch = repeat.length > 0 && next !== repeat
-  const tooShort = next.length > 0 && next.length < 8
+  const weak = next.length > 0 ? passwordHint(next) : null
   const same = next.length > 0 && next === current
 
   const submit = async (e: FormEvent) => {
@@ -73,8 +74,8 @@ export function PasswordPage() {
               required
               value={next}
               onChange={(e) => setNext(e.target.value)}
-              error={tooShort || same}
-              helperText={same ? 'Must differ from the current password' : tooShort ? 'At least 8 characters' : ' '}
+              error={!!weak || same}
+              helperText={same ? 'Must differ from the current password' : weak ?? PASSWORD_RULE}
             />
             <TextField
               label="Repeat the new password"
@@ -86,7 +87,7 @@ export function PasswordPage() {
               error={mismatch}
               helperText={mismatch ? 'The passwords do not match' : ' '}
             />
-            <Button type="submit" variant="contained" disabled={busy || !current || next.length < 8 || next !== repeat || same}>
+            <Button type="submit" variant="contained" disabled={busy || !current || !next || !!passwordHint(next) || next !== repeat || same}>
               Change password
             </Button>
           </Stack>

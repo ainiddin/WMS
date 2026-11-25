@@ -6,6 +6,7 @@ import type {
   Category,
   Customer,
   Invitation,
+  InvitationCreated,
   Order,
   OrderStatus,
   PersonShort,
@@ -224,8 +225,7 @@ export const teamApi = {
   approveDevice: (id: number) => post<StaffDevice>(`/team/devices/${id}/approve/`),
   revokeDevice: (id: number) => post<StaffDevice>(`/team/devices/${id}/revoke/`),
   invitations: () => get<Invitation[]>('/team/invitations/'),
-  invite: (email: string, full_name: string, role: 'WORKER' | 'MANAGER') =>
-    post<Invitation>('/team/invitations/', { email, full_name, role }),
-  resendInvitation: (id: number) => post<Invitation>(`/team/invitations/${id}/resend/`),
+  /** A new invitation link (works once, 1 hour); `link` is in this answer only. */
+  invite: (role: 'WORKER' | 'MANAGER') => post<InvitationCreated>('/team/invitations/', { role }),
   revokeInvitation: (id: number) => post<Invitation>(`/team/invitations/${id}/revoke/`),
 }

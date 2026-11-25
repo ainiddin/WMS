@@ -51,9 +51,7 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD_MAX_DAYS: int = 180          # an Admin must change the password this often
 
     # Staff join only by invitation from a Manager.
-    INVITATION_HOURS: int = 48                  # an invitation code lives 2 days
-    INVITATION_RESEND_SECONDS: int = 60
-    INVITATION_MAX_ATTEMPTS: int = 5            # wrong codes, then the Manager must send a new one
+    INVITATION_LINK_MINUTES: int = 60           # an invitation link lives 1 hour and works once
 
     # Password for all demo users created by `python -m app.seed --demo`.
     DEMO_PASSWORD: str | None = None

@@ -38,7 +38,7 @@ def test_leaked_password_is_useless_without_an_approved_phone(client, api):
     r = staff_login(client, "m@wms.kz", phone="stranger")
     assert r.status_code == 202
     assert "access_token" not in r.text
-    assert not any("sign in code" in text for text in OUTBOX["m@wms.kz"])  # only the invitation
+    assert not any("sign in code" in text for text in OUTBOX.get("m@wms.kz", []))  # never to the Manager
     pending = devices(client, api, "PENDING")
     assert [d["user_email"] for d in pending] == ["m@wms.kz"]
 

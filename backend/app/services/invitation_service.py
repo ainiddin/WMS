@@ -1,30 +1,35 @@
-"""Staff join only by invitation.
+"""Staff join only by invitation LINK.
 
 - A Manager invites a WORKER into his own team, or a MANAGER (who gets a new team): "up to his own rank".
-- The Admin sees and can revoke every invitation, but invites only to start a company with no active Manager.
-- The invitee gets a 6-digit code by email (valid INVITATION_HOURS) and sets a password in the Staff app.
-- Wrong codes are counted (INVITATION_MAX_ATTEMPTS, then the code is burnt) and also count as failed logins.
+- The Admin sees and can revoke every link, but creates one only to start a company with no active Manager.
+- A link carries a random token (only its SHA-256 is stored), works ONCE and lives INVITATION_LINK_MINUTES.
+- The person opens it on the website and types first and last name, work email, phone and a password; the account
+  is ACTIVE at once in the right role and team, and gets its employee id. Then: sign in in the Staff app, where
+  the new phone waits for the Manager's approval (a second gate if a link reached the wrong person).
 """
 
-import logging
+import hashlib
 import secrets
-import smtplib
 from datetime import timedelta
 
-import httpx
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password
 from app.models import AuditAction, Employee, Invitation, Role, User, UserStatus
 from app.models.common import utcnow
-from app.services import assignment_service, audit_service, email_service
-
-log = logging.getLogger("keyfive")
+from app.services import assignment_service, audit_service
 
 PENDING, ACCEPTED, REVOKED, EXPIRED = "PENDING", "ACCEPTED", "REVOKED", "EXPIRED"
+JOIN_PATH = "/join/"
+# The same answer for an unknown, used, revoked or expired link: a guess learns nothing.
+_LINK_GONE = "This invitation link is not valid or has expired. Ask your Manager for a new one."
+
+
+def _hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def status_of(invitation: Invitation) -> str:
@@ -37,43 +42,11 @@ def status_of(invitation: Invitation) -> str:
     return PENDING
 
 
-def _is_open(invitation: Invitation) -> bool:
-    return invitation.accepted_at is None and invitation.revoked_at is None
-
-
 def active_manager_exists(db: Session) -> bool:
     return db.scalar(
         select(Employee.id).join(User, Employee.user_id == User.id)
         .where(Employee.role == Role.MANAGER, Employee.is_active, User.status == UserStatus.ACTIVE).limit(1)
     ) is not None
-
-
-def _send(invitation: Invitation) -> None:
-    """New code for this invitation, mailed to the invitee. Caller commits."""
-    code = f"{secrets.randbelow(1_000_000):06d}"
-    now = utcnow()
-    invitation.code_hash = hash_password(code)
-    invitation.code_sent_at = now
-    invitation.attempts = 0
-    invitation.expires_at = now + timedelta(hours=settings.INVITATION_HOURS)
-    inviter = invitation.invited_by
-    if invitation.role == Role.WORKER:
-        what = f"a Worker in the team of {invitation.team_manager.full_name}"
-    else:
-        what = "a Manager with your own team"
-    try:
-        email_service.send_email(
-            invitation.email,
-            f"KeyFive WMS: you are invited, code {code}",
-            f"Hello {invitation.full_name},\n\n{inviter.full_name} invited you to KeyFive WMS as {what}.\n\n"
-            f"Your invitation code: {code}\n"
-            f"It is valid for {settings.INVITATION_HOURS} hours.\n\n"
-            "Open the KeyFive Staff app on your work phone, choose \"I have an invitation\", enter this email, "
-            "the code and a new password. If you did not expect this, ignore the email.",
-        )
-    except (httpx.HTTPError, smtplib.SMTPException, OSError) as exc:
-        log.error("Could not send invitation to %s: %s", invitation.email, exc)
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not send the invitation email, check the address") from None
 
 
 def get(db: Session, invitation_id: int) -> Invitation:
@@ -83,9 +56,8 @@ def get(db: Session, invitation_id: int) -> Invitation:
     return invitation
 
 
-def create(db: Session, inviter: User, email: str, full_name: str, role: Role, ip: str | None) -> Invitation:
-    """Caller commits."""
-    email = email.strip().lower()
+def create(db: Session, inviter: User, role: Role, ip: str | None) -> tuple[str, Invitation]:
+    """A new link. Returns (the path with the token, shown ONCE; the row). Caller commits."""
     if inviter.role == Role.MANAGER:
         if role not in (Role.WORKER, Role.MANAGER):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "A Manager can invite only Workers and Managers")
@@ -99,103 +71,74 @@ def create(db: Session, inviter: User, email: str, full_name: str, role: Role, i
     else:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only Managers invite staff")
 
-    if db.scalar(select(User.id).where(User.email == email)) is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This email is already registered")
-    email_service.ensure_domain_accepts_mail(email)
-    existing = db.scalars(
-        select(Invitation).where(Invitation.email == email, Invitation.accepted_at.is_(None),
-                                 Invitation.revoked_at.is_(None))
-    ).one_or_none()
-    if existing is not None:
-        if existing.expires_at > utcnow():
-            raise HTTPException(status.HTTP_409_CONFLICT, "This email already has an open invitation")
-        existing.revoked_at = utcnow()  # an expired one is closed so a new one can be made
-        db.flush()
-
-    invitation = Invitation(email=email, full_name=full_name, role=role, team_manager=team, invited_by=inviter)
+    token = secrets.token_urlsafe(32)
+    invitation = Invitation(token_hash=_hash(token), role=role, team_manager=team, invited_by=inviter,
+                            expires_at=utcnow() + timedelta(minutes=settings.INVITATION_LINK_MINUTES))
     db.add(invitation)
-    _send(invitation)
     db.flush()
-    audit_service.log(db, AuditAction.INVITE_SENT, inviter, None, ip, invitation_id=invitation.id, email=email,
-                      role=str(role), team_manager_id=team.id if team else None)
-    return invitation
+    audit_service.log(db, AuditAction.INVITE_SENT, inviter, None, ip, invitation_id=invitation.id,
+                      role=str(role), team_manager_id=team.id if team else None, by="link")
+    return JOIN_PATH + token, invitation
 
 
 def _check_owner(invitation: Invitation, user: User) -> None:
-    """A Manager acts only on his own invitations; the Admin on all of them."""
+    """A Manager acts only on his own links; the Admin on all of them."""
     if user.role == Role.ADMIN:
         return
     if invitation.invited_by_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Invitation not found")
 
 
-def resend(db: Session, invitation: Invitation, user: User, ip: str | None) -> Invitation:
-    _check_owner(invitation, user)
-    if not _is_open(invitation):
-        raise HTTPException(status.HTTP_409_CONFLICT, f"The invitation is {status_of(invitation).lower()}")
-    wait = settings.INVITATION_RESEND_SECONDS - (utcnow() - invitation.code_sent_at).total_seconds()
-    if wait > 0:
-        seconds = int(wait) + 1
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, f"Wait {seconds} s before sending it again",
-                            headers={"Retry-After": str(seconds)})
-    _send(invitation)
-    audit_service.log(db, AuditAction.INVITE_RESENT, user, None, ip, invitation_id=invitation.id, email=invitation.email)
-    return invitation
-
-
 def revoke(db: Session, invitation: Invitation, user: User, ip: str | None) -> Invitation:
     _check_owner(invitation, user)
-    if not _is_open(invitation):
+    if status_of(invitation) != PENDING:
         raise HTTPException(status.HTTP_409_CONFLICT, f"The invitation is {status_of(invitation).lower()}")
     invitation.revoked_at = utcnow()
     invitation.revoked_by = user
-    audit_service.log(db, AuditAction.INVITE_REVOKED, user, None, ip, invitation_id=invitation.id, email=invitation.email)
+    audit_service.log(db, AuditAction.INVITE_REVOKED, user, None, ip, invitation_id=invitation.id)
     return invitation
 
 
-_BAD_CODE = "Wrong email or invitation code"
+def open_link(db: Session, token: str, *, lock: bool = False) -> Invitation:
+    """The invitation of a link that can still be used, or 404 with one answer for every other case."""
+    stmt = select(Invitation).where(Invitation.token_hash == _hash(token))
+    if lock:  # two people with the same link at the same moment: the second waits and then finds it used
+        stmt = stmt.with_for_update()
+    invitation = db.scalars(stmt).one_or_none()
+    if invitation is None or status_of(invitation) != PENDING:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, _LINK_GONE)
+    _check_still_valid(invitation)
+    return invitation
 
 
-def accept(db: Session, email: str, code: str, password: str, phone: str | None, ip: str | None) -> User:
-    """The invitee sets a password: the account is ACTIVE at once, in the right role and team. Caller commits.
-    Wrong codes are saved (committed here) and an error is raised."""
-    email = email.strip().lower()
-    invitation = db.scalars(
-        select(Invitation).where(Invitation.email == email, Invitation.accepted_at.is_(None),
-                                 Invitation.revoked_at.is_(None))
-    ).one_or_none()
-    # Same answer for "no invitation" and "wrong code": nobody can probe who was invited.
-    if invitation is None or not invitation.code_hash:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, _BAD_CODE)
-    if not verify_password(code, invitation.code_hash):
-        invitation.attempts += 1
-        if invitation.attempts >= settings.INVITATION_MAX_ATTEMPTS:
-            invitation.code_hash = ""  # burnt: only a new code from the Manager helps
-        audit_service.log(db, AuditAction.INVITE_CODE_FAILED, None, None, ip, invitation_id=invitation.id,
-                          email=email, attempt=invitation.attempts)
-        db.commit()
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, _BAD_CODE)
-    # Only someone with the right code learns that the invitation exists but has expired.
-    if invitation.expires_at <= utcnow():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The invitation has expired. Ask your Manager to send it again.")
-
-    inviter = invitation.invited_by
-    team = invitation.team_manager
+def _check_still_valid(invitation: Invitation) -> None:
+    inviter, team = invitation.invited_by, invitation.team_manager
     if inviter.status != UserStatus.ACTIVE:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This invitation is no longer valid. Ask for a new one.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, _LINK_GONE)
     if team is not None and (team.role != Role.MANAGER or not team.is_active):
-        raise HTTPException(status.HTTP_409_CONFLICT, "That team no longer exists. Ask for a new invitation.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, _LINK_GONE)
+
+
+def accept(db: Session, token: str, first_name: str, last_name: str, email: str, phone: str, password: str,
+           ip: str | None) -> User:
+    """The person fills in the form: an ACTIVE account in the right role and team, with an employee id.
+    The link is used up. Caller commits."""
+    invitation = open_link(db, token, lock=True)
+    email = email.strip().lower()
     if db.scalar(select(User.id).where(User.email == email)) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "This email is already registered")
 
     now = utcnow()
-    user = User(email=email, password_hash=hash_password(password), full_name=invitation.full_name, phone=phone,
+    full_name = f"{first_name} {last_name}"
+    team = invitation.team_manager
+    inviter = invitation.invited_by
+    user = User(email=email, password_hash=hash_password(password), full_name=full_name, phone=phone,
                 role=invitation.role, status=UserStatus.ACTIVE, approved_by_id=inviter.id, approved_at=now)
-    user.employee = Employee(full_name=invitation.full_name, phone=phone, role=invitation.role,
+    user.employee = Employee(full_name=full_name, phone=phone, role=invitation.role,
                              manager_id=team.id if team else None)
     db.add(user)
-    invitation.accepted_at = now
     db.flush()
+    invitation.accepted_at = now
     invitation.accepted_user_id = user.id
     audit_service.log(db, AuditAction.INVITE_ACCEPTED, user, user, ip, invitation_id=invitation.id,
                       role=invitation.role, invited_by=inviter.email, team_manager_id=team.id if team else None)

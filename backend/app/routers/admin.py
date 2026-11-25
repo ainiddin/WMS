@@ -17,8 +17,8 @@ from app.schemas.people import (
     StaffDeviceOut,
     TeamChangeRequest,
 )
-from app.schemas.team import InvitationCreate, InvitationOut
 from app.schemas.accounts import AdminPaymentOut, PaymentsSummaryOut
+from app.schemas.team import InvitationCreate, InvitationCreated, InvitationOut
 from app.services import (audit_service, device_service, invitation_service, payment_gateway, payment_service,
                           user_service)
 from app.services.timeutil import local_tz
@@ -216,12 +216,12 @@ def all_invitations(
     return [r for r in rows if invitation_status is None or r.status == invitation_status]
 
 
-@router.post("/invitations/", response_model=InvitationOut, status_code=status.HTTP_201_CREATED)
+@router.post("/invitations/", response_model=InvitationCreated, status_code=status.HTTP_201_CREATED)
 def invite_first_manager(data: InvitationCreate, db: DB, admin: Admin, ip: ClientIP):
-    """Only while the company has no active Manager: someone must invite the first one."""
-    invitation = invitation_service.create(db, admin, data.email, data.full_name, Role(data.role), ip)
+    """Only while the company has no active Manager: someone must invite the first one (a link, as Managers do)."""
+    link, invitation = invitation_service.create(db, admin, Role(data.role), ip)
     db.commit()
-    return InvitationOut.from_invitation(invitation)
+    return InvitationCreated(**InvitationOut.from_invitation(invitation).model_dump(), link=link)
 
 
 @router.post("/invitations/{invitation_id}/revoke/", response_model=InvitationOut)
@@ -230,9 +230,3 @@ def revoke_invitation(invitation_id: int, db: DB, admin: Admin, ip: ClientIP):
     db.commit()
     return InvitationOut.from_invitation(invitation)
 
-
-@router.post("/invitations/{invitation_id}/resend/", response_model=InvitationOut)
-def resend_invitation(invitation_id: int, db: DB, admin: Admin, ip: ClientIP):
-    invitation = invitation_service.resend(db, invitation_service.get(db, invitation_id), admin, ip)
-    db.commit()
-    return InvitationOut.from_invitation(invitation)

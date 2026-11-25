@@ -110,42 +110,18 @@ class FlowsTest {
         assertNull(retryAfterSeconds(httpError(429)))
     }
 
-    // ---- invitations ----
-    @Test
-    fun `a manager invites up to his rank and nobody else invites`() {
-        assertEquals(listOf("WORKER", "MANAGER"), invitableRoles("MANAGER"))
-        assertTrue(invitableRoles("WORKER").isEmpty())
-        assertTrue(invitableRoles("ADMIN").isEmpty())
-        assertFalse("ADMIN" in invitableRoles("MANAGER"))
-    }
-
-    @Test
-    fun `only open invitations can be sent again or revoked`() {
-        assertEquals(setOf(InvitationAction.RESEND, InvitationAction.REVOKE), invitationActions("PENDING"))
-        assertEquals(setOf(InvitationAction.RESEND, InvitationAction.REVOKE), invitationActions("EXPIRED"))
-        assertTrue(invitationActions("ACCEPTED").isEmpty())
-        assertTrue(invitationActions("REVOKED").isEmpty())
-        assertTrue(invitationActions("SOMETHING NEW").isEmpty())
-    }
-
     // ---- forms ----
     @Test
     fun `new password rules`() {
-        assertEquals("At least 8 characters", newPasswordProblem("old-pass-1", "short", "short"))
+        assertEquals("Still needed: at least 8 characters, a digit, a special character (@ _ - \$ …)",
+            newPasswordProblem("old-pass-1", "short", "short"))
+        assertEquals("Still needed: a special character (@ _ - \$ …)",
+            newPasswordProblem("old-pass-1", "kettle2026", "kettle2026"))
         assertEquals("At most 72 characters", newPasswordProblem("old-pass-1", "x".repeat(73), "x".repeat(73)))
         assertEquals("Must differ from the current password", newPasswordProblem("same-pass-1", "same-pass-1", "same-pass-1"))
         assertEquals("The passwords do not match", newPasswordProblem("old-pass-1", "new-pass-1", "new-pass-2"))
         assertNull(newPasswordProblem("old-pass-1", "new-pass-1", "new-pass-1"))
         assertNull(newPasswordProblem("same-pass-1", "SAME-PASS-1", "SAME-PASS-1")) // case matters
-    }
-
-    @Test
-    fun `invitation form needs email, six digits and a matching password`() {
-        assertEquals("Enter the email the invitation came to", acceptProblem(" ", "123456", "password1", "password1"))
-        assertEquals("Enter the 6-digit code from the email", acceptProblem("a@wms.kz", "12345", "password1", "password1"))
-        assertEquals("The password needs at least 8 characters", acceptProblem("a@wms.kz", "123456", "pass", "pass"))
-        assertEquals("The passwords do not match", acceptProblem("a@wms.kz", "123456", "password1", "password2"))
-        assertNull(acceptProblem(" a@wms.kz ", "123456", "password1", "password1"))
     }
 
     // ---- live lock countdown ----
@@ -289,5 +265,23 @@ class FlowsTest {
     @Test
     fun `counts of other lines do not matter`() {
         assertEquals(PickScan.Counted(kettle, 1), pickScan("4870000000031", order, mapOf(2 to 3)))
+    }
+
+    // ---- the new password rule: the same cases as the server and the website ----
+    @Test
+    fun `a new password needs 8 characters, a letter, a digit and a special character`() {
+        val special = "a special character (@ _ - \$ …)"
+        assertEquals(listOf("a digit", special), passwordProblems("onlyletters"))
+        assertEquals(listOf("a letter", special), passwordProblems("12345678"))
+        assertEquals(listOf(special), passwordProblems("letters1234"))
+        assertEquals(listOf("a digit"), passwordProblems("letters_only"))
+        assertEquals(listOf("a letter"), passwordProblems("1234_5678"))
+        assertEquals(listOf(special), passwordProblems("with space 1")) // a space is not special
+        assertEquals(listOf("at least 8 characters"), passwordProblems("Ab1_"))
+        assertEquals(listOf("at least 8 characters", "a letter", "a digit", special), passwordProblems(""))
+        for (good in listOf("kettle_2026", "Pass-word9", "a1\$aaaaa", "Пароль_2026", "12345-x8")) {
+            assertEquals(good, emptyList<String>(), passwordProblems(good))
+            assertNull(good, passwordHint(good))
+        }
     }
 }

@@ -30,7 +30,7 @@ from app.schemas.auth import (
     WebLoginToken,
 )
 from app.schemas.common import Message
-from app.schemas.team import InvitationAccept
+from app.schemas.team import JoinInfo, JoinRequest
 from app.services import (
     audit_service,
     device_service,
@@ -106,19 +106,23 @@ def register_customer(data: CustomerRegister, db: DB, request: Request):
     return _tokens(user)
 
 
-@router.post("/invite/accept/", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def accept_invitation(data: InvitationAccept, db: DB, ip: ClientIP):
-    """Staff join only by invitation: email + the code from the invitation email + a new password.
-    The account is ACTIVE at once (role and team come from the invitation); then sign in in the Staff app,
-    where the new phone waits for approval. Wrong codes count as failed logins (brute-force limits)."""
-    email = data.email.strip().lower()
-    rate_limit.check_login(ip, email)
-    try:
-        user = invitation_service.accept(db, email, data.code, data.password, data.phone, ip)
-    except HTTPException as exc:
-        if exc.status_code == status.HTTP_400_BAD_REQUEST:
-            rate_limit.login_failed(ip, email)
-        raise
+@router.get("/join/{token}/", response_model=JoinInfo)
+def join_info(token: str, db: DB):
+    """The invitation link page: who invites, into which team, until when. One 404 for every bad link."""
+    invitation = invitation_service.open_link(db, token)
+    return JoinInfo(role=invitation.role,
+                    team_name=invitation.team_manager.team_name if invitation.team_manager else None,
+                    invited_by=invitation.invited_by.full_name, expires_at=invitation.expires_at)
+
+
+@router.post("/join/{token}/", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def join(token: str, data: JoinRequest, db: DB, ip: ClientIP):
+    """Staff join only by invitation link: name, work email, phone, password. The account is ACTIVE at once
+    (role and team come from the link) and gets its employee id; then sign in in the Staff app, where the new
+    phone waits for the Manager's approval. The link is used up. No rate limit: a link makes one account, and its
+    token (32 random bytes) cannot be guessed."""
+    user = invitation_service.accept(db, token, data.first_name, data.last_name, data.email, data.phone,
+                                     data.password, ip)
     db.commit()
     return UserOut.from_user(user)
 

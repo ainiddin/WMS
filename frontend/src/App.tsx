@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { FullPageSpinner, ProtectedRoute } from "@/auth/ProtectedRoute";
 import { ShopLayout } from "@/components/Layout";
-import { ErrorPage, LoginPage, SignUpPage } from "@/pages/auth/AuthPages";
+import { ErrorPage, JoinPage, LoginPage, SignUpPage } from "@/pages/auth/AuthPages";
 import { AccountPage } from "@/pages/customer/AccountPage";
 import { MyOrdersPage } from "@/pages/customer/MyOrdersPage";
 import {
@@ -60,6 +60,7 @@ export default function App() {
       {/* Public */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/join/:token" element={<JoinPage />} />
       <Route path="/403" element={<ErrorPage code={403} />} />
 
       {/* Shop: visitors can browse, customers order */}

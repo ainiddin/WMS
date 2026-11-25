@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import kz.keyfive.staff.data.AdminUser
 import kz.keyfive.staff.data.ApproveRequest
 import kz.keyfive.staff.data.Employee
-import kz.keyfive.staff.data.Invitation
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.StaffDevice
 import kz.keyfive.staff.data.TeamChangeRequest
@@ -45,7 +44,6 @@ import kz.keyfive.staff.ui.Red
 import kz.keyfive.staff.ui.Section
 import kz.keyfive.staff.ui.dateTime
 import kz.keyfive.staff.ui.load
-import kz.keyfive.staff.ui.manager.InvitationCard
 import kz.keyfive.staff.ui.rememberAction
 import kz.keyfive.staff.ui.roleLabel
 import kz.keyfive.staff.ui.statusColor
@@ -105,36 +103,6 @@ fun DevicesScreen(session: Session) {
         Confirm("Block this phone?", "${d.deviceName} of ${d.userFullName} is signed out at once and cannot sign in again.",
             "Block", action.busy,
             onConfirm = { action.run(after = { revoking = null; devices.reload() }) { session.api.revokeDevice(d.id); "Phone blocked" } },
-            onDismiss = { revoking = null })
-    }
-}
-
-// ---------------- Invitations (all teams) ----------------
-/** Managers invite their staff. The Admin sees every invitation and can send it again or revoke it. */
-@Composable
-fun AdminInvitationsScreen(session: Session) {
-    var status by remember { mutableStateOf<String?>("PENDING") }
-    val invitations = load(status) { session.api.allInvitations(status) }
-    val action = rememberAction()
-    var revoking by remember { mutableStateOf<Invitation?>(null) }
-
-    LoadedList(invitations, header = {
-        item { Hint("Staff join only by invitation from a Manager. Old sign-up requests, if any, are in Users.") }
-        item {
-            ChipRow(listOf("PENDING", "ACCEPTED", "EXPIRED", "REVOKED", null), status,
-                { s -> s?.lowercase()?.replaceFirstChar { c -> c.uppercaseChar() } ?: "All" }) { status = it }
-        }
-    }) { list ->
-        if (list.isEmpty()) item { Empty("No invitations") }
-        items(list, key = { it.id }) { inv ->
-            InvitationCard(inv, action.busy, showInviter = true,
-                onResend = { action.run(after = invitations.reload) { session.api.adminResendInvitation(inv.id); "Sent again to ${inv.email}" } },
-                onRevoke = { revoking = inv })
-        }
-    }
-    revoking?.let { inv ->
-        Confirm("Revoke the invitation?", "The code sent to ${inv.email} stops working at once.", "Revoke", action.busy,
-            onConfirm = { action.run(after = { revoking = null; invitations.reload() }) { session.api.adminRevokeInvitation(inv.id); "Invitation revoked" } },
             onDismiss = { revoking = null })
     }
 }

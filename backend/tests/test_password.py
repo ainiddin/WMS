@@ -63,10 +63,56 @@ def test_wrong_current_password_is_refused_and_counted_as_a_failed_login(client,
     assert change(client, headers, PASSWORD, NEW).status_code == 429  # brute force through this door is closed too
 
 
-@pytest.mark.parametrize("new", ["short", "x" * 73, ""])
-def test_new_password_rules(client, api, new):
+@pytest.mark.parametrize("new, missing", [
+    ("short", ["at least 8 characters", "a digit", "a special character"]),
+    ("", ["at least 8 characters", "a letter", "a digit", "a special character"]),
+    ("onlyletters", ["a digit", "a special character"]),
+    ("12345678", ["a letter", "a special character"]),
+    ("letters1234", ["a special character"]),
+    ("letters_only", ["a digit"]),
+    ("1234_5678", ["a letter"]),
+    ("with space 1", ["a special character"]),  # a space is not a special character
+    ("Ab1_", ["at least 8 characters"]),
+])
+def test_new_password_says_what_is_missing(client, api, new, missing):
     headers = api.customer("buyer@mail.kz")
-    assert change(client, headers, PASSWORD, new).status_code == 422
+    r = change(client, headers, PASSWORD, new)
+    assert r.status_code == 422
+    message = r.json()["detail"][0]["msg"]
+    for part in missing:
+        assert part in message, message
+    for part in {"at least 8 characters", "a letter", "a digit", "a special character"} - set(missing):
+        assert part not in message, message
+
+
+def test_too_long_password_is_refused(client, api):
+    headers = api.customer("buyer@mail.kz")
+    r = change(client, headers, PASSWORD, "a1_" + "x" * 70)
+    assert r.status_code == 422 and "at most 72" in r.json()["detail"][0]["msg"]
+
+
+@pytest.mark.parametrize("new", ["kettle_2026", "Pass-word9", "a1$aaaaa", "Пароль_2026", "12345-x8", "x" * 69 + "1_z"])
+def test_passwords_that_follow_the_rule(client, api, new):
+    headers = api.customer("buyer@mail.kz")
+    assert change(client, headers, PASSWORD, new).status_code == 200, new
+
+
+def test_the_rule_is_checked_on_customer_sign_up_too(client):
+    from tests.conftest import signup_code
+    body = {"email": "weak@mail.kz", "code": signup_code(client, "weak@mail.kz"), "password": "weakpassword",
+            "full_name": "Weak Password", "address": "Almaty, Abay 1"}
+    r = client.post("/api/auth/register/", json=body)
+    assert r.status_code == 422 and "a digit" in r.json()["detail"][0]["msg"]
+    assert client.post("/api/auth/register/", json={**body, "password": "strong_pass1"}).status_code == 201
+
+
+def test_an_old_weak_password_still_signs_in(client, api, db):
+    """The rule is for new passwords; people who set one before keep signing in."""
+    from app.core.security import hash_password
+    api.customer("old@mail.kz")
+    db.execute(text("UPDATE users SET password_hash = :h WHERE email = 'old@mail.kz'"), {"h": hash_password("oldpass")})
+    db.commit()
+    assert client.post("/api/auth/login/", data={"username": "old@mail.kz", "password": "oldpass"}).status_code == 200
 
 
 def test_change_needs_a_signed_in_user(client):

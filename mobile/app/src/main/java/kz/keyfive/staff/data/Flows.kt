@@ -5,7 +5,7 @@ import java.time.OffsetDateTime
 import kotlin.math.ceil
 import kotlin.math.max
 
-// Plain logic of the sign-in, invitation and team screens, kept free of Android so it is unit-tested on the JVM.
+// Plain logic of the sign-in and team screens, kept free of Android so it is unit-tested on the JVM.
 
 /** What the server answered to a staff sign in. */
 sealed interface LoginStep {
@@ -45,33 +45,29 @@ fun retryAfterSeconds(error: Throwable): Int? =
     (error as? HttpException)?.takeIf { it.code() == 429 }?.response()?.headers()?.get("Retry-After")?.toIntOrNull()
         ?.takeIf { it > 0 }
 
-/** A Manager invites up to his own rank; nobody else invites in the app. */
-fun invitableRoles(myRole: String): List<String> = if (myRole == "MANAGER") listOf("WORKER", "MANAGER") else emptyList()
-
-enum class InvitationAction { RESEND, REVOKE }
-
-/** Only an open invitation (waiting or expired) can be sent again or revoked. */
-fun invitationActions(status: String): Set<InvitationAction> = when (status) {
-    "PENDING", "EXPIRED" -> setOf(InvitationAction.RESEND, InvitationAction.REVOKE)
-    else -> emptySet()
-}
-
 /** What is wrong with a new password before it is sent, or null. The server checks the same and more. */
 fun newPasswordProblem(current: String, new: String, repeat: String): String? = when {
-    new.length < 8 -> "At least 8 characters"
-    new.length > 72 -> "At most 72 characters"
+    passwordHint(new) != null -> passwordHint(new)
     new == current -> "Must differ from the current password"
     repeat != new -> "The passwords do not match"
     else -> null
 }
 
-/** Invitation accept form: what is missing, or null when it can be sent. */
-fun acceptProblem(email: String, code: String, password: String, repeat: String): String? = when {
-    !email.trim().contains('@') -> "Enter the email the invitation came to"
-    code.length != 6 -> "Enter the 6-digit code from the email"
-    password.length < 8 -> "The password needs at least 8 characters"
-    password.length > 72 -> "The password can have at most 72 characters"
-    repeat != password -> "The passwords do not match"
+/**
+ * The rule for a NEW password, the same as the server's and the website's: at least 8 characters, a letter, a digit
+ * and a special character (@ _ - $ ... anything that is not a letter, a digit or a space). What is still missing.
+ */
+fun passwordProblems(password: String): List<String> = buildList {
+    if (password.codePointCount(0, password.length) < 8) add("at least 8 characters")
+    if (password.none { it.isLetter() }) add("a letter")
+    if (password.none { it.isDigit() }) add("a digit")
+    if (password.none { !it.isLetterOrDigit() && !it.isWhitespace() }) add("a special character (@ _ - \$ …)")
+}
+
+/** One line for the screen: what is missing, or null when the password follows the rule. */
+fun passwordHint(password: String): String? = when {
+    password.codePointCount(0, password.length) > 72 -> "At most 72 characters"
+    passwordProblems(password).isNotEmpty() -> "Still needed: " + passwordProblems(password).joinToString(", ")
     else -> null
 }
 
