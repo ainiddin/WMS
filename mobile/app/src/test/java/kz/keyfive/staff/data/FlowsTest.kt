@@ -243,4 +243,51 @@ class FlowsTest {
         assertEquals("Code from the email", codeFieldLabel("email"))
         assertEquals("Code from the email", codeFieldLabel("something new")) // unknown channel: the old text
     }
+
+    // ---- picking: the same check for a scanned and a typed barcode ----
+    private fun line(id: Int, barcode: String?, quantity: Int) = OrderItem(
+        id = id, productId = id, productCode = "P00$id", productName = "Product $id", barcode = barcode,
+        quantity = quantity, unitPrice = 100.0, lineTotal = 100.0 * quantity,
+    )
+
+    private val kettle = line(1, "4870000000031", 2)
+    private val towel = line(2, null, 3) // no barcode: counted by hand
+    private val order = listOf(kettle, towel)
+
+    @Test
+    fun `the right barcode counts one unit`() {
+        assertEquals(PickScan.Counted(kettle, 1), pickScan("4870000000031", order, emptyMap()))
+        assertEquals(PickScan.Counted(kettle, 2), pickScan("4870000000031", order, mapOf(1 to 1)))
+    }
+
+    @Test
+    fun `a typed code with spaces or dashes is checked exactly like a scanned one`() {
+        val scanned = pickScan("4870000000031", order, mapOf(1 to 1))
+        assertEquals(scanned, pickScan("4870 0000 0003 1", order, mapOf(1 to 1)))
+        assertEquals(scanned, pickScan(" 4870-0000-0003-1 ", order, mapOf(1 to 1)))
+    }
+
+    @Test
+    fun `a code that is not in the order is the wrong product`() {
+        assertEquals(PickScan.WrongProduct("4870000000048"), pickScan("4870000000048", order, emptyMap()))
+        assertEquals(PickScan.WrongProduct("487000000003"), pickScan("487000000003", order, emptyMap())) // a digit short
+        assertEquals(PickScan.WrongProduct("48700000000311"), pickScan("48700000000311", order, emptyMap())) // one extra
+    }
+
+    @Test
+    fun `an empty or letters-only code never matches a line without a barcode`() {
+        assertEquals(PickScan.WrongProduct(""), pickScan("", order, emptyMap()))
+        assertEquals(PickScan.WrongProduct(""), pickScan("abc", order, emptyMap()))
+    }
+
+    @Test
+    fun `a complete line refuses one more unit`() {
+        assertEquals(PickScan.AlreadyComplete(kettle), pickScan("4870000000031", order, mapOf(1 to 2)))
+        assertEquals(PickScan.AlreadyComplete(kettle), pickScan("4870 0000 0003 1", order, mapOf(1 to 2)))
+    }
+
+    @Test
+    fun `counts of other lines do not matter`() {
+        assertEquals(PickScan.Counted(kettle, 1), pickScan("4870000000031", order, mapOf(2 to 3)))
+    }
 }
