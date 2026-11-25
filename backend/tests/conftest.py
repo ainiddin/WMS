@@ -122,9 +122,12 @@ def admin_web_login(client):
 class Api:
     """Small helper around TestClient for building test scenarios."""
 
+    phones = 0  # a different phone number for every person who joins
+
     def __init__(self, client: TestClient):
         self.c = client
         self.managers: dict[int, dict] = {}  # employee id -> auth headers of that Manager
+        self.links: dict[str, tuple[str, str]] = {}  # email -> (invitation link, full name) for accept()
 
     def login(self, email: str, password: str = PASSWORD) -> dict:
         """Website login (customers)."""
@@ -152,15 +155,28 @@ class Api:
         return {"Authorization": f"Bearer {admin_login(self.c).json()['access_token']}"}
 
     def invite(self, inviter: dict, email: str, role: str, full_name: str | None = None):
-        """POST an invitation as `inviter` (a Manager, or the Admin for the very first Manager)."""
+        """An invitation LINK made by `inviter` (a Manager, or the Admin for the very first Manager), kept for
+        `accept(email)`. The email and name are what the person will type on the join page."""
         url = "/api/admin/invitations/" if inviter is None else "/api/team/invitations/"
-        return self.c.post(url, headers=inviter if inviter is not None else self.admin,
-                           json={"email": email, "role": role,
-                                 "full_name": full_name or email.split("@")[0].title() + " Test"})
+        r = self.c.post(url, headers=inviter if inviter is not None else self.admin, json={"role": role})
+        if r.status_code == 201:
+            self.links[email.lower()] = (r.json()["link"], full_name or email.split("@")[0].title() + " Test")
+        return r
+
+    def join(self, link: str, email: str, full_name: str = "New Person", password: str = PASSWORD,
+             phone: str | None = None):
+        """Fill in the join page of `link` (/join/<token>)."""
+        first, _, last = full_name.partition(" ")
+        Api.phones += 1
+        return self.c.post(f"/api/auth{link}/", json={
+            "first_name": first, "last_name": last or "Test", "email": email,
+            "phone": phone or f"+7 701 {Api.phones // 10000 % 1000:03d} {Api.phones // 100 % 100:02d} {Api.phones % 100:02d}",
+            "password": password,
+        })
 
     def accept(self, email: str, password: str = PASSWORD):
-        return self.c.post("/api/auth/invite/accept/",
-                           json={"email": email, "code": last_code(email), "password": password})
+        link, full_name = self.links[email.lower()]
+        return self.join(link, email, full_name, password)
 
     def staff(self, email: str, role: str, manager_id: int | None = None) -> tuple[dict, int]:
         """A staff member who joined by invitation and signed in on an approved phone.

@@ -13,7 +13,6 @@ import argparse
 import heapq
 import itertools
 import random
-import secrets
 import sys
 from collections import Counter
 from datetime import UTC, datetime, time, timedelta
@@ -31,7 +30,6 @@ from app.models import (
     Category,
     Customer,
     Employee,
-    Invitation,
     MovementType,
     Order,
     OrderStatus,
@@ -120,10 +118,6 @@ CUSTOMERS = [
 
 # Open invitations from the first Manager (staff join only by invitation). No email is sent by the seed,
 # so their codes are unknown: in the app the Manager presses "Send again" to get one to a real address.
-INVITED_STAFF = [
-    ("Ayan Kudaibergen", "ayan@wms.kz", Role.WORKER),
-    ("Dilnaz Sultanova", "dilnaz@wms.kz", Role.MANAGER),
-]
 
 
 def ean13(body12: str) -> str:
@@ -361,13 +355,6 @@ def seed_demo(db: Session) -> None:
         c_user.customer = Customer(full_name=name, phone=phone, address=address, account=Account())
         db.add(c_user)
 
-    first_manager = db.scalars(select(User).where(User.role == Role.MANAGER).order_by(User.id)).first()
-    for name, email, role in INVITED_STAFF:
-        sent = now - timedelta(hours=3)
-        db.add(Invitation(email=email, full_name=name, role=role, invited_by=first_manager,
-                          team_manager=first_manager.employee if role == Role.WORKER else None,
-                          code_hash=hash_password(secrets.token_urlsafe(16)), code_sent_at=sent,
-                          expires_at=sent + timedelta(hours=settings.INVITATION_HOURS)))
     db.commit()
 
     sim = Simulation(db, rng, year_ago, now)

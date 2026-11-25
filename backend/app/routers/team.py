@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.core.deps import DB, ClientIP, require_role
 from app.models import AuditAction, DeviceStatus, Employee, Invitation, Role, StaffDevice, User
 from app.schemas.people import StaffDeviceOut
-from app.schemas.team import InvitationCreate, InvitationOut, TeamMemberOut
+from app.schemas.team import InvitationCreate, InvitationCreated, InvitationOut, TeamMemberOut
 from app.services import audit_service, device_service, invitation_service, user_service
 
 router = APIRouter(prefix="/api/team", tags=["team"])
@@ -97,26 +97,19 @@ def revoke_device(device_id: int, db: DB, manager: Manager, ip: ClientIP):
     return StaffDeviceOut.from_device(device, None)
 
 
-# ---- Invitations ----
+# ---- Invitations: links ----
 @router.get("/invitations/", response_model=list[InvitationOut])
 def my_invitations(db: DB, manager: Manager):
     stmt = select(Invitation).where(Invitation.invited_by_id == manager.id).order_by(Invitation.created_at.desc())
     return [InvitationOut.from_invitation(i) for i in db.scalars(stmt)]
 
 
-@router.post("/invitations/", response_model=InvitationOut, status_code=status.HTTP_201_CREATED)
+@router.post("/invitations/", response_model=InvitationCreated, status_code=status.HTTP_201_CREATED)
 def invite(data: InvitationCreate, db: DB, manager: Manager, ip: ClientIP):
-    """WORKER joins your team; MANAGER gets a team of his own."""
-    invitation = invitation_service.create(db, manager, data.email, data.full_name, Role(data.role), ip)
+    """A new invitation link (1 hour, works once). The link is in this answer only: copy it and send it."""
+    link, invitation = invitation_service.create(db, manager, Role(data.role), ip)
     db.commit()
-    return InvitationOut.from_invitation(invitation)
-
-
-@router.post("/invitations/{invitation_id}/resend/", response_model=InvitationOut)
-def resend(invitation_id: int, db: DB, manager: Manager, ip: ClientIP):
-    invitation = invitation_service.resend(db, invitation_service.get(db, invitation_id), manager, ip)
-    db.commit()
-    return InvitationOut.from_invitation(invitation)
+    return InvitationCreated(**InvitationOut.from_invitation(invitation).model_dump(), link=link)
 
 
 @router.post("/invitations/{invitation_id}/revoke/", response_model=InvitationOut)

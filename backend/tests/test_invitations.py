@@ -1,25 +1,14 @@
-"""Staff join only by invitation; a Manager runs only his own team."""
+"""Staff join only by invitation LINK; a Manager runs only his own team."""
+
+import hashlib
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
-from app.models import Invitation
-from tests.conftest import OUTBOX, PASSWORD, last_code, staff_login
+from tests.conftest import PASSWORD, staff_login
 
-
-def accept(client, email, code, password=PASSWORD, **extra):
-    return client.post("/api/auth/invite/accept/", json={"email": email, "code": code, "password": password, **extra})
-
-
-def wrong(code: str) -> str:
-    return f"{(int(code) + 1) % 1_000_000:06d}"
-
-
-def age_invitations(db, seconds: int):
-    db.execute(text("UPDATE invitations SET code_sent_at = code_sent_at - make_interval(secs => :s)"), {"s": seconds})
-    db.commit()
+GONE = "This invitation link is not valid or has expired. Ask your Manager for a new one."
 
 
 @pytest.fixture
@@ -28,228 +17,203 @@ def boss(api):
     return {"h": headers, "id": emp_id}
 
 
-# ---------------- inviting and joining ----------------
-def test_manager_invites_a_worker_into_his_own_team(client, api, boss):
-    OUTBOX.clear()
-    r = api.invite(boss["h"], "Arman@WMS.kz", "WORKER", "Arman Seitov")
+def new_link(client, headers, role="WORKER", url="/api/team/invitations/"):
+    r = client.post(url, headers=headers, json={"role": role})
     assert r.status_code == 201, r.text
-    inv = r.json()
-    assert inv["email"] == "arman@wms.kz" and inv["status"] == "PENDING" and inv["team_manager_id"] == boss["id"]
-    assert set(OUTBOX) == {"arman@wms.kz"}  # the code goes to the invitee, nobody else
-    assert "Boss Test" in OUTBOX["arman@wms.kz"][0]
-    assert last_code("arman@wms.kz") not in r.text
+    return r.json()
 
-    r = accept(client, "ARMAN@wms.kz", last_code("arman@wms.kz"), phone="8 701 111 22 33")
+
+def join(client, link, email="arman@wms.kz", first="Arman", last="Bekov", phone="+7 701 111 22 33",
+         password=PASSWORD):
+    return client.post(f"/api/auth{link}/", json={"first_name": first, "last_name": last, "email": email,
+                                                  "phone": phone, "password": password})
+
+
+def info(client, link):
+    return client.get(f"/api/auth{link}/")
+
+
+# ---------------- creating a link and joining with it ----------------
+def test_a_manager_invites_a_worker_by_link_into_his_own_team(client, api, boss):
+    created = new_link(client, boss["h"])
+    assert created["link"].startswith("/join/") and len(created["link"]) > 40
+    assert created["status"] == "PENDING" and created["role"] == "WORKER" and created["team_manager_id"] == boss["id"]
+    minutes = settings.INVITATION_LINK_MINUTES
+    from datetime import datetime
+    created_at = datetime.fromisoformat(created["created_at"].replace("Z", "+00:00"))
+    expires = datetime.fromisoformat(created["expires_at"].replace("Z", "+00:00"))
+    assert abs((expires - created_at).total_seconds() - minutes * 60) < 5
+
+    page = info(client, created["link"])
+    assert page.status_code == 200
+    assert page.json()["role"] == "WORKER" and page.json()["team_name"]
+
+    r = join(client, created["link"], email="  Arman@WMS.kz ")
     assert r.status_code == 201, r.text
     user = r.json()
-    assert user["role"] == "WORKER" and user["status"] == "ACTIVE" and user["manager_id"] == boss["id"]
-    assert user["full_name"] == "Arman Seitov" and user["phone"] == "+7 701 111 22 33"
+    assert user["email"] == "arman@wms.kz" and user["full_name"] == "Arman Bekov" and user["role"] == "WORKER"
+    assert user["status"] == "ACTIVE" and user["manager_id"] == boss["id"]
+    assert user["employee_code"].startswith("E")  # the employee id he gets right away
+    assert PASSWORD not in r.text and "password_hash" not in r.text
 
-    # First sign in: the phone waits, and his Manager (not the Admin) approves it.
-    assert staff_login(client, "arman@wms.kz").status_code == 403
-    device = client.get("/api/team/devices/?status=PENDING", headers=boss["h"]).json()[0]
-    assert device["user_email"] == "arman@wms.kz"
-    assert client.post(f"/api/team/devices/{device['id']}/approve/", headers=boss["h"]).status_code == 200
-    assert staff_login(client, "arman@wms.kz").status_code == 200
+    listed = client.get("/api/team/invitations/", headers=boss["h"]).json()
+    assert listed[0]["status"] == "ACCEPTED" and listed[0]["joined_email"] == "arman@wms.kz"
+    assert listed[0]["joined_employee_code"] == user["employee_code"]
+    assert "link" not in listed[0]  # the link is shown once, when it is made
 
-    rows = client.get("/api/team/invitations/", headers=boss["h"]).json()
-    assert rows[0]["status"] == "ACCEPTED"
-
-
-def test_manager_invites_a_manager_who_gets_his_own_team(client, api, boss):
-    assert api.invite(boss["h"], "second@wms.kz", "MANAGER").status_code == 201
-    r = api.accept("second@wms.kz")
-    assert r.status_code == 201
-    assert r.json()["role"] == "MANAGER" and r.json()["manager_id"] is None
-    # A new Manager is not a member of the inviting Manager's team, so his phone is not in that team's list.
-    staff_login(client, "second@wms.kz")
-    assert client.get("/api/team/devices/", headers=boss["h"]).json() == []
+    # Then the Staff app: password works, the new phone waits for the Manager.
+    r = staff_login(client, "arman@wms.kz")
+    assert r.status_code == 403 and "waiting for" in r.json()["detail"]
 
 
-@pytest.mark.parametrize("role", ["ADMIN", "CUSTOMER", "boss", ""])
-def test_nobody_is_invited_above_manager_or_outside_staff(api, boss, role):
-    assert api.invite(boss["h"], "x@wms.kz", role).status_code == 422
+def test_a_manager_invites_a_manager_who_gets_his_own_team(client, api, boss):
+    created = new_link(client, boss["h"], role="MANAGER")
+    assert created["team_manager_id"] is None
+    r = join(client, created["link"], email="dana@wms.kz", first="Dana", last="Seitova")
+    assert r.status_code == 201 and r.json()["role"] == "MANAGER" and r.json()["manager_id"] is None
+
+
+def test_a_link_works_once(client, api, boss):
+    link = new_link(client, boss["h"])["link"]
+    assert join(client, link).status_code == 201
+    r = join(client, link, email="second@wms.kz")
+    assert r.status_code == 404 and r.json()["detail"] == GONE
+    assert info(client, link).status_code == 404
+
+
+def test_an_expired_link_is_dead(client, api, boss, db):
+    link = new_link(client, boss["h"])["link"]
+    db.execute(text("UPDATE invitations SET expires_at = now() - interval '1 second'"))
+    db.commit()
+    assert info(client, link).status_code == 404
+    r = join(client, link)
+    assert r.status_code == 404 and r.json()["detail"] == GONE
+    assert client.get("/api/team/invitations/", headers=boss["h"]).json()[0]["status"] == "EXPIRED"
+
+
+@pytest.mark.parametrize("link", ["/join/" + "x" * 43, "/join/short", "/join/" + "A" * 43])
+def test_an_unknown_link_gets_the_same_answer(client, link):
+    assert info(client, link).status_code == 404
+    r = join(client, link)
+    assert r.status_code == 404 and r.json()["detail"] == GONE
+
+
+def test_only_the_token_hash_is_stored(client, api, boss, db):
+    created = new_link(client, boss["h"])
+    token = created["link"].removeprefix("/join/")
+    stored = db.execute(text("SELECT token_hash FROM invitations WHERE id = :i"), {"i": created["id"]}).scalar_one()
+    assert stored == hashlib.sha256(token.encode()).hexdigest()
+    assert token not in str(db.execute(text("SELECT * FROM invitations")).all())
+
+
+def test_a_registered_email_cannot_join_again_and_the_link_stays_usable(client, api, boss):
+    api.customer("taken@mail.kz")
+    link = new_link(client, boss["h"])["link"]
+    r = join(client, link, email="taken@mail.kz")
+    assert r.status_code == 409 and r.json()["detail"] == "This email is already registered"
+    assert join(client, link, email="fresh@wms.kz").status_code == 201
+
+
+@pytest.mark.parametrize("field, value", [
+    ("first_name", ""), ("last_name", ""), ("email", "not-an-email"), ("phone", "12345"), ("phone", ""),
+    ("password", "short"), ("password", "nodigits_here"), ("password", "noSpecial123"),
+])
+def test_the_join_form_is_checked(client, api, boss, field, value):
+    link = new_link(client, boss["h"])["link"]
+    body = {"first_name": "Arman", "last_name": "Bekov", "email": "arman@wms.kz", "phone": "+7 701 111 22 33",
+            "password": PASSWORD, field: value}
+    assert client.post(f"/api/auth{link}/", json=body).status_code == 422
+    assert info(client, link).status_code == 200  # a bad form does not use up the link
+
+
+def test_two_people_with_the_same_link_make_one_account(client, api, boss):
+    """Row lock: the second waits for the first and then finds the link used."""
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+    link = new_link(client, boss["h"])["link"]
+    results = []
+    start = threading.Barrier(2)
+
+    def go(email):
+        with TestClient(app) as c:
+            start.wait()
+            results.append(join(c, link, email=email).status_code)
+
+    threads = [threading.Thread(target=go, args=(e,)) for e in ("one@wms.kz", "two@wms.kz")]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    assert sorted(results) == [201, 404]
+
+
+# ---------------- who may invite ----------------
+@pytest.mark.parametrize("role", ["ADMIN", "CUSTOMER", "SUPERHERO"])
+def test_nobody_is_invited_above_manager_or_outside_staff(client, boss, role):
+    assert client.post("/api/team/invitations/", headers=boss["h"], json={"role": role}).status_code == 422
 
 
 def test_only_managers_invite(client, api, boss):
     worker, _ = api.staff("w@wms.kz", "WORKER", boss["id"])
-    customer = api.customer("c@mail.kz")
-    for headers in (worker, customer):
-        assert api.invite(headers, "x@wms.kz", "WORKER").status_code == 403
-    assert client.post("/api/team/invitations/", json={"email": "x@wms.kz", "role": "WORKER", "full_name": "X"}).status_code == 401
+    for headers in (worker, api.customer("c@mail.kz")):
+        assert client.post("/api/team/invitations/", headers=headers, json={"role": "WORKER"}).status_code == 403
+    assert client.post("/api/team/invitations/", json={"role": "WORKER"}).status_code == 401
 
 
 def test_admin_invites_only_the_first_manager(client, api):
-    assert api.invite(None, "first@wms.kz", "WORKER").status_code == 403  # a Worker needs a team
-    assert api.invite(None, "first@wms.kz", "MANAGER").status_code == 201
-    api.accept("first@wms.kz")
-    r = api.invite(None, "another@wms.kz", "MANAGER")
-    assert r.status_code == 403  # now Managers do it
-    assert "first Manager" in r.json()["detail"]
+    admin = api.admin
+    assert client.post("/api/admin/invitations/", headers=admin, json={"role": "WORKER"}).status_code == 403
+    link = new_link(client, admin, role="MANAGER", url="/api/admin/invitations/")["link"]
+    assert join(client, link, email="first@wms.kz").status_code == 201
+    r = client.post("/api/admin/invitations/", headers=admin, json={"role": "MANAGER"})
+    assert r.status_code == 403 and "only the first Manager" in r.json()["detail"]
 
 
 def test_admin_cannot_use_the_manager_team_api(client, api, boss):
-    assert client.get("/api/team/members/", headers=api.admin).status_code == 403
-    assert api.invite(api.admin, "x@wms.kz", "WORKER").status_code == 403
+    assert client.post("/api/team/invitations/", headers=api.admin, json={"role": "WORKER"}).status_code == 403
 
 
-def test_registered_or_already_invited_emails_are_refused(client, api, boss):
-    api.customer("buyer@mail.kz")
-    assert api.invite(boss["h"], "buyer@mail.kz", "WORKER").status_code == 409
-    assert api.invite(boss["h"], "new@wms.kz", "WORKER").status_code == 201
-    r = api.invite(boss["h"], "NEW@wms.kz", "WORKER")
-    assert r.status_code == 409 and "open invitation" in r.json()["detail"]
-
-
-def test_an_expired_invitation_is_replaced_by_a_new_one(client, api, boss, db):
-    assert api.invite(boss["h"], "late@wms.kz", "WORKER").status_code == 201
-    old_code = last_code("late@wms.kz")
-    db.execute(text("UPDATE invitations SET expires_at = now() - interval '1 second'"))
-    db.commit()
-    assert api.invite(boss["h"], "late@wms.kz", "WORKER").status_code == 201
-    statuses = sorted(i["status"] for i in client.get("/api/team/invitations/", headers=boss["h"]).json())
-    assert statuses == ["PENDING", "REVOKED"]
-    new_code = last_code("late@wms.kz")
-    if old_code != new_code:
-        assert accept(client, "late@wms.kz", old_code).status_code == 400
-    assert accept(client, "late@wms.kz", new_code).status_code == 201
-
-
-def test_the_database_allows_one_open_invitation_per_email(db, api, boss):
-    api.invite(boss["h"], "dup@wms.kz", "WORKER")
-    with pytest.raises(IntegrityError):
-        db.execute(text("INSERT INTO invitations (email, full_name, role, team_manager_id, invited_by_id, code_hash, "
-                        "code_sent_at, expires_at) SELECT email, full_name, role, team_manager_id, invited_by_id, "
-                        "code_hash, now(), now() + interval '1 day' FROM invitations"))
-    db.rollback()
-
-
-# ---------------- the code ----------------
-def test_unknown_email_and_wrong_code_get_the_same_answer(client, api, boss):
-    api.invite(boss["h"], "arman@wms.kz", "WORKER")
-    a = accept(client, "nobody@wms.kz", "123456")
-    b = accept(client, "arman@wms.kz", wrong(last_code("arman@wms.kz")))
-    assert a.status_code == b.status_code == 400
-    assert a.json() == b.json()
-
-
-def test_five_wrong_codes_burn_the_invitation_until_it_is_sent_again(client, api, boss, db):
-    inv = api.invite(boss["h"], "arman@wms.kz", "WORKER").json()
-    code = last_code("arman@wms.kz")
-    for _ in range(settings.INVITATION_MAX_ATTEMPTS):
-        assert accept(client, "arman@wms.kz", wrong(code)).status_code == 400
-    from app.core import rate_limit
-
-    rate_limit.clear_login_timer("arman@wms.kz")  # look at the invitation rule alone, not the login limit
-    assert accept(client, "arman@wms.kz", code).status_code == 400  # burnt: the right code no longer works
-
-    age_invitations(db, 61)
-    assert client.post(f"/api/team/invitations/{inv['id']}/resend/", headers=boss["h"]).status_code == 200
-    assert accept(client, "arman@wms.kz", last_code("arman@wms.kz")).status_code == 201
-
-
-def test_wrong_codes_also_count_as_failed_logins(client, api, boss):
-    api.invite(boss["h"], "arman@wms.kz", "WORKER")
-    code = last_code("arman@wms.kz")
-    for _ in range(settings.LOGIN_MAX_FAILS_PER_EMAIL - 1):
-        accept(client, "arman@wms.kz", wrong(code))
-    accept(client, "nobody@x.kz", "000000")
-    r = accept(client, "arman@wms.kz", wrong(code))
-    assert r.status_code == 400
-    r = accept(client, "arman@wms.kz", code)
-    assert r.status_code == 429  # even the right code waits now
-
-
-def test_an_expired_invitation_says_so_only_to_whoever_has_the_code(client, api, boss, db):
-    api.invite(boss["h"], "arman@wms.kz", "WORKER")
-    code = last_code("arman@wms.kz")
-    db.execute(text("UPDATE invitations SET expires_at = now() - interval '1 second'"))
-    db.commit()
-    assert "expired" not in accept(client, "arman@wms.kz", wrong(code)).json()["detail"]
-    r = accept(client, "arman@wms.kz", code)
-    assert r.status_code == 400 and "expired" in r.json()["detail"]
-
-
-def test_an_accepted_invitation_cannot_be_used_again(client, api, boss):
-    api.invite(boss["h"], "arman@wms.kz", "WORKER")
-    code = last_code("arman@wms.kz")
-    assert accept(client, "arman@wms.kz", code).status_code == 201
-    assert accept(client, "arman@wms.kz", code, password="another-pass-1").status_code == 400
-    assert api.invite(boss["h"], "arman@wms.kz", "WORKER").status_code == 409  # registered now
-
-
-@pytest.mark.parametrize("extra,status", [({"password": "short"}, 422), ({"code": "12345"}, 422),
-                                          ({"code": "abcdef"}, 422), ({"phone": "12"}, 422)])
-def test_accept_input_is_checked(client, api, boss, extra, status):
-    api.invite(boss["h"], "arman@wms.kz", "WORKER")
-    body = {"email": "arman@wms.kz", "code": last_code("arman@wms.kz"), "password": PASSWORD, **extra}
-    assert client.post("/api/auth/invite/accept/", json=body).status_code == status
-
-
-def test_codes_are_stored_only_as_hashes(api, boss, db):
-    api.invite(boss["h"], "arman@wms.kz", "WORKER")
-    row = db.query(Invitation).filter_by(email="arman@wms.kz").one()
-    assert row.code_hash.startswith("$2") and last_code("arman@wms.kz") not in row.code_hash
-
-
-# ---------------- resend and revoke ----------------
-def test_resend_once_a_minute_and_the_old_code_stops_working(client, api, boss, db):
-    inv = api.invite(boss["h"], "arman@wms.kz", "WORKER").json()
-    old = last_code("arman@wms.kz")
-    r = client.post(f"/api/team/invitations/{inv['id']}/resend/", headers=boss["h"])
-    assert r.status_code == 429 and int(r.headers["Retry-After"]) <= 60
-    age_invitations(db, 61)
-    assert client.post(f"/api/team/invitations/{inv['id']}/resend/", headers=boss["h"]).status_code == 200
-    new = last_code("arman@wms.kz")
-    if old != new:
-        assert accept(client, "arman@wms.kz", old).status_code == 400
-    assert accept(client, "arman@wms.kz", new).status_code == 201
-
-
-def test_revoked_invitation_is_dead(client, api, boss):
-    inv = api.invite(boss["h"], "arman@wms.kz", "WORKER").json()
-    code = last_code("arman@wms.kz")
-    r = client.post(f"/api/team/invitations/{inv['id']}/revoke/", headers=boss["h"])
+# ---------------- revoking, seeing ----------------
+def test_a_revoked_link_is_dead(client, api, boss):
+    created = new_link(client, boss["h"])
+    r = client.post(f"/api/team/invitations/{created['id']}/revoke/", headers=boss["h"])
     assert r.status_code == 200 and r.json()["status"] == "REVOKED"
-    assert accept(client, "arman@wms.kz", code).status_code == 400
-    assert client.post(f"/api/team/invitations/{inv['id']}/revoke/", headers=boss["h"]).status_code == 409
-    assert client.post(f"/api/team/invitations/{inv['id']}/resend/", headers=boss["h"]).status_code == 409
-    assert api.invite(boss["h"], "arman@wms.kz", "WORKER").status_code == 201  # a new one is possible
+    assert join(client, created["link"]).status_code == 404
+    assert client.post(f"/api/team/invitations/{created['id']}/revoke/", headers=boss["h"]).status_code == 409
 
 
-def test_a_manager_sees_and_touches_only_his_own_invitations(client, api, boss):
+def test_a_manager_sees_and_touches_only_his_own_links(client, api, boss):
     other, _ = api.staff("other@wms.kz", "MANAGER")
-    mine = api.invite(boss["h"], "mine@wms.kz", "WORKER").json()
-    theirs = api.invite(other, "theirs@wms.kz", "WORKER").json()
-    emails = {i["email"] for i in client.get("/api/team/invitations/", headers=boss["h"]).json()}
-    assert "mine@wms.kz" in emails and "theirs@wms.kz" not in emails
+    theirs = new_link(client, other)
+    mine = new_link(client, boss["h"])
+    ids = [i["id"] for i in client.get("/api/team/invitations/", headers=boss["h"]).json()]
+    assert mine["id"] in ids and theirs["id"] not in ids
     assert client.post(f"/api/team/invitations/{theirs['id']}/revoke/", headers=boss["h"]).status_code == 404
-    assert client.post(f"/api/team/invitations/{theirs['id']}/resend/", headers=boss["h"]).status_code == 404
-    assert client.post(f"/api/team/invitations/{mine['id']}/revoke/", headers=other).status_code == 404
 
 
-def test_admin_sees_every_invitation_and_can_step_in(client, api, boss, db):
-    other, _ = api.staff("other@wms.kz", "MANAGER")
-    a = api.invite(boss["h"], "a@wms.kz", "WORKER").json()
-    api.invite(other, "b@wms.kz", "WORKER")
-    rows = client.get("/api/admin/invitations/", headers=api.admin).json()
-    assert {"a@wms.kz", "b@wms.kz"} <= {r["email"] for r in rows}
-    assert {r["email"] for r in client.get("/api/admin/invitations/?status=PENDING", headers=api.admin).json()} \
-        == {"a@wms.kz", "b@wms.kz"}
-    assert client.get("/api/admin/invitations/?status=WHATEVER", headers=api.admin).status_code == 422
-    r = client.post(f"/api/admin/invitations/{a['id']}/revoke/", headers=api.admin)
-    assert r.status_code == 200 and r.json()["status"] == "REVOKED"
-    assert client.get("/api/admin/invitations/", headers=boss["h"]).status_code == 403
-
-
-def test_invitation_dies_with_its_inviter_or_team(client, api, boss):
+def test_admin_sees_every_link_and_can_revoke_it(client, api, boss):
+    created = new_link(client, boss["h"])
     admin = api.admin
-    api.invite(boss["h"], "arman@wms.kz", "WORKER")
-    code = last_code("arman@wms.kz")
+    rows = client.get("/api/admin/invitations/", headers=admin).json()
+    assert created["id"] in [r["id"] for r in rows] and all("link" not in r for r in rows)
+    assert client.post(f"/api/admin/invitations/{created['id']}/revoke/", headers=admin).status_code == 200
+    assert join(client, created["link"]).status_code == 404
+
+
+def test_a_link_dies_with_its_inviter(client, api, boss):
+    admin = api.admin
+    link = new_link(client, boss["h"])["link"]
     boss_user = next(u for u in client.get("/api/admin/users/?search=boss", headers=admin).json())
     assert client.post(f"/api/admin/users/{boss_user['id']}/block/", headers=admin).status_code == 200
-    r = accept(client, "arman@wms.kz", code)
-    assert r.status_code == 409 and "no longer valid" in r.json()["detail"]
+    assert join(client, link).status_code == 404
+
+
+def test_the_old_email_code_endpoint_is_gone(client):
+    r = client.post("/api/auth/invite/accept/", json={"email": "a@wms.kz", "code": "123456", "password": PASSWORD})
+    assert r.status_code in (404, 405)
 
 
 # ---------------- the team ----------------
@@ -308,22 +272,31 @@ def test_workers_and_customers_have_no_team_api(client, api, boss):
         assert client.get("/api/team/invitations/", headers=headers).status_code == 403
 
 
-def test_team_actions_and_invitations_are_in_the_audit_log(client, api, boss, db):
-    inv = api.invite(boss["h"], "arman@wms.kz", "WORKER").json()
-    code = last_code("arman@wms.kz")
-    accept(client, "arman@wms.kz", wrong(code))
-    age_invitations(db, 61)
-    client.post(f"/api/team/invitations/{inv['id']}/resend/", headers=boss["h"])
-    accept(client, "arman@wms.kz", last_code("arman@wms.kz"))
+def test_team_actions_and_invitations_are_in_the_audit_log(client, api, boss):
+    created = new_link(client, boss["h"])
+    assert join(client, created["link"]).status_code == 201
     uid = next(u["id"] for u in client.get("/api/admin/users/?search=arman", headers=api.admin).json())
     client.post(f"/api/team/members/{uid}/block/", headers=boss["h"])
+    revoked = new_link(client, boss["h"])
+    client.post(f"/api/team/invitations/{revoked['id']}/revoke/", headers=boss["h"])
 
     rows = client.get("/api/admin/audit/?limit=50", headers=api.admin).json()
-    rows = [r for r in rows if "arman@wms.kz" in (r["target_email"], r["details"].get("email"))]
-    actions = [r["action"] for r in rows if r["action"].startswith("INVITE_") or r["action"] == "USER_BLOCKED"]
-    assert actions == ["USER_BLOCKED", "INVITE_ACCEPTED", "INVITE_RESENT", "INVITE_CODE_FAILED", "INVITE_SENT"]
-    by_action = {r["action"]: r for r in rows}
+    mine = [r for r in rows if r["details"].get("invitation_id") in (created["id"], revoked["id"])
+            or r["target_email"] == "arman@wms.kz"]
+    actions = [r["action"] for r in mine if r["action"].startswith("INVITE_") or r["action"] == "USER_BLOCKED"]
+    assert actions == ["INVITE_REVOKED", "INVITE_SENT", "USER_BLOCKED", "INVITE_ACCEPTED", "INVITE_SENT"]
+    by_action = {r["action"]: r for r in mine}
     assert by_action["USER_BLOCKED"]["actor_email"] == "boss@wms.kz"
     assert by_action["INVITE_SENT"]["actor_email"] == "boss@wms.kz"
-    assert by_action["INVITE_SENT"]["details"]["email"] == "arman@wms.kz"
-    assert by_action["INVITE_CODE_FAILED"]["details"]["attempt"] == 1
+    assert by_action["INVITE_ACCEPTED"]["actor_email"] == "arman@wms.kz"
+    assert "token" not in str(rows) or all("link" not in str(r["details"]) for r in rows)
+
+
+def test_a_manager_link_dies_with_its_inviter_too(client, api, boss):
+    """A MANAGER link has no team to check: the inviter's status is what stops it."""
+    admin = api.admin
+    link = new_link(client, boss["h"], role="MANAGER")["link"]
+    boss_user = next(u for u in client.get("/api/admin/users/?search=boss", headers=admin).json())
+    assert client.post(f"/api/admin/users/{boss_user['id']}/block/", headers=admin).status_code == 200
+    assert info(client, link).status_code == 404
+    assert join(client, link, email="newboss@wms.kz").status_code == 404
