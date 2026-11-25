@@ -11,7 +11,10 @@ import type {
   DeviceStatus,
   Employee,
   Invitation,
+  InvitationCreated,
   InvitationStatus,
+  JoinForm,
+  JoinInfo,
   Period,
   Role,
   StaffDevice,
@@ -160,11 +163,15 @@ export const adminApi = {
   audit: (filters: AuditFilters = {}) => get<AuditRow[]>("/admin/audit/", filters),
   invitations: (status?: InvitationStatus) =>
     get<Invitation[]>("/admin/invitations/", status ? { status } : {}),
-  resendInvitation: (id: number) => post<Invitation>(`/admin/invitations/${id}/resend/`),
   revokeInvitation: (id: number) => post<Invitation>(`/admin/invitations/${id}/revoke/`),
-  /** Only while there is no active Manager. */
-  inviteFirstManager: (email: string, full_name: string) =>
-    post<Invitation>("/admin/invitations/", { email, full_name, role: "MANAGER" }),
+  /** Only while there is no active Manager: a link for the first one. */
+  inviteFirstManager: () => post<InvitationCreated>("/admin/invitations/", { role: "MANAGER" }),
+};
+
+/** The public join page of an invitation link (/join/<token>). */
+export const joinApi = {
+  info: (token: string) => get<JoinInfo>(`/auth/join/${encodeURIComponent(token)}/`),
+  join: (token: string, form: JoinForm) => post<User>(`/auth/join/${encodeURIComponent(token)}/`, form),
 };
 
 export const performanceApi = {

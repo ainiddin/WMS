@@ -324,10 +324,9 @@ export interface AllPerformance extends PeriodInfo {
 
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
 
+/** An invitation link (works once, 1 hour). After it is used: who joined with it. */
 export interface Invitation {
   id: number;
-  email: string;
-  full_name: string;
   role: "WORKER" | "MANAGER";
   status: InvitationStatus;
   team_manager_id: number | null;
@@ -335,8 +334,31 @@ export interface Invitation {
   invited_by_id: number;
   invited_by_email: string;
   created_at: string;
-  code_sent_at: string;
   expires_at: string;
   accepted_at: string | null;
   revoked_at: string | null;
+  joined_name: string | null;
+  joined_email: string | null;
+  joined_employee_code: string | null;
+}
+
+/** Right after creating: `link` is /join/<token>, shown only now (the server keeps only its hash). */
+export interface InvitationCreated extends Invitation {
+  link: string;
+}
+
+/** What the join page shows before the form. */
+export interface JoinInfo {
+  role: "WORKER" | "MANAGER";
+  team_name: string | null;
+  invited_by: string;
+  expires_at: string;
+}
+
+export interface JoinForm {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  password: string;
 }

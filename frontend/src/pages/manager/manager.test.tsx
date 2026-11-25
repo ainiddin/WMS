@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { tokens } from '@/api/client'
 import { authApi } from '@/api/endpoints'
 import { reportsApi, teamApi, type RestockRow, type TeamMember } from '@/api/staff'
-import type { Invitation, StaffDevice } from '@/api/types'
+import type { Invitation, InvitationCreated, StaffDevice } from '@/api/types'
+import { clipboard } from '@/pages/admin/invitationParts'
 import { ProtectedRoute } from '@/auth/ProtectedRoute'
 import { MANAGER_NAV, ManagerLayout } from '@/pages/admin/AdminLayout'
 import { homeOf } from '@/pages/admin/AdminLoginPage'
@@ -106,20 +107,25 @@ describe('TeamPage', () => {
 
 describe('ManagerInvitationsPage', () => {
   const inv: Invitation = {
-    id: 1, email: 'ayan@wms.kz', full_name: 'Ayan', role: 'WORKER', status: 'PENDING', team_manager_id: 2,
-    team_name: 'Team Boss', invited_by_id: 5, invited_by_email: 'boss@wms.kz', created_at: '2026-11-18T10:00:00Z',
-    code_sent_at: '2026-11-18T10:00:00Z', expires_at: '2026-11-20T10:00:00Z', accepted_at: null, revoked_at: null,
+    id: 1, role: 'WORKER', status: 'PENDING', team_manager_id: 2, team_name: 'Team Boss', invited_by_id: 5,
+    invited_by_email: 'boss@wms.kz', created_at: '2026-11-25T10:00:00Z', expires_at: '2026-11-25T11:00:00Z',
+    accepted_at: null, revoked_at: null, joined_name: null, joined_email: null, joined_employee_code: null,
   }
+  const created: InvitationCreated = { ...inv, link: '/join/abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG' }
 
-  it('invites with trimmed values and the chosen role', async () => {
+  it('makes a link for the chosen role and shows it once, ready to copy', async () => {
     vi.spyOn(teamApi, 'invitations').mockResolvedValue([])
-    const invite = vi.spyOn(teamApi, 'invite').mockResolvedValue(inv)
+    const invite = vi.spyOn(teamApi, 'invite').mockResolvedValue(created)
+    const copy = vi.spyOn(clipboard, 'copy').mockResolvedValue()
     renderAt('/i', <Route path="/i" element={<ManagerInvitationsPage />} />)
     await screen.findByText('No invitations yet')
-    fireEvent.change(screen.getByLabelText(/^Full name/), { target: { value: '  Ayan K ' } })
-    fireEvent.change(screen.getByLabelText(/^Work email/), { target: { value: ' ayan@wms.kz ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
-    await waitFor(() => expect(invite).toHaveBeenCalledWith('ayan@wms.kz', 'Ayan K', 'WORKER'))
+    fireEvent.click(screen.getByRole('button', { name: 'Create invitation link' }))
+    await waitFor(() => expect(invite).toHaveBeenCalledWith('WORKER'))
+    const field = (await screen.findByLabelText('Invitation link')) as HTMLInputElement
+    expect(field.value).toBe(`${window.location.origin}/join/abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG`)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    await waitFor(() => expect(copy).toHaveBeenCalledWith(field.value))
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
 
   it('cannot invite an Admin: the form offers only Worker and Manager', async () => {
@@ -131,16 +137,17 @@ describe('ManagerInvitationsPage', () => {
     expect(options).toEqual(['Worker (joins my team)', 'Manager (gets own team)'])
   })
 
-  it('shows the server answer when the invitation is refused', async () => {
-    vi.spyOn(teamApi, 'invitations').mockResolvedValue([])
-    const { AxiosError, AxiosHeaders } = await import('axios')
-    const response = { status: 409, statusText: '', data: { detail: 'This email is already registered' }, headers: new AxiosHeaders(), config: { headers: new AxiosHeaders() } }
-    vi.spyOn(teamApi, 'invite').mockRejectedValue(new AxiosError('x', '409', undefined, undefined, response as never))
+  it('shows who joined with a used link, and revokes only open ones', async () => {
+    const used: Invitation = { ...inv, id: 2, status: 'ACCEPTED', accepted_at: '2026-11-25T10:20:00Z',
+      joined_name: 'Arman Bekov', joined_email: 'arman@wms.kz', joined_employee_code: 'E0012' }
+    vi.spyOn(teamApi, 'invitations').mockResolvedValue([inv, used])
+    const revoke = vi.spyOn(teamApi, 'revokeInvitation').mockResolvedValue({ ...inv, status: 'REVOKED' })
     renderAt('/i', <Route path="/i" element={<ManagerInvitationsPage />} />)
-    await screen.findByText('No invitations yet')
-    fireEvent.change(screen.getByLabelText(/^Full name/), { target: { value: 'X' } })
-    fireEvent.change(screen.getByLabelText(/^Work email/), { target: { value: 'x@wms.kz' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
-    expect(await screen.findByText('This email is already registered')).toBeInTheDocument()
+    expect(await screen.findByText(/Arman Bekov · E0012/)).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1) // only the open link
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }))
+    const buttons = await screen.findAllByRole('button', { name: 'Revoke' }) // the row's and the dialog's
+    fireEvent.click(buttons[buttons.length - 1])
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith(1))
   })
 })
