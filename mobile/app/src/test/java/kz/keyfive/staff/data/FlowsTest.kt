@@ -110,24 +110,6 @@ class FlowsTest {
         assertNull(retryAfterSeconds(httpError(429)))
     }
 
-    // ---- invitations ----
-    @Test
-    fun `a manager invites up to his rank and nobody else invites`() {
-        assertEquals(listOf("WORKER", "MANAGER"), invitableRoles("MANAGER"))
-        assertTrue(invitableRoles("WORKER").isEmpty())
-        assertTrue(invitableRoles("ADMIN").isEmpty())
-        assertFalse("ADMIN" in invitableRoles("MANAGER"))
-    }
-
-    @Test
-    fun `only open invitations can be sent again or revoked`() {
-        assertEquals(setOf(InvitationAction.RESEND, InvitationAction.REVOKE), invitationActions("PENDING"))
-        assertEquals(setOf(InvitationAction.RESEND, InvitationAction.REVOKE), invitationActions("EXPIRED"))
-        assertTrue(invitationActions("ACCEPTED").isEmpty())
-        assertTrue(invitationActions("REVOKED").isEmpty())
-        assertTrue(invitationActions("SOMETHING NEW").isEmpty())
-    }
-
     // ---- forms ----
     @Test
     fun `new password rules`() {
@@ -140,17 +122,6 @@ class FlowsTest {
         assertEquals("The passwords do not match", newPasswordProblem("old-pass-1", "new-pass-1", "new-pass-2"))
         assertNull(newPasswordProblem("old-pass-1", "new-pass-1", "new-pass-1"))
         assertNull(newPasswordProblem("same-pass-1", "SAME-PASS-1", "SAME-PASS-1")) // case matters
-    }
-
-    @Test
-    fun `invitation form needs email, six digits and a matching password`() {
-        assertEquals("Enter the email the invitation came to", acceptProblem(" ", "123456", "password_1", "password_1"))
-        assertEquals("Enter the 6-digit code from the email", acceptProblem("a@wms.kz", "12345", "password_1", "password_1"))
-        assertEquals("Password: still needed: at least 8 characters, a digit, a special character (@ _ - \$ …)",
-            acceptProblem("a@wms.kz", "123456", "pass", "pass"))
-        assertEquals("Password: still needed: a digit", acceptProblem("a@wms.kz", "123456", "password_", "password_"))
-        assertEquals("The passwords do not match", acceptProblem("a@wms.kz", "123456", "password_1", "password_2"))
-        assertNull(acceptProblem(" a@wms.kz ", "123456", "password_1", "password_1"))
     }
 
     // ---- live lock countdown ----

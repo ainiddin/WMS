@@ -27,9 +27,6 @@ interface Api {
     @POST("auth/password/")
     suspend fun changePassword(@Body body: ChangePasswordRequest): TokenPair
 
-    @POST("auth/invite/accept/")
-    suspend fun acceptInvitation(@Body body: InviteAcceptRequest): User
-
     @GET("auth/me/")
     suspend fun me(): User
 
@@ -191,15 +188,6 @@ interface Api {
     @POST("admin/devices/{id}/revoke/")
     suspend fun revokeDevice(@Path("id") id: Int): StaffDevice
 
-    @GET("admin/invitations/")
-    suspend fun allInvitations(@Query("status") status: String? = null): List<Invitation>
-
-    @POST("admin/invitations/{id}/resend/")
-    suspend fun adminResendInvitation(@Path("id") id: Int): Invitation
-
-    @POST("admin/invitations/{id}/revoke/")
-    suspend fun adminRevokeInvitation(@Path("id") id: Int): Invitation
-
     // ---- Team (Manager: only his own team) ----
     @GET("team/members/")
     suspend fun teamMembers(): List<TeamMember>
@@ -218,18 +206,6 @@ interface Api {
 
     @POST("team/devices/{id}/revoke/")
     suspend fun revokeTeamDevice(@Path("id") id: Int): StaffDevice
-
-    @GET("team/invitations/")
-    suspend fun myInvitations(): List<Invitation>
-
-    @POST("team/invitations/")
-    suspend fun invite(@Body body: InvitationCreate): Invitation
-
-    @POST("team/invitations/{id}/resend/")
-    suspend fun resendInvitation(@Path("id") id: Int): Invitation
-
-    @POST("team/invitations/{id}/revoke/")
-    suspend fun revokeInvitation(@Path("id") id: Int): Invitation
 
     // ---- Website sign ins waiting for "Is this you?" on this phone ----
     @GET("web-logins/")

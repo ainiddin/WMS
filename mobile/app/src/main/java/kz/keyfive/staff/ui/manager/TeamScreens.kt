@@ -24,14 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import kz.keyfive.staff.data.Invitation
-import kz.keyfive.staff.data.InvitationAction
-import kz.keyfive.staff.data.InvitationCreate
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.StaffDevice
 import kz.keyfive.staff.data.TeamMember
-import kz.keyfive.staff.data.invitableRoles
-import kz.keyfive.staff.data.invitationActions
 import kz.keyfive.staff.ui.Badge
 import kz.keyfive.staff.ui.Blue
 import kz.keyfive.staff.ui.ChipRow
@@ -48,85 +43,6 @@ import kz.keyfive.staff.ui.load
 import kz.keyfive.staff.ui.rememberAction
 import kz.keyfive.staff.ui.roleLabel
 import kz.keyfive.staff.ui.statusColor
-
-fun invitationColor(status: String) = when (status) {
-    "PENDING" -> Orange
-    "ACCEPTED" -> Green
-    "EXPIRED" -> Red
-    else -> Blue
-}
-
-/** One invitation with its actions. Used by the Manager (his own) and the Admin (all teams). */
-@Composable
-fun InvitationCard(inv: Invitation, busy: Boolean, showInviter: Boolean, onResend: () -> Unit, onRevoke: () -> Unit) {
-    val actions = invitationActions(inv.status)
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(inv.fullName, fontWeight = FontWeight.SemiBold)
-                    Hint(inv.email)
-                }
-                Badge(inv.status.lowercase(), invitationColor(inv.status))
-            }
-            Hint("${roleLabel[inv.role]} · ${inv.teamName ?: "own new team"}" + if (showInviter) " · by ${inv.invitedByEmail}" else "")
-            Hint(if (inv.status == "PENDING") "Code valid until ${dateTime(inv.expiresAt)}" else "Invited ${dateTime(inv.createdAt)}")
-            if (actions.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (InvitationAction.RESEND in actions) OutlinedButton(onClick = onResend, enabled = !busy) { Text("Send again") }
-                    if (InvitationAction.REVOKE in actions) TextButton(onClick = onRevoke, enabled = !busy) { Text("Revoke", color = Red) }
-                }
-            }
-        }
-    }
-}
-
-// ---------------- Invitations (Manager) ----------------
-@Composable
-fun InvitationsScreen(session: Session, myRole: String) {
-    val invitations = load { session.api.myInvitations() }
-    val action = rememberAction()
-    var revoking by remember { mutableStateOf<Invitation?>(null) }
-    var email by remember { mutableStateOf("") }
-    var fullName by remember { mutableStateOf("") }
-    val roles = invitableRoles(myRole)
-    var role by remember { mutableStateOf(roles.firstOrNull() ?: "WORKER") }
-
-    LoadedList(invitations, header = {
-        item {
-            Section("Invite") {
-                Hint("A Worker joins your team. A Manager gets a team of his own. The person gets a code by email " +
-                    "and joins in this app with \"I have an invitation\".")
-                ChipRow(roles, role, { roleLabel.getValue(it) }) { role = it }
-                OutlinedTextField(fullName, { fullName = it }, label = { Text("Full name") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(email, { email = it }, label = { Text("Work email") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-                Button(
-                    onClick = {
-                        action.run(after = { email = ""; fullName = ""; invitations.reload() }) {
-                            "Invitation sent to ${session.api.invite(InvitationCreate(email.trim(), fullName.trim(), role)).email}"
-                        }
-                    },
-                    enabled = !action.busy && email.contains('@') && fullName.isNotBlank() && role in roles,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Send invitation") }
-            }
-        }
-    }) { list ->
-        if (list.isEmpty()) item { Empty("No invitations yet") }
-        items(list, key = { it.id }) { inv ->
-            InvitationCard(inv, action.busy, showInviter = false,
-                onResend = { action.run(after = invitations.reload) { session.api.resendInvitation(inv.id); "Sent again to ${inv.email}" } },
-                onRevoke = { revoking = inv })
-        }
-    }
-    revoking?.let { inv ->
-        Confirm("Revoke the invitation?", "The code sent to ${inv.email} stops working at once.", "Revoke", action.busy,
-            onConfirm = { action.run(after = { revoking = null; invitations.reload() }) { session.api.revokeInvitation(inv.id); "Invitation revoked" } },
-            onDismiss = { revoking = null })
-    }
-}
 
 // ---------------- Team members and their phones (Manager) ----------------
 @Composable
@@ -153,7 +69,7 @@ private fun MembersList(session: Session, onTab: (String) -> Unit) {
         item { Tabs("members", onTab) }
         item { Hint("Only the Workers of your team. Blocking signs a person out at once; the history stays.") }
     }) { list ->
-        if (list.isEmpty()) item { Empty("No Workers in your team yet", "Invite them in Invitations.") }
+        if (list.isEmpty()) item { Empty("No Workers in your team yet", "Invite them with a link: Invitations on the website.") }
         items(list, key = { it.userId }) { m ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

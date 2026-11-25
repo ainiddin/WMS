@@ -13,7 +13,6 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.automirrored.filled.ForwardToInbox
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Inventory2
@@ -60,14 +59,12 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.User
-import kz.keyfive.staff.ui.admin.AdminInvitationsScreen
 import kz.keyfive.staff.ui.admin.DevicesScreen
 import kz.keyfive.staff.ui.admin.UsersScreen
 import kz.keyfive.staff.ui.manager.CategoriesScreen
 import kz.keyfive.staff.ui.manager.CustomersScreen
 import kz.keyfive.staff.ui.manager.DashboardScreen
 import kz.keyfive.staff.ui.manager.OrdersScreen
-import kz.keyfive.staff.ui.manager.InvitationsScreen
 import kz.keyfive.staff.ui.manager.ProductsScreen
 import kz.keyfive.staff.ui.manager.ReportsScreen
 import kz.keyfive.staff.ui.manager.RestockScreen
@@ -107,9 +104,7 @@ private val SCREENS = listOf(
     Screen("team", "My team", Icons.Default.Groups, setOf("MANAGER"), "Performance"),
     Screen("admin-performance", "All teams", Icons.Default.TrendingUp, setOf("ADMIN"), "Performance"),
     Screen("leaderboard", "Leaderboard", Icons.Default.Leaderboard, STAFF, "Performance"),
-    Screen("team-invitations", "Invitations", Icons.AutoMirrored.Filled.ForwardToInbox, setOf("MANAGER"), "My team"),
     Screen("team-members", "Members and phones", Icons.Default.ManageAccounts, setOf("MANAGER"), "My team"),
-    Screen("invitations", "Invitations", Icons.AutoMirrored.Filled.ForwardToInbox, setOf("ADMIN"), "Admin"),
     Screen("devices", "Staff phones", Icons.Default.PhoneAndroid, setOf("ADMIN"), "Admin"),
     Screen("users", "Users", Icons.AutoMirrored.Filled.ReceiptLong, setOf("ADMIN"), "Admin"),
     Screen("password", "Change password", Icons.Default.Key, STAFF, "Account"),
@@ -209,9 +204,7 @@ fun StaffApp(session: Session, user: User) {
                 composable("team/{id}") { TeamPerformanceScreen(session, it.arguments?.getString("id")?.toIntOrNull() ?: 0) }
                 composable("admin-performance") { AdminPerformanceScreen(session) { id -> nav.navigate("team/$id") } }
                 composable("leaderboard") { LeaderboardScreen(session) }
-                composable("team-invitations") { InvitationsScreen(session, user.role) }
                 composable("team-members") { TeamMembersScreen(session) }
-                composable("invitations") { AdminInvitationsScreen(session) }
                 composable("password") { ChangePasswordScreen(session, forced = false) { nav.go(home(user.role)) } }
                 composable("devices") { DevicesScreen(session) }
                 composable("users") { UsersScreen(session, user) }

@@ -5,7 +5,7 @@ import java.time.OffsetDateTime
 import kotlin.math.ceil
 import kotlin.math.max
 
-// Plain logic of the sign-in, invitation and team screens, kept free of Android so it is unit-tested on the JVM.
+// Plain logic of the sign-in and team screens, kept free of Android so it is unit-tested on the JVM.
 
 /** What the server answered to a staff sign in. */
 sealed interface LoginStep {
@@ -45,17 +45,6 @@ fun retryAfterSeconds(error: Throwable): Int? =
     (error as? HttpException)?.takeIf { it.code() == 429 }?.response()?.headers()?.get("Retry-After")?.toIntOrNull()
         ?.takeIf { it > 0 }
 
-/** A Manager invites up to his own rank; nobody else invites in the app. */
-fun invitableRoles(myRole: String): List<String> = if (myRole == "MANAGER") listOf("WORKER", "MANAGER") else emptyList()
-
-enum class InvitationAction { RESEND, REVOKE }
-
-/** Only an open invitation (waiting or expired) can be sent again or revoked. */
-fun invitationActions(status: String): Set<InvitationAction> = when (status) {
-    "PENDING", "EXPIRED" -> setOf(InvitationAction.RESEND, InvitationAction.REVOKE)
-    else -> emptySet()
-}
-
 /** What is wrong with a new password before it is sent, or null. The server checks the same and more. */
 fun newPasswordProblem(current: String, new: String, repeat: String): String? = when {
     passwordHint(new) != null -> passwordHint(new)
@@ -79,15 +68,6 @@ fun passwordProblems(password: String): List<String> = buildList {
 fun passwordHint(password: String): String? = when {
     password.codePointCount(0, password.length) > 72 -> "At most 72 characters"
     passwordProblems(password).isNotEmpty() -> "Still needed: " + passwordProblems(password).joinToString(", ")
-    else -> null
-}
-
-/** Invitation accept form: what is missing, or null when it can be sent. */
-fun acceptProblem(email: String, code: String, password: String, repeat: String): String? = when {
-    !email.trim().contains('@') -> "Enter the email the invitation came to"
-    code.length != 6 -> "Enter the 6-digit code from the email"
-    passwordHint(password) != null -> "Password: " + passwordHint(password)!!.replaceFirstChar { it.lowercase() }
-    repeat != password -> "The passwords do not match"
     else -> null
 }
 

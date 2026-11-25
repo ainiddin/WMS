@@ -63,10 +63,6 @@ data class ChangePasswordRequest(
     @SerialName("new_password") val newPassword: String,
 )
 
-/** Staff join only by invitation: the code from the invitation email and a new password. */
-@Serializable
-data class InviteAcceptRequest(val email: String, val code: String, val password: String, val phone: String? = null)
-
 @Serializable
 data class Detail(val detail: String)
 
@@ -408,23 +404,7 @@ data class StaffDevice(
     val current: Boolean = false,
 )
 
-// ---- Team (Manager) and invitations ----
-@Serializable
-data class Invitation(
-    val id: Int,
-    val email: String,
-    @SerialName("full_name") val fullName: String,
-    val role: String,
-    val status: String,
-    @SerialName("team_name") val teamName: String? = null,
-    @SerialName("invited_by_email") val invitedByEmail: String,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("expires_at") val expiresAt: String,
-)
-
-@Serializable
-data class InvitationCreate(val email: String, @SerialName("full_name") val fullName: String, val role: String)
-
+// ---- Team (Manager) ----
 @Serializable
 data class TeamMember(
     @SerialName("user_id") val userId: Int,

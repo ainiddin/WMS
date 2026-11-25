@@ -60,7 +60,6 @@ Tests use the separate `wms_test` database (`TEST_DATABASE_URL`) and wipe it on 
 | Manager | `dauren@wms.kz`, `aigerim@wms.kz`, `nurlan@wms.kz` — one team each |
 | Worker | Team Dauren: `arman@`, `dana@`, `yerlan@` · Team Aigerim: `madina@`, `timur@` · Team Nurlan: `asel@`, `bekzat@` (all `@wms.kz`) |
 | Customer | `aliya@mail.kz`, `ruslan@mail.kz`, `saule@mail.kz` … (12 in total) |
-| Invited staff | `ayan@wms.kz` (Worker), `dilnaz@wms.kz` (Manager) — open invitations from Dauren |
 
 Staff logins work only in the KeyFive Staff app, and only on a phone the Admin has approved (see below).
 
@@ -207,11 +206,14 @@ backend/app/
     a digit and a special character (`@ _ - $ ...`, not a space): `schemas/common.py` `password_problems`,
     the same rule on the website (`src/password.ts`) and in the app (`Flows.kt`), each says what is missing.
     Old passwords keep working for sign in.
-13. Staff join only by invitation (`invitations`, `/api/team/invitations/`): a Manager invites a WORKER into his
-    team or a MANAGER (new team) — never above his rank. The code lives 48 h; 5 wrong codes burn it (and count as
-    failed logins); "Send again" once a minute; one open invitation per email (partial unique index). The Admin
-    sees and can revoke every invitation and invites only the first Manager when none is active. A Manager sees
-    and manages only his own team (`/api/team/members/`, `/api/team/devices/`); anything else answers 404.
+13. Staff join only by invitation LINK (`invitations`, `/api/team/invitations/`): a Manager makes a one-time link for
+    a WORKER (his team) or a MANAGER (new team) — never above his rank — and sends it (any messenger). Only the
+    SHA-256 of its 32-byte token is stored; it works once and lives 1 hour (`INVITATION_LINK_MINUTES`). The person
+    opens `/join/<token>`, types first and last name, work email, phone and a password, and gets an ACTIVE account
+    with an employee id; then signs in in the Staff app, where the new phone waits for the Manager's approval.
+    Unknown, used, revoked or expired links all get the same 404. The Admin sees and can revoke every link and
+    makes one only for the first Manager when none is active. A Manager sees and manages only his own team
+    (`/api/team/members/`, `/api/team/devices/`); anything else answers 404.
 14. Audit log (`audit_log`, `GET /api/admin/audit/`): who did what to whom, when, from which IP. Append-only:
     PostgreSQL refuses UPDATE and DELETE.
 
