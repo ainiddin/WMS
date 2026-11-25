@@ -1,6 +1,10 @@
 package kz.keyfive.staff.data
 
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import retrofit2.HttpException
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import kotlin.math.ceil
 import kotlin.math.max
@@ -171,3 +175,34 @@ fun pickScan(raw: String, items: List<OrderItem>, picked: Map<Int, Int>): PickSc
     return if (now >= item.quantity) PickScan.AlreadyComplete(item) else PickScan.Counted(item, now + 1)
 }
 
+
+/** The full address of an invitation link: the website is served by the same server the app talks to. */
+fun invitationUrl(server: String, path: String): String = server.trimEnd('/') + "/" + path.trimStart('/')
+
+/** Only a link that still works can be revoked. */
+fun canRevokeInvitation(status: String): Boolean = status == "PENDING"
+
+/**
+ * Orders a Manager ships, as on the website: approved orders given to his team (his Workers or himself).
+ * The server refuses any other order anyway.
+ */
+fun teamOrders(orders: List<Order>, teamEmployeeIds: Set<Int>): List<Order> =
+    orders.filter { o -> o.assignedTo?.id?.let { it in teamEmployeeIds } == true }
+
+/** Audit "details" as short "key: value" text (shown as plain text, never as markup). */
+fun auditDetailsText(details: JsonObject): String =
+    details.entries.joinToString(" · ") { (key, value) ->
+        val text = when (value) {
+            is JsonNull -> "—"
+            is JsonPrimitive -> value.content
+            else -> value.toString()
+        }
+        "${key.replace('_', ' ')}: $text"
+    }
+
+/** Audit date filter (yyyy-MM-dd): an error text, or null when the range can be asked. Empty ends mean "open". */
+fun auditRangeError(from: String, to: String): String? {
+    val dates = listOf(from, to).filter { it.isNotBlank() }
+    if (dates.any { runCatching { LocalDate.parse(it) }.isFailure }) return "Dates as YYYY-MM-DD"
+    return if (from.isNotBlank() && to.isNotBlank() && from > to) "\"From\" is after \"To\"" else null
+}

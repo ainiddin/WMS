@@ -188,6 +188,28 @@ interface Api {
     @POST("admin/devices/{id}/revoke/")
     suspend fun revokeDevice(@Path("id") id: Int): StaffDevice
 
+    @GET("admin/invitations/")
+    suspend fun allInvitations(@Query("status") status: String? = null): List<Invitation>
+
+    /** Only while the company has no active Manager (the server refuses otherwise). */
+    @POST("admin/invitations/")
+    suspend fun inviteFirstManager(@Body body: InvitationCreate = InvitationCreate("MANAGER")): InvitationCreated
+
+    @POST("admin/invitations/{id}/revoke/")
+    suspend fun adminRevokeInvitation(@Path("id") id: Int): Invitation
+
+    @GET("admin/payments/")
+    suspend fun payments(): PaymentsSummary
+
+    @GET("admin/audit/")
+    suspend fun audit(
+        @Query("action") action: String? = null,
+        @Query("date_from") from: String? = null,
+        @Query("date_to") to: String? = null,
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
+    ): List<AuditRow>
+
     // ---- Team (Manager: only his own team) ----
     @GET("team/members/")
     suspend fun teamMembers(): List<TeamMember>
@@ -206,6 +228,16 @@ interface Api {
 
     @POST("team/devices/{id}/revoke/")
     suspend fun revokeTeamDevice(@Path("id") id: Int): StaffDevice
+
+    @GET("team/invitations/")
+    suspend fun myInvitations(): List<Invitation>
+
+    /** A one-time link, 1 hour; `link` is in this answer only. */
+    @POST("team/invitations/")
+    suspend fun invite(@Body body: InvitationCreate): InvitationCreated
+
+    @POST("team/invitations/{id}/revoke/")
+    suspend fun revokeInvitation(@Path("id") id: Int): Invitation
 
     // ---- Website sign ins waiting for "Is this you?" on this phone ----
     @GET("web-logins/")

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ForwardToInbox
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Assessment
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoveToInbox
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Store
@@ -59,11 +61,15 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.User
+import kz.keyfive.staff.ui.admin.AdminInvitationsScreen
+import kz.keyfive.staff.ui.admin.AuditScreen
 import kz.keyfive.staff.ui.admin.DevicesScreen
+import kz.keyfive.staff.ui.admin.PaymentsScreen
 import kz.keyfive.staff.ui.admin.UsersScreen
 import kz.keyfive.staff.ui.manager.CategoriesScreen
 import kz.keyfive.staff.ui.manager.CustomersScreen
 import kz.keyfive.staff.ui.manager.DashboardScreen
+import kz.keyfive.staff.ui.manager.InvitationsScreen
 import kz.keyfive.staff.ui.manager.OrdersScreen
 import kz.keyfive.staff.ui.manager.ProductsScreen
 import kz.keyfive.staff.ui.manager.ReportsScreen
@@ -105,8 +111,12 @@ private val SCREENS = listOf(
     Screen("admin-performance", "All teams", Icons.Default.TrendingUp, setOf("ADMIN"), "Performance"),
     Screen("leaderboard", "Leaderboard", Icons.Default.Leaderboard, STAFF, "Performance"),
     Screen("team-members", "Members and phones", Icons.Default.ManageAccounts, setOf("MANAGER"), "My team"),
+    Screen("team-invitations", "Invitations", Icons.AutoMirrored.Filled.ForwardToInbox, setOf("MANAGER"), "My team"),
+    Screen("users", "Users", Icons.Default.People, setOf("ADMIN"), "Admin"),
+    Screen("invitations", "Invitations", Icons.AutoMirrored.Filled.ForwardToInbox, setOf("ADMIN"), "Admin"),
     Screen("devices", "Staff phones", Icons.Default.PhoneAndroid, setOf("ADMIN"), "Admin"),
-    Screen("users", "Users", Icons.AutoMirrored.Filled.ReceiptLong, setOf("ADMIN"), "Admin"),
+    Screen("payments", "Payments", Icons.Default.Payments, setOf("ADMIN"), "Admin"),
+    Screen("audit", "Audit log", Icons.AutoMirrored.Filled.ReceiptLong, setOf("ADMIN"), "Admin"),
     Screen("password", "Change password", Icons.Default.Key, STAFF, "Account"),
 )
 
@@ -208,6 +218,10 @@ fun StaffApp(session: Session, user: User) {
                 composable("password") { ChangePasswordScreen(session, forced = false) { nav.go(home(user.role)) } }
                 composable("devices") { DevicesScreen(session) }
                 composable("users") { UsersScreen(session, user) }
+                composable("invitations") { AdminInvitationsScreen(session) }
+                composable("payments") { PaymentsScreen(session) }
+                composable("audit") { AuditScreen(session) }
+                composable("team-invitations") { InvitationsScreen(session) }
             }
         }
     }

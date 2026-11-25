@@ -57,6 +57,7 @@ import kz.keyfive.staff.data.StockInRequest
 import kz.keyfive.staff.data.User
 import kz.keyfive.staff.data.message
 import kz.keyfive.staff.data.pickScan
+import kz.keyfive.staff.data.teamOrders
 import kz.keyfive.staff.ui.Badge
 import kz.keyfive.staff.ui.BarcodeField
 import kz.keyfive.staff.ui.ChipRow
@@ -217,8 +218,11 @@ fun ToShipScreen(session: Session, user: User) {
         }
     }
     val isWorker = user.role == "WORKER"
+    // A Manager ships only his team's orders, as on the website (the server refuses any other).
+    val team = if (user.role == "MANAGER") load { session.api.teamMembers().map { it.employeeId }.toSet() + listOfNotNull(user.employeeId) } else null
 
-    LoadedList(orders) { list ->
+    LoadedList(orders) { all ->
+        val list = team?.data?.let { teamOrders(all, it) } ?: all
         val mine = list.filter { isWorker && it.assignedTo?.id == user.employeeId }
         val others = list - mine.toSet()
         if (isWorker) {
@@ -231,10 +235,14 @@ fun ToShipScreen(session: Session, user: User) {
         }
         if (!isWorker || others.isNotEmpty()) {
             item {
-                Text(if (isWorker) "Other Workers' orders (take over if a colleague is away)" else "All approved orders",
+                Text(when {
+                    isWorker -> "Other Workers' orders (take over if a colleague is away)"
+                    team != null -> "Approved orders of your team, oldest first"
+                    else -> "All approved orders"
+                },
                     style = MaterialTheme.typography.titleMedium)
             }
-            if (others.isEmpty()) item { Empty("Nothing to ship", "Approved orders will appear here.") }
+            if (others.isEmpty()) item { Empty("Nothing to ship", if (team != null) "Approved orders of your team appear here." else "Approved orders will appear here.") }
             items(others, key = { it.id }) { ShipCard(it, mine = !isWorker) { picking = it } }
         }
     }

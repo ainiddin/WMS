@@ -284,4 +284,52 @@ class FlowsTest {
             assertNull(good, passwordHint(good))
         }
     }
+
+    // ---- invitation links, Manager's ship list, audit log ----
+    @Test
+    fun `invitation link is the server address plus the join path, with one slash`() {
+        assertEquals("https://keyfive-wms.onrender.com/join/abc", invitationUrl("https://keyfive-wms.onrender.com", "/join/abc"))
+        assertEquals("http://10.0.2.2:8000/join/abc", invitationUrl("http://10.0.2.2:8000/", "/join/abc"))
+        assertEquals("http://h/join/abc", invitationUrl("http://h", "join/abc"))
+    }
+
+    @Test
+    fun `only a waiting link can be revoked`() {
+        assertTrue(canRevokeInvitation("PENDING"))
+        listOf("ACCEPTED", "EXPIRED", "REVOKED").forEach { assertFalse(it, canRevokeInvitation(it)) }
+    }
+
+    private fun order(id: Int, assignee: Int?) = json.decodeFromString(
+        Order.serializer(),
+        """{"id":$id,"code":"ORD-$id","status":"APPROVED","delivery_address":"a","total_amount":1,
+           "created_at":"2026-11-01T10:00:00+05:00","customer":{"id":9,"code":"C9","full_name":"C"},
+           "assigned_to":${assignee?.let { """{"id":$it,"code":"E$it","full_name":"W"}""" } ?: "null"},"items":[]}""",
+    )
+
+    @Test
+    fun `a Manager ships only orders given to his team, never unassigned or other teams' ones`() {
+        val orders = listOf(order(1, 10), order(2, 11), order(3, 20), order(4, null), order(5, 5))
+        assertEquals(listOf(1, 2, 5), teamOrders(orders, setOf(10, 11, 5)).map { it.id })
+        assertEquals(emptyList<Int>(), teamOrders(orders, emptySet()).map { it.id })
+    }
+
+    @Test
+    fun `audit details become plain key value text`() {
+        val details = json.parseToJsonElement("""{"device_id":7,"device_name":"Pixel <b>","old_role":null,"tags":["a"]}""")
+        assertEquals(
+            "device id: 7 · device name: Pixel <b> · old role: — · tags: [\"a\"]",
+            auditDetailsText(details as kotlinx.serialization.json.JsonObject),
+        )
+        assertEquals("", auditDetailsText(kotlinx.serialization.json.JsonObject(emptyMap())))
+    }
+
+    @Test
+    fun `audit date range - open ends are fine, wrong order or format is an error`() {
+        assertNull(auditRangeError("", ""))
+        assertNull(auditRangeError("2026-11-01", ""))
+        assertNull(auditRangeError("2026-11-01", "2026-11-01"))
+        assertEquals("\"From\" is after \"To\"", auditRangeError("2026-11-02", "2026-11-01"))
+        assertEquals("Dates as YYYY-MM-DD", auditRangeError("01.11.2026", ""))
+        assertEquals("Dates as YYYY-MM-DD", auditRangeError("", "2026-13-01"))
+    }
 }

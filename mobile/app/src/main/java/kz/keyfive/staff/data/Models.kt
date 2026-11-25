@@ -430,3 +430,57 @@ data class PendingWebLogin(
 
 @Serializable
 data class WebLoginDecision(val number: Int)
+
+// ---- Invitation links (Manager: his own; Admin: all, and the first Manager's link) ----
+@Serializable
+data class Invitation(
+    val id: Int,
+    val role: String,
+    val status: String,
+    @SerialName("team_name") val teamName: String? = null,
+    @SerialName("invited_by_email") val invitedByEmail: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("expires_at") val expiresAt: String,
+    @SerialName("joined_name") val joinedName: String? = null,
+    @SerialName("joined_email") val joinedEmail: String? = null,
+    @SerialName("joined_employee_code") val joinedEmployeeCode: String? = null,
+)
+
+/** Only right after making it: `link` is the path /join/<token>, never shown again (the server keeps its hash). */
+@Serializable
+data class InvitationCreated(
+    val id: Int,
+    @SerialName("expires_at") val expiresAt: String,
+    val link: String,
+)
+
+@Serializable
+data class InvitationCreate(val role: String)
+
+// ---- Admin: card payments (read only) and the audit log ----
+@Serializable
+data class AdminPayment(
+    val code: String,
+    val amount: Double,
+    val status: String,
+    @SerialName("card_brand") val cardBrand: String? = null,
+    @SerialName("card_last4") val cardLast4: String? = null,
+    @SerialName("failure_reason") val failureReason: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("account_code") val accountCode: String,
+    @SerialName("customer_name") val customerName: String,
+)
+
+@Serializable
+data class PaymentsSummary(val gateway: String, val total: Double, val today: Double, val payments: List<AdminPayment>)
+
+@Serializable
+data class AuditRow(
+    val id: Int,
+    @SerialName("created_at") val createdAt: String,
+    val action: String,
+    @SerialName("actor_email") val actorEmail: String? = null,
+    @SerialName("target_email") val targetEmail: String? = null,
+    val ip: String? = null,
+    val details: JsonObject = JsonObject(emptyMap()),
+)

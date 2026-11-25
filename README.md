@@ -117,8 +117,8 @@ never gets the warehouse screens, and a staff password that leaks is not enough 
 | Role | Screens |
 |---|---|
 | Worker | Orders to ship (scan every unit → Ship), Stock IN (scanner), Stock, Movement history, My performance, Leaderboard |
-| Manager | + Invitations, team members (block / unblock) and their phones, Dashboard, Orders (approve / reject / cancel, workload, rebalance), Restock list, Reports + Excel/PDF, Products, Categories, Suppliers, Customers, My team |
-| Admin | + All teams performance, Invitations (all teams: send again, revoke), Staff phones, Users (role, team, block, Clear timer), Audit log |
+| Manager | + Invitations (one-time links: create, copy / send, revoke), team members (block / unblock) and their phones, Dashboard, Orders (approve / reject / cancel, workload, rebalance), Restock list, Reports + Excel/PDF, Products, Categories, Suppliers, Customers, My team; Orders to ship shows only his team's orders |
+| Admin | + All teams performance, Invitations (all teams: revoke; the first Manager's link), Staff phones, Users (role, team, block, Clear timer), Payments (read only), Audit log |
 
 Build (JDK 17 and the Android SDK; Android Studio can simply open `mobile/`):
 
@@ -134,8 +134,9 @@ The app talks to https://keyfive-wms.onrender.com by default; **Server** on the 
 services scanner, so the phone needs Google Play services; typing the code always works too.
 
 Install the APK only on work phones. Staff join **only by invitation**: a Manager invites a Worker into his team
-(or a Manager, who gets a team of his own) → the person gets a code by email → in the app "I have an invitation":
-email, code, new password → first sign in → the phone waits for approval (a Worker's phone: his Manager).
+(or a Manager, who gets a team of his own) by a one-time link, made in the app or on the website → the person opens
+`/join/<token>` in a browser, fills in the form → first sign in in the app → the phone waits for approval
+(a Worker's phone: his Manager).
 
 ## Deploy (Render)
 
