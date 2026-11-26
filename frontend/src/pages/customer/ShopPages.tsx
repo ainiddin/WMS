@@ -24,7 +24,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router'
 import { catalogApi, customersApi, ordersApi, type ProductFilters } from '@/api/endpoints'
 import { useAuth } from '@/auth/AuthContext'
@@ -36,9 +36,14 @@ import { formatMoney, PHONE_HINT, phoneError } from '@/format'
 import { TopUpDialog, useAccount } from './AccountPage'
 import { categoryLook, ProductCard, ProductPicture } from './ProductCard'
 
-import { t } from '@/i18n'
+import { compareTranslations, matchesTranslation, t } from '@/i18n'
 function useCategories() {
-  return useQuery({ queryKey: ['categories'], queryFn: () => catalogApi.categories(), staleTime: 5 * 60_000 })
+  return useQuery({
+    queryKey: ['categories'],
+    queryFn: () => catalogApi.categories(),
+    staleTime: 5 * 60_000,
+    select: (list) => [...list].sort((a, b) => compareTranslations(a.name, b.name)),
+  })
 }
 
 export function HomePage() {
@@ -143,7 +148,15 @@ export function CatalogPage() {
     in_stock: params.get('stock') === '1' ? true : undefined,
     sort: (params.get('sort') as ProductFilters['sort']) || 'name',
   }
-  const products = useQuery({ queryKey: ['products', 'catalog', filters], queryFn: () => catalogApi.products(filters) })
+  // Search and sorting by name happen here, on the names in the chosen language; the server filters the rest.
+  const { search: query = '', ...serverFilters } = filters
+  const products = useQuery({ queryKey: ['products', 'catalog', serverFilters], queryFn: () => catalogApi.products(serverFilters) })
+  const shown = useMemo(() => {
+    const found = (products.data ?? []).filter(
+      (p) => matchesTranslation(p.product_name, query) || p.code.toLowerCase().includes(query.trim().toLowerCase()),
+    )
+    return serverFilters.sort === 'name' ? found.sort((a, b) => compareTranslations(a.product_name, b.product_name)) : found
+  }, [products.data, query, serverFilters.sort])
 
   const update = (key: string, value: string | null) => {
     setParams(
@@ -160,7 +173,7 @@ export function CatalogPage() {
 
   return (
     <>
-      <PageHeader title={t('Catalog')} subtitle={products.data ? t('{0} products', products.data.length) : undefined} />
+      <PageHeader title={t('Catalog')} subtitle={products.data ? t('{0} products', shown.length) : undefined} />
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} sx={{ alignItems: 'center' }}>
@@ -232,9 +245,9 @@ export function CatalogPage() {
         </CardContent>
       </Card>
       <QueryState isLoading={products.isLoading} error={products.error}>
-        {products.data?.length ? (
+        {shown.length ? (
           <Grid container spacing={2}>
-            {products.data.map((p) => (
+            {shown.map((p) => (
               <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                 <ProductCard product={p} />
               </Grid>

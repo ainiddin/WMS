@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ADMIN_NAV, MANAGER_NAV } from '@/pages/admin/AdminLayout'
 import { ACTION_LABEL } from '@/pages/admin/AuditPage'
-import { fromBrowser, getLanguage, setLanguage, t } from '.'
+import { compareTranslations, fromBrowser, getLanguage, matchesTranslation, setLanguage, t } from '.'
 import { KK } from './kk'
 import { RU } from './ru'
 
@@ -30,6 +30,19 @@ describe('t()', () => {
     setLanguage('kk')
     expect(t('Home textile')).toBe('Үй тоқыма бұйымдары')
     expect(t('Garden hose 20 m')).toBe('Garden hose 20 m')
+  })
+
+  it('the shop searches and sorts names in the chosen language', () => {
+    setLanguage('ru')
+    expect(matchesTranslation('Non-stick frying pan 28 cm', 'СКОВОРОДА')).toBe(true)
+    expect(matchesTranslation('Non-stick frying pan 28 cm', 'pan')).toBe(true)
+    expect(matchesTranslation('Non-stick frying pan 28 cm', 'чайник')).toBe(false)
+    expect(['Kitchen', 'Bathroom', 'Laundry'].sort(compareTranslations)).toEqual(['Bathroom', 'Kitchen', 'Laundry'])
+    setLanguage('en')
+    expect(['Kitchen', 'Bathroom', 'Laundry'].sort(compareTranslations)).toEqual(['Bathroom', 'Kitchen', 'Laundry'])
+    setLanguage('kk')
+    // Ас үй, Жуынатын бөлме, Кір жуу
+    expect(['Laundry', 'Bathroom', 'Kitchen'].sort(compareTranslations)).toEqual(['Kitchen', 'Bathroom', 'Laundry'])
   })
 
   it('the choice is remembered in the browser and set on <html lang>', () => {

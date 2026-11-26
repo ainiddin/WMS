@@ -46,6 +46,7 @@ import kz.keyfive.staff.ui.Action
 import kz.keyfive.staff.ui.Badge
 import kz.keyfive.staff.ui.Confirm
 import kz.keyfive.staff.ui.Empty
+import kz.keyfive.staff.i18n.sortedByTranslation
 import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Hint
 import kz.keyfive.staff.ui.LoadedList
@@ -152,7 +153,7 @@ fun ProductsScreen(session: Session) {
         }
     }) { list ->
         if (list.isEmpty()) item { Empty(t("No products")) }
-        items(list, key = { it.id }) { p ->
+        items(list.sortedByTranslation { it.name }, key = { it.id }) { p ->
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -233,7 +234,7 @@ fun CategoriesScreen(session: Session) {
     LoadedList(categories, header = {
         item { AddButton(t("New category")) { editing = null; form = "" to true } }
     }) { list ->
-        items(list, key = { it.id }) { c ->
+        items(list.sortedByTranslation { it.name }, key = { it.id }) { c ->
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.text.Collator
+import java.util.Locale
 
 /** The languages of the app; English is the source text, Russian and Kazakh come from RU_TEXT and KK_TEXT. */
 enum class Lang(val code: String, val label: String) {
@@ -43,4 +45,10 @@ fun t(en: String, vararg args: Any?): String {
         Lang.KK -> KK_TEXT[en] ?: en
     }
     return args.foldIndexed(text) { i, s, arg -> s.replace("{$i}", arg.toString()) }
+}
+
+/** In the alphabet of the chosen language, by the translated text (e.g. category and product names). */
+fun <T> List<T>.sortedByTranslation(english: (T) -> String): List<T> {
+    val collator = Collator.getInstance(Locale.forLanguageTag(I18n.lang.code))
+    return sortedWith(compareBy(collator) { t(english(it)) })
 }

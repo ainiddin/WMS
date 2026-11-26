@@ -58,6 +58,7 @@ import kz.keyfive.staff.data.User
 import kz.keyfive.staff.data.message
 import kz.keyfive.staff.data.pickScan
 import kz.keyfive.staff.data.teamOrders
+import kz.keyfive.staff.i18n.sortedByTranslation
 import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Badge
 import kz.keyfive.staff.ui.BarcodeField
@@ -100,7 +101,7 @@ fun StockScreen(session: Session) {
         val rows = list.filter {
             (q.isEmpty() || q in it.name.lowercase() || q in t(it.name).lowercase() || q in it.code.lowercase() || it.barcode?.contains(q) == true) &&
                 (!lowOnly || it.belowMin)
-        }
+        }.sortedByTranslation { it.name }
         if (rows.isEmpty()) item { Empty(t("No products match")) }
         items(rows, key = { it.id }) { ProductStockCard(it) }
     }

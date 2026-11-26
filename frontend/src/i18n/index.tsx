@@ -60,6 +60,17 @@ export function t(en: string, ...args: (string | number | null | undefined)[]): 
   return args.reduce<string>((s, arg, i) => s.split(`{${i}}`).join(String(arg ?? '')), text)
 }
 
+/** Orders by the translated text in the alphabet of the chosen language (category and product names). */
+export function compareTranslations(a: string, b: string): number {
+  return t(a).localeCompare(t(b), current)
+}
+
+/** The text or its translation contains the query, ignoring case: a customer may search in any language. */
+export function matchesTranslation(en: string, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  return !q || en.toLowerCase().includes(q) || t(en).toLowerCase().includes(q)
+}
+
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
   return () => listeners.delete(listener)
