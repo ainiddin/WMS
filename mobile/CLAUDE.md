@@ -19,6 +19,8 @@ The root `CLAUDE.md` rules apply. This file adds what matters inside `mobile/`.
 - Menu and routes: `ui/StaffApp.kt` (`SCREENS` list with roles).
 
 ## Rules
+- **Every text the user sees goes through `t("English text")`** (`kz.keyfive.staff.i18n.t`); add its Russian and
+  Kazakh to `i18n/mobile.txt` and run `python i18n/build.py`. `I18nTest` fails otherwise.
 - The server decides who may do what; hiding a screen is only convenience.
 - Endpoints the app calls repeatedly with the user token must not be under `/api/auth/` (the token refresher skips
   those paths).

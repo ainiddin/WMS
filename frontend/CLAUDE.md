@@ -30,6 +30,8 @@ npm run build
 - Reuse `components/common.tsx` (PageHeader, QueryState, ConfirmDialog, EmptyState) before writing new ones.
 
 ## Rules
+- **Every text the user sees goes through `t('English text')`** (`@/i18n`); add its Russian and Kazakh to
+  `i18n/web.txt` (or `i18n/mobile.txt` if the app uses it too) and run `python i18n/build.py`. `i18n.test.ts` fails otherwise.
 - **Timers and waits are counted in the browser** from one server value (`Retry-After`, `seconds`), never by asking
   the server every second. Poll the server only while really waiting (staff sign-in: every 2 s, stops at the answer).
 - Show server errors with `errorMessage(e)`; a 429 with `Retry-After` shows a live countdown.
