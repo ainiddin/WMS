@@ -40,8 +40,9 @@ import { ConfirmDialog, EmptyState, PageHeader, QueryState } from '@/components/
 import { useNotify } from '@/components/Notify'
 import { barcodeError, formatMoney } from '@/format'
 
+import { t } from '@/i18n'
 function ActiveChip({ active }: { active: boolean }) {
-  return active ? null : <Chip size="small" label="inactive" sx={{ ml: 1 }} />
+  return active ? null : <Chip size="small" label={t('inactive')} sx={{ ml: 1 }} />
 }
 
 function SearchField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
@@ -88,9 +89,9 @@ function FormDialog({
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button type="submit" variant="contained" disabled={busy}>
-            Save
+            {t('Save')}
           </Button>
         </DialogActions>
       </form>
@@ -121,10 +122,10 @@ function useSafeDelete(onDeactivate: (id: number) => Promise<unknown>, remove: (
     try {
       if (hasHistory) {
         await onDeactivate(target.id)
-        notify.success(`${target.name} deactivated`)
+        notify.success(t('{0} deactivated', target.name))
       } else {
         await remove(target.id)
-        notify.success(`${target.name} deleted`)
+        notify.success(t('{0} deleted', target.name))
       }
       refresh()
       close()
@@ -139,13 +140,13 @@ function useSafeDelete(onDeactivate: (id: number) => Promise<unknown>, remove: (
   const dialog = (
     <ConfirmDialog
       open={Boolean(target)}
-      title={hasHistory ? `Deactivate ${target?.name}?` : `Delete ${target?.name}?`}
+      title={hasHistory ? t('Deactivate {0}?', target?.name) : t('Delete {0}?', target?.name)}
       text={
         hasHistory
-          ? 'This record has history (orders, movements or products), so the database does not allow deleting it. Deactivate it instead — it will be hidden but the history stays.'
-          : 'This cannot be undone.'
+          ? t('This record has history (orders, movements or products), so the database does not allow deleting it. Deactivate it instead — it will be hidden but the history stays.')
+          : t('This cannot be undone.')
       }
-      confirmLabel={hasHistory ? 'Deactivate' : 'Delete'}
+      confirmLabel={hasHistory ? t('Deactivate') : t('Delete')}
       color={hasHistory ? 'warning' : 'error'}
       loading={busy}
       onConfirm={confirm}
@@ -208,11 +209,11 @@ export function ProductsPage() {
       return editing === 'new' ? catalogApi.createProduct(body) : catalogApi.updateProduct((editing as ProductStaff).id, body)
     },
     onSuccess: (p) => {
-      notify.success(`${p.code} ${p.product_name} saved`)
+      notify.success(t('{0} saved', `${p.code} ${p.product_name}`))
       queryClient.invalidateQueries({ queryKey: ['products'] })
       setEditing(null)
     },
-    onError: (e) => setError(statusOf(e) === 409 ? 'This barcode is already used by another product.' : errorMessage(e)),
+    onError: (e) => setError(statusOf(e) === 409 ? t('This barcode is already used by another product.') : errorMessage(e)),
   })
 
   const del = useSafeDelete(
@@ -233,8 +234,8 @@ export function ProductsPage() {
   return (
     <>
       <PageHeader
-        title="Products"
-        subtitle="Prices, minimum stock and barcodes. Quantity changes only through Stock IN and shipments."
+        title={t('Products')}
+        subtitle={t('Prices, minimum stock and barcodes. Quantity changes only through Stock IN and shipments.')}
         actions={
           <>
             <Button
@@ -242,10 +243,10 @@ export function ProductsPage() {
               startIcon={<PrintOutlinedIcon />}
               onClick={() => downloadFile('/products/barcodes/labels.pdf', 'barcodes.pdf').catch(notify.error)}
             >
-              Barcode labels
+              {t('Barcode labels')}
             </Button>
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => openForm('new')}>
-              New product
+              {t('New product')}
             </Button>
           </>
         }
@@ -253,10 +254,10 @@ export function ProductsPage() {
       <Card>
         <CardContent>
           <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap', rowGap: 1 }}>
-            <SearchField value={search} onChange={setSearch} placeholder="Search by name, code or barcode" />
+            <SearchField value={search} onChange={setSearch} placeholder={t('Search by name, code or barcode')} />
             <FormControlLabel
               control={<Switch checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />}
-              label="Show inactive"
+              label={t('Show inactive')}
             />
           </Stack>
           <QueryState isLoading={products.isLoading} error={products.error}>
@@ -265,14 +266,14 @@ export function ProductsPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Code</TableCell>
-                      <TableCell>Product</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Category</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Supplier</TableCell>
-                      <TableCell align="right">Price</TableCell>
-                      <TableCell align="right">Qty</TableCell>
-                      <TableCell align="right">Min</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Barcode</TableCell>
+                      <TableCell>{t('Code')}</TableCell>
+                      <TableCell>{t('Product')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Category')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t('Supplier')}</TableCell>
+                      <TableCell align="right">{t('Price')}</TableCell>
+                      <TableCell align="right">{t('Qty')}</TableCell>
+                      <TableCell align="right">{t('Min')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Barcode')}</TableCell>
                       <TableCell align="right" />
                     </TableRow>
                   </TableHead>
@@ -295,13 +296,13 @@ export function ProductsPage() {
                         <TableCell align="right">{p.min_quantity}</TableCell>
                         <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, fontFamily: 'monospace' }}>{p.barcode}</TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                          <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => openForm(p)} aria-label="Edit">
+                          <Tooltip title={t('Edit')}>
+                            <IconButton size="small" onClick={() => openForm(p)} aria-label={t('Edit')}>
                               <EditOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete">
-                            <IconButton size="small" onClick={() => del.ask(p.id, p.product_name)} aria-label="Delete">
+                          <Tooltip title={t('Delete')}>
+                            <IconButton size="small" onClick={() => del.ask(p.id, p.product_name)} aria-label={t('Delete')}>
                               <DeleteOutlineIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -312,7 +313,7 @@ export function ProductsPage() {
                 </Table>
               </TableContainer>
             ) : (
-              <EmptyState title="No products" />
+              <EmptyState title={t('No products')} />
             )}
           </QueryState>
         </CardContent>
@@ -320,15 +321,15 @@ export function ProductsPage() {
 
       <FormDialog
         open={editing !== null}
-        title={editing === 'new' ? 'New product' : `Edit ${(editing as ProductStaff | null)?.code ?? ''}`}
+        title={editing === 'new' ? t('New product') : t('Edit {0}', (editing as ProductStaff | null)?.code ?? '')}
         onClose={() => setEditing(null)}
         onSubmit={() => save.mutate()}
         busy={save.isPending || !!barcodeError(form.barcode ?? '')}
         error={error}
       >
-        <TextField label="Name" required value={form.product_name} onChange={(e) => set('product_name', e.target.value)} />
+        <TextField label={t('Name')} required value={form.product_name} onChange={(e) => set('product_name', e.target.value)} />
         <TextField
-          label="Description"
+          label={t('Description')}
           multiline
           minRows={2}
           value={form.description ?? ''}
@@ -340,7 +341,7 @@ export function ProductsPage() {
               select
               fullWidth
               required
-              label="Category"
+              label={t('Category')}
               value={form.category_id || ''}
               onChange={(e) => set('category_id', Number(e.target.value))}
             >
@@ -356,7 +357,7 @@ export function ProductsPage() {
               select
               fullWidth
               required
-              label="Supplier"
+              label={t('Supplier')}
               value={form.supplier_id || ''}
               onChange={(e) => set('supplier_id', Number(e.target.value))}
             >
@@ -372,7 +373,7 @@ export function ProductsPage() {
               fullWidth
               required
               type="number"
-              label="Price, ₸"
+              label={t('Price, ₸')}
               value={form.unit_price}
               onChange={(e) => set('unit_price', Number(e.target.value))}
               slotProps={{ htmlInput: { min: 0, step: '0.01' } }}
@@ -383,7 +384,7 @@ export function ProductsPage() {
               fullWidth
               required
               type="number"
-              label="Minimum stock"
+              label={t('Minimum stock')}
               value={form.min_quantity}
               onChange={(e) => set('min_quantity', Number(e.target.value))}
               slotProps={{ htmlInput: { min: 0 } }}
@@ -392,18 +393,18 @@ export function ProductsPage() {
           <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               fullWidth
-              label="Barcode"
+              label={t('Barcode')}
               value={form.barcode ?? ''}
               onChange={(e) => set('barcode', e.target.value)}
               error={!!barcodeError(form.barcode ?? '')}
-              helperText={barcodeError(form.barcode ?? '') ?? 'EAN-13, 13 digits (optional)'}
+              helperText={barcodeError(form.barcode ?? '') ?? t('EAN-13, 13 digits (optional)')}
               slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 13 } }}
             />
           </Grid>
         </Grid>
         <FormControlLabel
           control={<Switch checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />}
-          label="Active (visible in the shop)"
+          label={t('Active (visible in the shop)')}
         />
         {editing !== 'new' && editing && (
           <Typography variant="caption" color="text.secondary">
@@ -439,7 +440,7 @@ export function CategoriesPage() {
         ? catalogApi.createCategory({ name, is_active: active })
         : catalogApi.updateCategory((editing as Category).id, { name, is_active: active }),
     onSuccess: (c) => {
-      notify.success(`Category ${c.name} saved`)
+      notify.success(t('Category {0} saved', c.name))
       queryClient.invalidateQueries({ queryKey: ['categories'] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
       setEditing(null)
@@ -456,11 +457,11 @@ export function CategoriesPage() {
   return (
     <>
       <PageHeader
-        title="Categories"
-        subtitle="Sections of the shop catalog."
+        title={t('Categories')}
+        subtitle={t('Sections of the shop catalog.')}
         actions={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => open('new')}>
-            New category
+            {t('New category')}
           </Button>
         }
       />
@@ -469,8 +470,8 @@ export function CategoriesPage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Code</TableCell>
-                <TableCell>Name</TableCell>
+                <TableCell>{t('Code')}</TableCell>
+                <TableCell>{t('Name')}</TableCell>
                 <TableCell align="right" />
               </TableRow>
             </TableHead>
@@ -483,10 +484,10 @@ export function CategoriesPage() {
                     <ActiveChip active={c.is_active} />
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" onClick={() => open(c)} aria-label="Edit">
+                    <IconButton size="small" onClick={() => open(c)} aria-label={t('Edit')}>
                       <EditOutlinedIcon fontSize="small" />
                     </IconButton>
-                    <IconButton size="small" onClick={() => del.ask(c.id, c.name)} aria-label="Delete">
+                    <IconButton size="small" onClick={() => del.ask(c.id, c.name)} aria-label={t('Delete')}>
                       <DeleteOutlineIcon fontSize="small" />
                     </IconButton>
                   </TableCell>
@@ -498,14 +499,14 @@ export function CategoriesPage() {
       </Card>
       <FormDialog
         open={editing !== null}
-        title={editing === 'new' ? 'New category' : 'Edit category'}
+        title={editing === 'new' ? t('New category') : t('Edit category')}
         onClose={() => setEditing(null)}
         onSubmit={() => save.mutate()}
         busy={save.isPending}
         error={error}
       >
-        <TextField label="Name" required autoFocus value={name} onChange={(e) => setName(e.target.value)} />
-        <FormControlLabel control={<Switch checked={active} onChange={(e) => setActive(e.target.checked)} />} label="Active" />
+        <TextField label={t('Name')} required autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+        <FormControlLabel control={<Switch checked={active} onChange={(e) => setActive(e.target.checked)} />} label={t('Active')} />
       </FormDialog>
       {del.dialog}
     </>
@@ -537,7 +538,7 @@ export function SuppliersPage() {
       return editing === 'new' ? catalogApi.createSupplier(body) : catalogApi.updateSupplier((editing as Supplier).id, body)
     },
     onSuccess: (s) => {
-      notify.success(`${s.code} ${s.supplier_name} saved`)
+      notify.success(t('{0} saved', `${s.code} ${s.supplier_name}`))
       queryClient.invalidateQueries({ queryKey: ['suppliers'] })
       setEditing(null)
     },
@@ -553,10 +554,10 @@ export function SuppliersPage() {
   return (
     <>
       <PageHeader
-        title="Suppliers"
+        title={t('Suppliers')}
         actions={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => open('new')}>
-            New supplier
+            {t('New supplier')}
           </Button>
         }
       />
@@ -565,17 +566,17 @@ export function SuppliersPage() {
           <FormControlLabel
             sx={{ mb: 1 }}
             control={<Switch checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />}
-            label="Show inactive"
+            label={t('Show inactive')}
           />
           <QueryState isLoading={suppliers.isLoading} error={suppliers.error}>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Phone</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Email</TableCell>
+                    <TableCell>{t('Code')}</TableCell>
+                    <TableCell>{t('Name')}</TableCell>
+                    <TableCell>{t('Phone')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t('Email')}</TableCell>
                     <TableCell align="right" />
                   </TableRow>
                 </TableHead>
@@ -592,10 +593,10 @@ export function SuppliersPage() {
                       </TableCell>
                       <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{s.email}</TableCell>
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                        <IconButton size="small" onClick={() => open(s)} aria-label="Edit">
+                        <IconButton size="small" onClick={() => open(s)} aria-label={t('Edit')}>
                           <EditOutlinedIcon fontSize="small" />
                         </IconButton>
-                        <IconButton size="small" onClick={() => del.ask(s.id, s.supplier_name)} aria-label="Delete">
+                        <IconButton size="small" onClick={() => del.ask(s.id, s.supplier_name)} aria-label={t('Delete')}>
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
                       </TableCell>
@@ -609,18 +610,18 @@ export function SuppliersPage() {
       </Card>
       <FormDialog
         open={editing !== null}
-        title={editing === 'new' ? 'New supplier' : 'Edit supplier'}
+        title={editing === 'new' ? t('New supplier') : t('Edit supplier')}
         onClose={() => setEditing(null)}
         onSubmit={() => save.mutate()}
         busy={save.isPending}
         error={error}
       >
-        <TextField label="Name" required value={form.supplier_name} onChange={(e) => setForm({ ...form, supplier_name: e.target.value })} />
-        <TextField label="Phone" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-        <TextField label="Email" type="email" value={form.email ?? ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <TextField label={t('Name')} required value={form.supplier_name} onChange={(e) => setForm({ ...form, supplier_name: e.target.value })} />
+        <TextField label={t('Phone')} required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <TextField label={t('Email')} type="email" value={form.email ?? ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <FormControlLabel
           control={<Switch checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />}
-          label="Active"
+          label={t('Active')}
         />
       </FormDialog>
       {del.dialog}
@@ -634,11 +635,11 @@ export function CustomersPage() {
   const customers = useQuery({ queryKey: ['customers', search], queryFn: () => customersApi.list(search || undefined) })
   return (
     <>
-      <PageHeader title="Customers" subtitle="Contacts are visible to Managers and Admins only." />
+      <PageHeader title={t('Customers')} subtitle={t('Contacts are visible to Managers and Admins only.')} />
       <Card>
         <CardContent>
           <Stack direction="row" sx={{ mb: 2 }}>
-            <SearchField value={search} onChange={setSearch} placeholder="Search by name or phone" />
+            <SearchField value={search} onChange={setSearch} placeholder={t('Search by name or phone')} />
           </Stack>
           <QueryState isLoading={customers.isLoading} error={customers.error}>
             {customers.data?.length ? (
@@ -646,12 +647,12 @@ export function CustomersPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Code</TableCell>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Phone</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Email</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Address</TableCell>
-                      <TableCell align="right">Balance</TableCell>
+                      <TableCell>{t('Code')}</TableCell>
+                      <TableCell>{t('Name')}</TableCell>
+                      <TableCell>{t('Phone')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Email')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Address')}</TableCell>
+                      <TableCell align="right">{t('Balance')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -671,7 +672,7 @@ export function CustomersPage() {
                 </Table>
               </TableContainer>
             ) : (
-              <EmptyState title="No customers found" />
+              <EmptyState title={t('No customers found')} />
             )}
           </QueryState>
         </CardContent>

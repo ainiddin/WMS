@@ -11,6 +11,7 @@ import { formatDateTime } from '@/format'
 import { InvitationRows, NewLink } from '@/pages/admin/invitationParts'
 import { Section, UserStatusChip } from '@/pages/admin/parts'
 
+import { t } from '@/i18n'
 function useRun() {
   const queryClient = useQueryClient()
   const notify = useNotify()
@@ -32,7 +33,7 @@ function useRun() {
   return { busy, run }
 }
 
-const DEVICE_LABEL: Record<DeviceStatus, string> = { PENDING: 'Waiting', APPROVED: 'Approved', REVOKED: 'Blocked' }
+const DEVICE_LABEL: Record<DeviceStatus, string> = { PENDING: 'Waiting', APPROVED: 'Approved', REVOKED: 'Blocked' } // t() keys
 const DEVICE_COLOR = { PENDING: 'warning', APPROVED: 'success', REVOKED: 'error' } as const
 
 /** The Workers of my team and their phones. A Manager sees nobody else. */
@@ -50,18 +51,18 @@ export function TeamPage() {
 
   return (
     <>
-      <PageHeader title="My team" subtitle="Only the Workers of your team. Blocking signs a person out at once; the history stays." />
+      <PageHeader title={t('My team')} subtitle={t('Only the Workers of your team. Blocking signs a person out at once; the history stays.')} />
       <Stack spacing={3}>
-        <Section title="Members">
+        <Section title={t('Members')}>
           <QueryState isLoading={members.isLoading} error={members.error}>
             {members.data?.length ? (
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Worker</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Joined</TableCell>
+                      <TableCell>{t('Worker')}</TableCell>
+                      <TableCell>{t('Status')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Joined')}</TableCell>
                       <TableCell align="right" />
                     </TableRow>
                   </TableHead>
@@ -85,7 +86,7 @@ export function TeamPage() {
                           {(m.status === 'ACTIVE' || m.status === 'BLOCKED') && (
                             <Button size="small" color={m.status === 'BLOCKED' ? 'success' : 'error'} disabled={busy}
                               onClick={() => setBlocking(m)}>
-                              {m.status === 'BLOCKED' ? 'Unblock' : 'Block'}
+                              {m.status === 'BLOCKED' ? t('Unblock') : t('Block')}
                             </Button>
                           )}
                         </TableCell>
@@ -95,24 +96,24 @@ export function TeamPage() {
                 </Table>
               </TableContainer>
             ) : (
-              <EmptyState title="No Workers in your team yet" text="Invite them in Invitations." />
+              <EmptyState title={t('No Workers in your team yet')} text={t('Invite them in Invitations.')} />
             )}
           </QueryState>
         </Section>
 
         <Section
-          title="Their phones"
+          title={t('Their phones')}
           action={
-            <ToggleButtonGroup size="small" exclusive value={deviceStatus} onChange={(_, v) => v && setDeviceStatus(v)} aria-label="Phone status">
-              <ToggleButton value="PENDING">Waiting</ToggleButton>
-              <ToggleButton value="APPROVED">Approved</ToggleButton>
-              <ToggleButton value="REVOKED">Blocked</ToggleButton>
-              <ToggleButton value="ALL">All</ToggleButton>
+            <ToggleButtonGroup size="small" exclusive value={deviceStatus} onChange={(_, v) => v && setDeviceStatus(v)} aria-label={t('Phone status')}>
+              <ToggleButton value="PENDING">{t('Waiting')}</ToggleButton>
+              <ToggleButton value="APPROVED">{t('Approved')}</ToggleButton>
+              <ToggleButton value="REVOKED">{t('Blocked')}</ToggleButton>
+              <ToggleButton value="ALL">{t('All')}</ToggleButton>
             </ToggleButtonGroup>
           }
         >
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Approve a phone only after the person confirms it is theirs. An unexpected request means their password leaked.
+            {t('Approve a phone only after the person confirms it is theirs. An unexpected request means their password leaked.')}
           </Typography>
           <QueryState isLoading={devices.isLoading} error={devices.error}>
             {devices.data?.length ? (
@@ -124,22 +125,22 @@ export function TeamPage() {
                         <TableCell>
                           {d.device_name}
                           <Typography variant="caption" color="text.secondary" component="div">
-                            {d.user_full_name} · requested {formatDateTime(d.created_at)}
+                            {d.user_full_name} · {t('requested {0}', formatDateTime(d.created_at))}
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip size="small" variant="outlined" color={DEVICE_COLOR[d.status]} label={DEVICE_LABEL[d.status]} />
+                          <Chip size="small" variant="outlined" color={DEVICE_COLOR[d.status]} label={t(DEVICE_LABEL[d.status])} />
                         </TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                           {d.status !== 'APPROVED' && (
                             <Button size="small" color="success" disabled={busy}
-                              onClick={() => run(() => teamApi.approveDevice(d.id), 'Phone approved')}>
-                              Approve
+                              onClick={() => run(() => teamApi.approveDevice(d.id), t('Phone approved'))}>
+                              {t('Approve')}
                             </Button>
                           )}
                           {d.status !== 'REVOKED' && (
                             <Button size="small" color="error" disabled={busy} onClick={() => setRevoking(d)}>
-                              Block
+                              {t('Block')}
                             </Button>
                           )}
                         </TableCell>
@@ -149,7 +150,7 @@ export function TeamPage() {
                 </Table>
               </TableContainer>
             ) : (
-              <EmptyState title={deviceStatus === 'PENDING' ? 'No phones waiting' : 'No phones'} />
+              <EmptyState title={deviceStatus === 'PENDING' ? t('No phones waiting') : t('No phones')} />
             )}
           </QueryState>
         </Section>
@@ -157,28 +158,28 @@ export function TeamPage() {
 
       <ConfirmDialog
         open={Boolean(blocking)}
-        title={unblock ? `Unblock ${blocking?.full_name}?` : `Block ${blocking?.full_name}?`}
-        text={unblock ? 'The person will be able to sign in again.' : 'The person is signed out at once and cannot sign in.'}
-        confirmLabel={unblock ? 'Unblock' : 'Block'}
+        title={unblock ? t('Unblock {0}?', blocking?.full_name) : t('Block {0}?', blocking?.full_name)}
+        text={unblock ? t('The person will be able to sign in again.') : t('The person is signed out at once and cannot sign in.')}
+        confirmLabel={unblock ? t('Unblock') : t('Block')}
         color={unblock ? 'success' : 'error'}
         loading={busy}
         onConfirm={async () => {
           if (!blocking) return
           const ok = await run(() => (unblock ? teamApi.unblock(blocking.user_id) : teamApi.block(blocking.user_id)),
-            `${blocking.full_name} ${unblock ? 'unblocked' : 'blocked'}`)
+            unblock ? t('{0} unblocked', blocking.full_name) : t('{0} blocked', blocking.full_name))
           if (ok) setBlocking(null)
         }}
         onClose={() => setBlocking(null)}
       />
       <ConfirmDialog
         open={Boolean(revoking)}
-        title="Block this phone?"
-        text={revoking ? `${revoking.device_name} of ${revoking.user_full_name} is signed out at once.` : undefined}
-        confirmLabel="Block"
+        title={t('Block this phone?')}
+        text={revoking ? t('{0} of {1} is signed out at once.', revoking.device_name, revoking.user_full_name) : undefined}
+        confirmLabel={t('Block')}
         color="error"
         loading={busy}
         onConfirm={async () => {
-          if (revoking && (await run(() => teamApi.revokeDevice(revoking.id), 'Phone blocked'))) setRevoking(null)
+          if (revoking && (await run(() => teamApi.revokeDevice(revoking.id), t('Phone blocked')))) setRevoking(null)
         }}
         onClose={() => setRevoking(null)}
       />
@@ -208,20 +209,20 @@ export function ManagerInvitationsPage() {
   return (
     <>
       <PageHeader
-        title="Invitations"
-        subtitle="Make a link and send it to the person. They type their name, work email, phone and a password, get an employee id and sign in in the KeyFive Staff app; you approve their phone."
+        title={t('Invitations')}
+        subtitle={t('Make a link and send it to the person. They type their name, work email, phone and a password, get an employee id and sign in in the KeyFive Staff app; you approve their phone.')}
       />
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Stack spacing={2}>
             {error && <Alert severity="error">{error}</Alert>}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField select label="Role" value={role} onChange={(e) => setRole(e.target.value as 'WORKER' | 'MANAGER')} sx={{ minWidth: 240 }}>
-                <MenuItem value="WORKER">Worker (joins my team)</MenuItem>
-                <MenuItem value="MANAGER">Manager (gets own team)</MenuItem>
+              <TextField select label={t('Role')} value={role} onChange={(e) => setRole(e.target.value as 'WORKER' | 'MANAGER')} sx={{ minWidth: 240 }}>
+                <MenuItem value="WORKER">{t('Worker (joins my team)')}</MenuItem>
+                <MenuItem value="MANAGER">{t('Manager (gets own team)')}</MenuItem>
               </TextField>
               <Button variant="contained" startIcon={<LinkIcon />} disabled={busy} onClick={create}>
-                Create invitation link
+                {t('Create invitation link')}
               </Button>
             </Stack>
             {created && <NewLink path={created.link} expiresAt={created.expires_at} />}
@@ -235,13 +236,13 @@ export function ManagerInvitationsPage() {
       </Card>
       <ConfirmDialog
         open={Boolean(revoking)}
-        title="Revoke this invitation link?"
-        text="The link stops working at once."
-        confirmLabel="Revoke"
+        title={t('Revoke this invitation link?')}
+        text={t('The link stops working at once.')}
+        confirmLabel={t('Revoke')}
         color="error"
         loading={busy}
         onConfirm={async () => {
-          if (revoking && (await run(() => teamApi.revokeInvitation(revoking.id), 'Invitation revoked'))) setRevoking(null)
+          if (revoking && (await run(() => teamApi.revokeInvitation(revoking.id), t('Invitation revoked')))) setRevoking(null)
         }}
         onClose={() => setRevoking(null)}
       />

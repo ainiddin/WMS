@@ -34,6 +34,7 @@ import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
 import { OrderItemsTable, OrderMeta } from '@/components/OrderParts'
 import { formatDateTime } from '@/format'
+import { t } from '@/i18n'
 
 /** How often the list refreshes while the page is open (new approved orders). */
 export const SHIP_LIST_REFRESH_MS = 20_000
@@ -53,7 +54,7 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
   const ship = useMutation({
     mutationFn: () => ordersApi.ship(order.id),
     onSuccess: (o) => {
-      notify.success(`Order ${o.code} shipped`)
+      notify.success(t('Order {0} shipped', o.code))
       for (const key of ['orders', 'products', 'movements', 'reports', 'performance']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
@@ -73,15 +74,15 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
     if (!code) return
     const result = pickScan(code, order.items, picked)
     if (result.kind === 'wrong-product') {
-      setMessage({ ok: false, text: `Barcode ${result.code} is not in this order — wrong product` })
+      setMessage({ ok: false, text: t('Barcode {0} is not in this order — wrong product', result.code) })
     } else if (result.kind === 'already-complete') {
       setMessage({
         ok: false,
-        text: `All ${result.item.quantity} × ${result.item.product_name} are already picked — put this one back`,
+        text: t('All {0} × {1} are already picked — put this one back', result.item.quantity, result.item.product_name),
       })
     } else {
       setPicked((prev) => ({ ...prev, [result.item.id]: result.picked }))
-      setMessage({ ok: true, text: `${result.item.product_name}: ${result.picked} of ${result.item.quantity}` })
+      setMessage({ ok: true, text: t('{0}: {1} of {2}', result.item.product_name, result.picked, result.item.quantity) })
     }
     setCode('')
   }
@@ -92,12 +93,12 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Ship order {order.code}</DialogTitle>
+      <DialogTitle>{t('Ship order {0}', order.code)}</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           <OrderMeta order={order} staff />
           <TextField
-            label="Barcode of every unit"
+            label={t('Barcode of every unit')}
             autoFocus
             value={code}
             onChange={(e) => setCode(barcodeInput(e.target.value))}
@@ -107,7 +108,7 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
                 onScan()
               }
             }}
-            helperText="Type the digits and press Enter (a USB scanner does it for you)"
+            helperText={t('Type the digits and press Enter (a USB scanner does it for you)')}
             slotProps={{ htmlInput: { inputMode: 'numeric', autoComplete: 'off' } }}
           />
           {message && (
@@ -118,10 +119,10 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
           <Box>
             <Stack direction="row" sx={{ justifyContent: 'space-between', mb: 0.5 }}>
               <Typography variant="body2" color="text.secondary">
-                Picked
+                {t('Picked')}
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {done} of {total} units
+                {t('{0} of {1} units', done, total)}
               </Typography>
             </Stack>
             <LinearProgress
@@ -146,14 +147,14 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
                     primary={`${item.quantity} × ${item.product_name}`}
                     secondary={
                       item.barcode
-                        ? `${item.product_code} · ${item.barcode}${open ? '' : ' · type or scan it first'}`
-                        : `${item.product_code} · no barcode: count by hand`
+                        ? `${item.product_code} · ${item.barcode}${open ? '' : ' · ' + t('type or scan it first')}`
+                        : `${item.product_code} · ` + t('no barcode: count by hand')
                     }
                   />
                   <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
                     <IconButton
                       size="small"
-                      aria-label={`One less ${item.product_name}`}
+                      aria-label={t('One less {0}', item.product_name)}
                       disabled={!open || n <= (item.barcode ? 1 : 0)}
                       onClick={() => setCount(item, n - 1)}
                     >
@@ -168,14 +169,14 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
                       slotProps={{
                         htmlInput: {
                           inputMode: 'numeric',
-                          'aria-label': `Picked ${item.product_name}`,
+                          'aria-label': t('Picked {0}', item.product_name),
                           style: { textAlign: 'center' },
                         },
                       }}
                     />
                     <IconButton
                       size="small"
-                      aria-label={`One more ${item.product_name}`}
+                      aria-label={t('One more {0}', item.product_name)}
                       disabled={!open || complete}
                       onClick={() => setCount(item, n + 1)}
                     >
@@ -192,14 +193,14 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('Cancel')}</Button>
         <Button
           variant="contained"
           startIcon={<LocalShippingOutlinedIcon />}
           disabled={!allPicked || ship.isPending}
           onClick={() => ship.mutate()}
         >
-          Ship (OUT)
+          {t('Ship (OUT)')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -224,8 +225,8 @@ export function ShipPage() {
   return (
     <>
       <PageHeader
-        title="Orders to ship"
-        subtitle={`Approved orders of your team, oldest first: ${mine.length} orders, ${units} units. Every unit is checked by its barcode.`}
+        title={t('Orders to ship')}
+        subtitle={t('Approved orders of your team, oldest first: {0} orders, {1} units. Every unit is checked by its barcode.', mine.length, units)}
       />
       <QueryState isLoading={orders.isLoading || members.isLoading} error={orders.error ?? members.error}>
         {mine.length ? (
@@ -237,7 +238,7 @@ export function ShipPage() {
                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1 }}>
                       <Typography variant="h6">{order.code}</Typography>
                       <Typography variant="body2" color="text.secondary">
-                        approved {formatDateTime(order.approved_at)}
+                        {t('approved {0}', formatDateTime(order.approved_at))}
                       </Typography>
                     </Stack>
                     <OrderMeta order={order} staff />
@@ -252,7 +253,7 @@ export function ShipPage() {
                       sx={{ mt: 2 }}
                       onClick={() => setShipping(order)}
                     >
-                      Pick & ship {order.code}
+                      {t('Pick & ship {0}', order.code)}
                     </Button>
                   </CardContent>
                 </Card>
@@ -261,7 +262,7 @@ export function ShipPage() {
           </Grid>
         ) : (
           <Card>
-            <EmptyState title="Nothing to ship" text="Approved orders of your team appear here." />
+            <EmptyState title={t('Nothing to ship')} text={t('Approved orders of your team appear here.')} />
           </Card>
         )}
       </QueryState>

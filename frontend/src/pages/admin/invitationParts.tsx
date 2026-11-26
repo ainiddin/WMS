@@ -17,6 +17,7 @@ import { useState } from 'react'
 import type { Invitation } from '@/api/types'
 import { EmptyState } from '@/components/common'
 import { formatDateTime, roleLabel } from '@/format'
+import { t } from '@/i18n'
 
 export const INVITE_COLOR = { PENDING: 'warning', ACCEPTED: 'success', REVOKED: 'default', EXPIRED: 'error' } as const
 
@@ -34,14 +35,14 @@ export function NewLink({ path, expiresAt }: { path: string; expiresAt: string }
     <Alert severity="success" icon={false} sx={{ '& .MuiAlert-message': { width: '100%' } }}>
       <Stack spacing={1.5}>
         <Typography sx={{ fontWeight: 600 }}>
-          Link ready. Send it to the person (Telegram, WhatsApp…). It works once, until {formatDateTime(expiresAt)}.
+          {t('Link ready. Send it to the person (Telegram, WhatsApp…). It works once, until {0}.', formatDateTime(expiresAt))}
         </Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
           <TextField
             size="small"
             fullWidth
             value={url}
-            label="Invitation link"
+            label={t('Invitation link')}
             slotProps={{ htmlInput: { readOnly: true, onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select() } }}
           />
           <Button
@@ -56,11 +57,11 @@ export function NewLink({ path, expiresAt }: { path: string; expiresAt: string }
               }
             }}
           >
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('Copied') : t('Copy')}
           </Button>
         </Stack>
         <Typography variant="body2" color="text.secondary">
-          This is the only time the link is shown. If it gets lost, revoke it and make a new one.
+          {t('This is the only time the link is shown. If it gets lost, revoke it and make a new one.')}
         </Typography>
       </Stack>
     </Alert>
@@ -79,17 +80,17 @@ export function InvitationRows({
   onRevoke: (inv: Invitation) => void
   showInviter?: boolean
 }) {
-  if (!invitations.length) return <EmptyState title="No invitations yet" text="Make a link and send it to the person." />
+  if (!invitations.length) return <EmptyState title={t('No invitations yet')} text={t('Make a link and send it to the person.')} />
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Made</TableCell>
-            <TableCell>Role</TableCell>
-            {showInviter && <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>By</TableCell>}
-            <TableCell>Status</TableCell>
-            <TableCell>Joined / valid until</TableCell>
+            <TableCell>{t('Made')}</TableCell>
+            <TableCell>{t('Role')}</TableCell>
+            {showInviter && <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('By')}</TableCell>}
+            <TableCell>{t('Status')}</TableCell>
+            <TableCell>{t('Joined / valid until')}</TableCell>
             <TableCell align="right" />
           </TableRow>
         </TableHead>
@@ -109,7 +110,7 @@ export function InvitationRows({
                 <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{inv.invited_by_email}</TableCell>
               )}
               <TableCell>
-                <Chip size="small" variant="outlined" color={INVITE_COLOR[inv.status]} label={inv.status} />
+                <Chip size="small" variant="outlined" color={INVITE_COLOR[inv.status]} label={t(inv.status)} />
               </TableCell>
               <TableCell>
                 {inv.status === 'ACCEPTED' ? (
@@ -128,7 +129,7 @@ export function InvitationRows({
               <TableCell align="right">
                 {inv.status === 'PENDING' && (
                   <Button size="small" color="error" disabled={busy} onClick={() => onRevoke(inv)}>
-                    Revoke
+                    {t('Revoke')}
                   </Button>
                 )}
               </TableCell>

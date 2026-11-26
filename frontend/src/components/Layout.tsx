@@ -30,6 +30,7 @@ import { accountApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import { useCart } from "@/cart/CartContext";
 import { formatMoney } from "@/format";
+import { LanguageMenu, t } from "@/i18n";
 
 // The website is the shop only. Warehouse staff (Admin / Manager / Worker) work in the KeyFive Staff Android app.
 
@@ -38,11 +39,11 @@ export function ThemeToggle() {
   const current = mode === "system" ? systemMode : mode;
   if (!current) return null;
   return (
-    <Tooltip title={current === "dark" ? "Light mode" : "Dark mode"}>
+    <Tooltip title={current === "dark" ? t("Light mode") : t("Dark mode")}>
       <IconButton
         color="inherit"
         onClick={() => setMode(current === "dark" ? "light" : "dark")}
-        aria-label="Toggle dark mode"
+        aria-label={t("Toggle dark mode")}
       >
         {current === "dark" ? (
           <LightModeOutlinedIcon />
@@ -91,7 +92,7 @@ function UserMenu({ children }: { children?: ReactNode }) {
         <IconButton
           color="inherit"
           onClick={(e) => setAnchor(e.currentTarget)}
-          aria-label="Account menu"
+          aria-label={t("Account menu")}
         >
           <Avatar
             sx={{
@@ -128,7 +129,7 @@ function UserMenu({ children }: { children?: ReactNode }) {
           <ListItemIcon>
             <LogoutIcon fontSize="small" />
           </ListItemIcon>
-          Sign out
+          {t("Sign out")}
         </MenuItem>
       </Menu>
     </>
@@ -166,7 +167,7 @@ export function ShopLayout() {
             to="/catalog"
             sx={{ display: { xs: "none", sm: "inline-flex" } }}
           >
-            Catalog
+            {t("Catalog")}
           </Button>
           {isCustomer && (
             <Button
@@ -175,11 +176,11 @@ export function ShopLayout() {
               to="/my-orders"
               sx={{ display: { xs: "none", sm: "inline-flex" } }}
             >
-              My orders
+              {t("My orders")}
             </Button>
           )}
           {isCustomer && account.data && (
-            <Tooltip title="My account">
+            <Tooltip title={t("My account")}>
               <Button
                 color="inherit"
                 component={RouterLink}
@@ -191,13 +192,14 @@ export function ShopLayout() {
               </Button>
             </Tooltip>
           )}
+          <LanguageMenu />
           <ThemeToggle />
-          <Tooltip title="Cart">
+          <Tooltip title={t("Cart")}>
             <IconButton
               color="inherit"
               component={RouterLink}
               to="/cart"
-              aria-label="Cart"
+              aria-label={t("Cart")}
             >
               <Badge badgeContent={count} color="secondary">
                 <ShoppingCartOutlinedIcon />
@@ -211,19 +213,19 @@ export function ShopLayout() {
                   <ListItemIcon>
                     <ReceiptLongOutlinedIcon fontSize="small" />
                   </ListItemIcon>
-                  My orders
+                  {t("My orders")}
                 </MenuItem>,
                 <MenuItem key="account" onClick={() => navigate("/account")}>
                   <ListItemIcon>
                     <AccountBalanceWalletOutlinedIcon fontSize="small" />
                   </ListItemIcon>
-                  My account
+                  {t("My account")}
                 </MenuItem>,
                 <MenuItem key="profile" onClick={() => navigate("/profile")}>
                   <ListItemIcon>
                     <AccountCircleOutlinedIcon fontSize="small" />
                   </ListItemIcon>
-                  Profile
+                  {t("Profile")}
                 </MenuItem>,
               ]}
             </UserMenu>
@@ -235,7 +237,7 @@ export function ShopLayout() {
               to="/login"
               sx={{ ml: 1 }}
             >
-              Sign in
+              {t("Sign in")}
             </Button>
           )}
         </Toolbar>
@@ -255,7 +257,7 @@ export function ShopLayout() {
           fontSize: 13,
         }}
       >
-        KeyFive household goods · Almaty · prices in KZT (₸)
+        {t("KeyFive household goods · Almaty · prices in KZT (₸)")}
       </Box>
     </Box>
   );

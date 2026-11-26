@@ -42,6 +42,7 @@ import { reportsApi } from '@/api/staff'
 import { useAuth } from '@/auth/AuthContext'
 import { ThemeToggle } from '@/components/Layout'
 import { formatDateTime } from '@/format'
+import { LanguageMenu, t } from '@/i18n'
 
 export interface NavItem {
   to: string
@@ -147,7 +148,7 @@ export function StaffLayout({
           sx={{ mx: 1, borderRadius: 1, '&.active': { bgcolor: 'action.selected', fontWeight: 600 } }}
         >
           <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-          <ListItemText primary={item.label} />
+          <ListItemText primary={t(item.label)} />
           {!!badges[item.to] && <Badge badgeContent={badges[item.to]} color="error" max={99} sx={{ mr: 1.5 }} />}
         </ListItemButton>
       ))}
@@ -158,23 +159,24 @@ export function StaffLayout({
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <AppBar position="fixed" color="default" elevation={0} sx={{ zIndex: (t) => t.zIndex.drawer + 1, borderBottom: 1, borderColor: 'divider' }}>
         <Toolbar sx={{ gap: 1 }}>
-          <IconButton edge="start" onClick={() => setOpen(true)} sx={{ display: { md: 'none' } }} aria-label="Menu">
+          <IconButton edge="start" onClick={() => setOpen(true)} sx={{ display: { md: 'none' } }} aria-label={t('Menu')}>
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontSize: '1.1rem' }}>
             {title}
           </Typography>
           {endsAt && (
-            <Tooltip title="Website sessions end after 4 hours; then sign in again.">
-              <Chip size="small" variant="outlined" label={`Session until ${formatDateTime(endsAt.toISOString())}`} sx={{ display: { xs: 'none', sm: 'flex' } }} />
+            <Tooltip title={t('Website sessions end after 4 hours; then sign in again.')}>
+              <Chip size="small" variant="outlined" label={t('Session until {0}', formatDateTime(endsAt.toISOString()))} sx={{ display: { xs: 'none', sm: 'flex' } }} />
             </Tooltip>
           )}
           <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', md: 'block' } }}>
             {user?.full_name}
           </Typography>
+          <LanguageMenu />
           <ThemeToggle />
-          <Tooltip title="Sign out">
-            <IconButton onClick={signOut} aria-label="Sign out">
+          <Tooltip title={t('Sign out')}>
+            <IconButton onClick={signOut} aria-label={t('Sign out')}>
               <LogoutIcon />
             </IconButton>
           </Tooltip>

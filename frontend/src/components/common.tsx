@@ -17,6 +17,7 @@ import {
 import type { ReactNode } from "react";
 import { errorMessage } from "@/api/client";
 import type { OrderStatus } from "@/api/types";
+import { t } from "@/i18n";
 
 export function PageHeader({
   title,
@@ -70,11 +71,11 @@ const ORDER_COLORS: Record<OrderStatus, ChipProps["color"]> = {
 
 /** PENDING now only means "waiting for stock": nobody approves orders by hand. */
 const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-  PENDING: "WAITING FOR STOCK",
-  APPROVED: "APPROVED",
-  SHIPPED: "SHIPPED",
-  REJECTED: "REJECTED",
-  CANCELLED: "CANCELLED",
+  get PENDING() { return t("WAITING FOR STOCK") },
+  get APPROVED() { return t("APPROVED") },
+  get SHIPPED() { return t("SHIPPED") },
+  get REJECTED() { return t("REJECTED") },
+  get CANCELLED() { return t("CANCELLED") },
 };
 
 export function OrderStatusChip({ status }: { status: OrderStatus }) {
@@ -141,7 +142,7 @@ export function ConfirmDialog({
   open,
   title,
   text,
-  confirmLabel = "Confirm",
+  confirmLabel = t("Confirm"),
   color = "primary",
   loading,
   onConfirm,
@@ -166,7 +167,7 @@ export function ConfirmDialog({
         {children}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t("Cancel")}</Button>
         <Button
           variant="contained"
           color={color}

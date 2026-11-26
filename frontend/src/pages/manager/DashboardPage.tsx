@@ -26,6 +26,7 @@ import { Section, StatCard } from '@/pages/admin/parts'
 import { formatMoney, formatMonth, formatNumber } from '@/format'
 import { chartColors } from '@/theme'
 
+import { t } from '@/i18n'
 const compactMoney = (v: number) =>
   v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
 
@@ -36,42 +37,42 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Stock and sales at a glance. Charts cover the last 12 months." />
+      <PageHeader title={t('Dashboard')} subtitle={t('Stock and sales at a glance. Charts cover the last 12 months.')} />
       <QueryState isLoading={data.isLoading} error={data.error}>
         {d && (
           <Grid container spacing={2}>
             <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
-                label="Below minimum"
+                label={t('Below minimum')}
                 value={d.cards.products_below_min}
-                hint={`${d.cards.products_out_of_stock} out of stock · ${d.cards.products_active} products`}
+                hint={t('{0} out of stock · {1} products', d.cards.products_out_of_stock, d.cards.products_active)}
                 icon={<ReportProblemOutlinedIcon />}
                 tone={d.cards.products_below_min ? 'warning' : 'success'}
               />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
-                label="Waiting for stock"
+                label={t('Waiting for stock')}
                 value={d.cards.orders_pending}
-                hint={`${d.cards.orders_to_ship} waiting to ship`}
+                hint={t('{0} waiting to ship', d.cards.orders_to_ship)}
                 icon={<PendingActionsOutlinedIcon />}
                 tone={d.cards.orders_pending ? 'warning' : 'default'}
               />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
-                label="Shipped this month"
+                label={t('Shipped this month')}
                 value={d.cards.orders_shipped_month}
                 hint={formatMoney(d.cards.revenue_month)}
                 icon={<LocalShippingOutlinedIcon />}
               />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
-              <StatCard label="Stock value" value={formatMoney(d.cards.stock_value)} icon={<PaymentsOutlinedIcon />} />
+              <StatCard label={t('Stock value')} value={formatMoney(d.cards.stock_value)} icon={<PaymentsOutlinedIcon />} />
             </Grid>
 
             <Grid size={{ xs: 12, lg: 7 }}>
-              <Section title="Stock movements by month (units)">
+              <Section title={t('Stock movements by month (units)')}>
                 <ChartBox>
                   <BarChart data={d.movements_by_month} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
                     <CartesianGrid {...s.grid} />
@@ -79,14 +80,14 @@ export function DashboardPage() {
                     <YAxis {...s.axis} />
                     <Tooltip {...s.tooltip} labelFormatter={(m) => formatMonth(String(m))} />
                     <Legend {...s.legend} />
-                    <Bar dataKey="in" name="IN" fill={chartColors.in} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="out" name="OUT" fill={chartColors.out} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="in" name={t('IN')} fill={chartColors.in} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="out" name={t('OUT')} fill={chartColors.out} radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ChartBox>
               </Section>
             </Grid>
             <Grid size={{ xs: 12, lg: 5 }}>
-              <Section title="Revenue by month">
+              <Section title={t('Revenue by month')}>
                 <ChartBox>
                   <AreaChart data={d.sales_by_month} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
                     <CartesianGrid {...s.grid} />
@@ -100,7 +101,7 @@ export function DashboardPage() {
                     <Area
                       type="monotone"
                       dataKey="revenue"
-                      name="Revenue"
+                      name={t('Revenue')}
                       stroke={chartColors.revenue}
                       fill={chartColors.revenue}
                       fillOpacity={0.15}
@@ -112,7 +113,7 @@ export function DashboardPage() {
             </Grid>
 
             <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-              <Section title="Sales by category">
+              <Section title={t('Sales by category')}>
                 <ChartBox>
                   <PieChart>
                     <Pie data={d.sales_by_category} dataKey="revenue" nameKey="category" innerRadius="50%" outerRadius="80%" paddingAngle={2}>
@@ -127,24 +128,24 @@ export function DashboardPage() {
               </Section>
             </Grid>
             <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-              <Section title="Top customers">
+              <Section title={t('Top customers')}>
                 <ChartBox>
                   <BarChart data={d.top_customers} layout="vertical" margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
                     <CartesianGrid {...s.grid} horizontal={false} vertical />
                     <XAxis type="number" {...s.axis} tickFormatter={compactMoney} />
                     <YAxis type="category" dataKey="full_name" {...s.axis} width={110} />
                     <Tooltip {...s.tooltip} formatter={(v) => formatMoney(Number(v))} />
-                    <Bar dataKey="total_amount" name="Bought" fill={chartColors.units} radius={[0, 3, 3, 0]} />
+                    <Bar dataKey="total_amount" name={t('Bought')} fill={chartColors.units} radius={[0, 3, 3, 0]} />
                   </BarChart>
                 </ChartBox>
               </Section>
             </Grid>
             <Grid size={{ xs: 12, lg: 4 }}>
               <Section
-                title="Restock now"
+                title={t('Restock now')}
                 action={
                   <Button size="small" component={RouterLink} to="/manage/restock">
-                    Full list
+                    {t('Full list')}
                   </Button>
                 }
               >
@@ -152,8 +153,8 @@ export function DashboardPage() {
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Product</TableCell>
-                        <TableCell align="right">Qty / min</TableCell>
+                        <TableCell>{t('Product')}</TableCell>
+                        <TableCell align="right">{t('Qty / min')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -173,17 +174,17 @@ export function DashboardPage() {
                     </TableBody>
                   </Table>
                 ) : (
-                  <EmptyState title="Nothing to reorder" />
+                  <EmptyState title={t('Nothing to reorder')} />
                 )}
               </Section>
             </Grid>
 
             <Grid size={12}>
               <Section
-                title="Stock by product"
+                title={t('Stock by product')}
                 action={
                   <Typography variant="caption" color="text.secondary">
-                    bar = quantity, red mark = minimum
+                    {t('bar = quantity, red mark = minimum')}
                   </Typography>
                 }
               >
@@ -197,12 +198,12 @@ export function DashboardPage() {
                       labelFormatter={(code) => d.stock_by_product.find((p) => p.product_code === code)?.product_name ?? code}
                       formatter={(v, name) => [formatNumber(Number(v)), name]}
                     />
-                    <Bar dataKey="quantity" name="Quantity" radius={[3, 3, 0, 0]}>
+                    <Bar dataKey="quantity" name={t('Quantity')} radius={[3, 3, 0, 0]}>
                       {d.stock_by_product.map((p) => (
                         <Cell key={p.product_code} fill={p.quantity < p.min_quantity ? chartColors.stockIn : chartColors.in} />
                       ))}
                     </Bar>
-                    <Bar dataKey="min_quantity" name="Minimum" fill={chartColors.out} barSize={4} />
+                    <Bar dataKey="min_quantity" name={t('Minimum')} fill={chartColors.out} barSize={4} />
                   </BarChart>
                 </ChartBox>
               </Section>

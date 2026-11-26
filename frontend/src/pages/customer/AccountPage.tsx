@@ -30,6 +30,7 @@ import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
 import { formatDateTime, formatMoney } from '@/format'
 
+import { t } from '@/i18n'
 const QUICK_AMOUNTS = [5_000, 10_000, 20_000, 50_000, 100_000]
 // The server checks the limits (also 1 000 000 KZT a day); these only help to type a right amount.
 const MIN_TOP_UP = 100
@@ -62,7 +63,7 @@ export function TopUpDialog({ open, onClose, suggested }: { open: boolean; onClo
   const value = Number(amount || suggested || 0)
   const error =
     !Number.isInteger(value) || value < MIN_TOP_UP || value > MAX_TOP_UP
-      ? `Whole tenge, ${formatMoney(MIN_TOP_UP)} – ${formatMoney(MAX_TOP_UP)} at a time`
+      ? t('Whole tenge, {0} – {1} at a time', formatMoney(MIN_TOP_UP), formatMoney(MAX_TOP_UP))
       : null
 
   const close = () => {
@@ -78,16 +79,16 @@ export function TopUpDialog({ open, onClose, suggested }: { open: boolean; onClo
 
   return (
     <Dialog open={open} onClose={close} fullWidth maxWidth="xs">
-      <DialogTitle>Top up your account</DialogTitle>
+      <DialogTitle>{t('Top up your account')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <TextField
-            label="Amount"
+            label={t('Amount')}
             autoFocus
             value={amount || (suggested ? String(suggested) : '')}
             onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
             error={!!amount && !!error}
-            helperText={error ?? 'Up to 1 000 000 ₸ a day'}
+            helperText={error ?? t('Up to 1 000 000 ₸ a day')}
             slotProps={{
               input: { endAdornment: <InputAdornment position="end">₸</InputAdornment> },
               htmlInput: { inputMode: 'numeric' },
@@ -99,17 +100,17 @@ export function TopUpDialog({ open, onClose, suggested }: { open: boolean; onClo
             ))}
           </Stack>
           <Alert severity="info" icon={false}>
-            You will pay by card on the <b>CardPay Fake</b> page: a pretend payment gateway for this course project.
-            Do not type a real card there; no real money is charged.
+            {t('You will pay by card on the CardPay Fake page: a pretend payment gateway for this course project. ' +
+              'Do not type a real card there; no real money is charged.')}
           </Alert>
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={close} disabled={start.isPending}>
-          Cancel
+          {t('Cancel')}
         </Button>
         <Button variant="contained" disabled={!!error || start.isPending} onClick={() => start.mutate()}>
-          {start.isPending ? 'Opening…' : 'Pay by card'}
+          {start.isPending ? t('Opening…') : t('Pay by card')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -121,18 +122,19 @@ export function paymentTone(p: Payment): 'success' | 'info' | 'warning' {
 }
 
 export function paymentText(p: Payment, waitedLong = false): string {
-  const card = p.card_last4 ? ` by ${p.card_brand} •• ${p.card_last4}` : ''
   switch (p.status) {
     case 'SUCCEEDED':
-      return `${formatMoney(p.amount)} added${card}.`
+      return p.card_last4
+        ? t('{0} added by {1} •• {2}.', formatMoney(p.amount), p.card_brand, p.card_last4)
+        : t('{0} added.', formatMoney(p.amount))
     case 'FAILED':
-      return `The payment was not made: ${p.failure_reason ?? 'cancelled'}. Nothing was charged.`
+      return t('The payment was not made: {0}. Nothing was charged.', p.failure_reason ?? t('cancelled'))
     case 'EXPIRED':
-      return 'The payment link expired. Nothing was charged; start a new top-up.'
+      return t('The payment link expired. Nothing was charged; start a new top-up.')
     default:
       return waitedLong
-        ? 'The payment is not confirmed yet. If you paid, the money appears in a moment; refresh the page.'
-        : 'Waiting for the payment gateway to confirm…'
+        ? t('The payment is not confirmed yet. If you paid, the money appears in a moment; refresh the page.')
+        : t('Waiting for the payment gateway to confirm…')
   }
 }
 
@@ -160,10 +162,10 @@ export function PaymentResult({ code, onDone }: { code: string; onDone: () => vo
   if (payment.isError)
     return (
       <Alert severity="error" onClose={onDone}>
-        This payment was not found.
+        {t('This payment was not found.')}
       </Alert>
     )
-  if (!payment.data) return <Alert severity="info">Checking the payment…</Alert>
+  if (!payment.data) return <Alert severity="info">{t('Checking the payment…')}</Alert>
   const done = payment.data.status !== 'PENDING'
   return (
     <Alert severity={paymentTone(payment.data)} onClose={done ? onDone : undefined} role="status">
@@ -181,8 +183,8 @@ export function AccountPage() {
   return (
     <>
       <PageHeader
-        title="My account"
-        subtitle={account.data ? `Account ${account.data.code} · orders are paid from this balance` : undefined}
+        title={t('My account')}
+        subtitle={account.data ? t('Account {0} · orders are paid from this balance', account.data.code) : undefined}
       />
       <QueryState isLoading={account.isLoading} error={account.error}>
         {account.data && (
@@ -190,12 +192,12 @@ export function AccountPage() {
             {returned && <PaymentResult code={returned} onDone={() => setParams({}, { replace: true })} />}
             <Card sx={{ maxWidth: 560 }}>
               <CardContent>
-                <Typography color="text.secondary">Balance</Typography>
+                <Typography color="text.secondary">{t('Balance')}</Typography>
                 <Typography variant="h3" sx={{ fontWeight: 700, my: 1 }}>
                   {formatMoney(account.data.balance)}
                 </Typography>
                 <Button variant="contained" startIcon={<AddCardOutlinedIcon />} onClick={() => setOpen(true)}>
-                  Top up
+                  {t('Top up')}
                 </Button>
               </CardContent>
             </Card>
@@ -203,36 +205,36 @@ export function AccountPage() {
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                  History
+                  {t('History')}
                 </Typography>
                 {account.data.transactions.length ? (
                   <Box sx={{ overflowX: 'auto' }}>
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>Date</TableCell>
-                          <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Operation</TableCell>
-                          <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Details</TableCell>
-                          <TableCell align="right">Amount</TableCell>
+                          <TableCell>{t('Date')}</TableCell>
+                          <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t('Operation')}</TableCell>
+                          <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t('Details')}</TableCell>
+                          <TableCell align="right">{t('Amount')}</TableCell>
                           <TableCell align="right" sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                            Balance
+                            {t('Balance')}
                           </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {account.data.transactions.map((t) => (
-                          <TableRow key={t.id}>
-                            <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDateTime(t.created_at)}</TableCell>
+                        {account.data.transactions.map((tx) => (
+                          <TableRow key={tx.id}>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDateTime(tx.created_at)}</TableCell>
                             <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                              <Chip size="small" label={TX_LABEL[t.tx_type].label} color={TX_LABEL[t.tx_type].color} />
+                              <Chip size="small" label={t(TX_LABEL[tx.tx_type].label)} color={TX_LABEL[tx.tx_type].color} />
                             </TableCell>
                             <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                              {t.order_id ? (
-                                <Link component={RouterLink} to="/my-orders" state={{ highlight: t.order_id }}>
-                                  {t.note}
+                              {tx.order_id ? (
+                                <Link component={RouterLink} to="/my-orders" state={{ highlight: tx.order_id }}>
+                                  {tx.note}
                                 </Link>
                               ) : (
-                                t.note
+                                tx.note
                               )}
                             </TableCell>
                             <TableCell
@@ -240,14 +242,14 @@ export function AccountPage() {
                               sx={{
                                 whiteSpace: 'nowrap',
                                 fontWeight: 600,
-                                color: t.tx_type === 'PAYMENT' ? 'text.primary' : 'success.main',
+                                color: tx.tx_type === 'PAYMENT' ? 'text.primary' : 'success.main',
                               }}
                             >
-                              {t.tx_type === 'PAYMENT' ? '−' : '+'}
-                              {formatMoney(t.amount)}
+                              {tx.tx_type === 'PAYMENT' ? '−' : '+'}
+                              {formatMoney(tx.amount)}
                             </TableCell>
                             <TableCell align="right" sx={{ whiteSpace: 'nowrap', display: { xs: 'none', sm: 'table-cell' } }}>
-                              {formatMoney(t.balance_after)}
+                              {formatMoney(tx.balance_after)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -255,7 +257,7 @@ export function AccountPage() {
                     </Table>
                   </Box>
                 ) : (
-                  <EmptyState title="No operations yet" text="Top up your account to start shopping." />
+                  <EmptyState title={t('No operations yet')} text={t('Top up your account to start shopping.')} />
                 )}
               </CardContent>
             </Card>

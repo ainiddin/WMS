@@ -7,6 +7,7 @@ import { adminApi } from '@/api/endpoints'
 import type { Invitation, InvitationCreated, InvitationStatus } from '@/api/types'
 import { ConfirmDialog, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
+import { t } from '@/i18n'
 import { InvitationRows, NewLink } from './invitationParts'
 
 const STATUSES: InvitationStatus[] = ['PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED']
@@ -36,7 +37,7 @@ export function InvitationsPage() {
     setBusy(true)
     try {
       await adminApi.revokeInvitation(revoking.id)
-      notify.success('Invitation revoked')
+      notify.success(t('Invitation revoked'))
       queryClient.invalidateQueries({ queryKey: ['admin'] })
       setRevoking(null)
     } catch (e) {
@@ -49,14 +50,14 @@ export function InvitationsPage() {
   return (
     <>
       <PageHeader
-        title="Invitations"
-        subtitle="Staff join only by a one-time link from a Manager: a Worker into his team, a Manager with a team of his own."
+        title={t('Invitations')}
+        subtitle={t('Staff join only by a one-time link from a Manager: a Worker into his team, a Manager with a team of his own.')}
         actions={
-          <TextField select size="small" label="Status" value={status} onChange={(e) => setStatus(e.target.value as InvitationStatus | '')} sx={{ minWidth: 160 }}>
-            <MenuItem value="">All</MenuItem>
+          <TextField select size="small" label={t('Status')} value={status} onChange={(e) => setStatus(e.target.value as InvitationStatus | '')} sx={{ minWidth: 160 }}>
+            <MenuItem value="">{t('All')}</MenuItem>
             {STATUSES.map((s) => (
               <MenuItem key={s} value={s}>
-                {s}
+                {t(s)}
               </MenuItem>
             ))}
           </TextField>
@@ -70,9 +71,9 @@ export function InvitationsPage() {
       </Card>
       <ConfirmDialog
         open={Boolean(revoking)}
-        title="Revoke this invitation link?"
-        text="The link stops working at once."
-        confirmLabel="Revoke"
+        title={t('Revoke this invitation link?')}
+        text={t('The link stops working at once.')}
+        confirmLabel={t('Revoke')}
         color="error"
         loading={busy}
         onConfirm={revoke}
@@ -106,13 +107,13 @@ function FirstManagerLink() {
     <Card sx={{ mb: 3 }}>
       <CardContent>
         <Stack spacing={2}>
-          <Typography variant="h6">No Manager yet</Typography>
+          <Typography variant="h6">{t('No Manager yet')}</Typography>
           <Typography color="text.secondary">
-            The company has no active Manager, so nobody can invite staff. Make a link for the first Manager.
+            {t('The company has no active Manager, so nobody can invite staff. Make a link for the first Manager.')}
           </Typography>
           {error && <Alert severity="error">{error}</Alert>}
           <Button variant="contained" startIcon={<LinkIcon />} disabled={busy} onClick={create} sx={{ alignSelf: 'flex-start' }}>
-            Invite the first Manager
+            {t('Invite the first Manager')}
           </Button>
           {created && <NewLink path={created.link} expiresAt={created.expires_at} />}
         </Stack>

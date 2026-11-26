@@ -6,6 +6,8 @@ import type { AuditAction, AuditRow } from '@/api/types'
 import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { formatDateTime } from '@/format'
 
+import { t } from '@/i18n'
+/** English keys, shown through t(). */
 export const ACTION_LABEL: Record<AuditAction, string> = {
   USER_APPROVED: 'Account approved',
   USER_REJECTED: 'Account rejected',
@@ -64,27 +66,27 @@ export function AuditPage() {
 
   return (
     <>
-      <PageHeader title="Audit log" subtitle="Every admin action and Admin sign in. Rows cannot be changed or deleted." />
+      <PageHeader title={t('Audit log')} subtitle={t('Every admin action and Admin sign in. Rows cannot be changed or deleted.')} />
       <Card>
         <CardContent>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
-            <TextField select label="Action" value={action} onChange={(e) => change(() => setAction(e.target.value as AuditAction | ''))} sx={{ minWidth: 220 }}>
-              <MenuItem value="">All actions</MenuItem>
+            <TextField select label={t('Action')} value={action} onChange={(e) => change(() => setAction(e.target.value as AuditAction | ''))} sx={{ minWidth: 220 }}>
+              <MenuItem value="">{t('All actions')}</MenuItem>
               {(Object.keys(ACTION_LABEL) as AuditAction[]).map((a) => (
                 <MenuItem key={a} value={a}>
-                  {ACTION_LABEL[a]}
+                  {t(ACTION_LABEL[a])}
                 </MenuItem>
               ))}
             </TextField>
-            <TextField label="From" type="date" value={from} onChange={(e) => change(() => setFrom(e.target.value))} slotProps={{ inputLabel: { shrink: true } }} />
+            <TextField label={t('From')} type="date" value={from} onChange={(e) => change(() => setFrom(e.target.value))} slotProps={{ inputLabel: { shrink: true } }} />
             <TextField
-              label="To"
+              label={t('To')}
               type="date"
               value={to}
               onChange={(e) => change(() => setTo(e.target.value))}
               slotProps={{ inputLabel: { shrink: true } }}
               error={badRange}
-              helperText={badRange ? '"From" is after "To"' : ' '}
+              helperText={badRange ? t('"From" is after "To"') : ' '}
             />
           </Stack>
           {badRange ? null : (
@@ -92,19 +94,19 @@ export function AuditPage() {
               {rows.data?.length ? (
                 <AuditTable rows={rows.data} />
               ) : (
-                <EmptyState title="Nothing logged for these filters" />
+                <EmptyState title={t('Nothing logged for these filters')} />
               )}
             </QueryState>
           )}
           <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary">
-              Page {page + 1}
+              {t('Page {0}', page + 1)}
             </Typography>
             <Button size="small" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              Newer
+              {t('Newer')}
             </Button>
             <Button size="small" disabled={(rows.data?.length ?? 0) < PAGE} onClick={() => setPage((p) => p + 1)}>
-              Older
+              {t('Older')}
             </Button>
           </Stack>
         </CardContent>
@@ -119,12 +121,12 @@ export function AuditTable({ rows }: { rows: AuditRow[] }) {
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>When</TableCell>
-            <TableCell>Action</TableCell>
-            <TableCell>Who</TableCell>
-            <TableCell>To whom</TableCell>
+            <TableCell>{t('When')}</TableCell>
+            <TableCell>{t('Action')}</TableCell>
+            <TableCell>{t('Who')}</TableCell>
+            <TableCell>{t('To whom')}</TableCell>
             <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>IP</TableCell>
-            <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Details</TableCell>
+            <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t('Details')}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -132,9 +134,9 @@ export function AuditTable({ rows }: { rows: AuditRow[] }) {
             <TableRow key={r.id} hover>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDateTime(r.created_at)}</TableCell>
               <TableCell>
-                <Chip size="small" variant="outlined" color={DANGER.includes(r.action) ? 'error' : 'default'} label={ACTION_LABEL[r.action] ?? r.action} />
+                <Chip size="small" variant="outlined" color={DANGER.includes(r.action) ? 'error' : 'default'} label={ACTION_LABEL[r.action] ? t(ACTION_LABEL[r.action]) : r.action} />
               </TableCell>
-              <TableCell>{r.actor_email ?? 'system'}</TableCell>
+              <TableCell>{r.actor_email ?? t('system')}</TableCell>
               <TableCell>{r.target_email ?? '—'}</TableCell>
               <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{r.ip ?? '—'}</TableCell>
               <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>

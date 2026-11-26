@@ -27,6 +27,7 @@ import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
 import { formatMoney, formatMonth, formatNumber } from '@/format'
 
+import { t } from '@/i18n'
 function ExportButtons({ name }: { name: ReportName }) {
   const notify = useNotify()
   const [busy, setBusy] = useState<string | null>(null)
@@ -54,8 +55,8 @@ export function RestockPage() {
   return (
     <>
       <PageHeader
-        title="Restock list"
-        subtitle="Products below their minimum and whom to call. The main query from Task 9."
+        title={t('Restock list')}
+        subtitle={t('Products below their minimum and whom to call. The main query from Task 9.')}
         actions={<ExportButtons name="restock" />}
       />
       <Card>
@@ -65,11 +66,11 @@ export function RestockPage() {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Product</TableCell>
-                    <TableCell align="right">In stock</TableCell>
-                    <TableCell align="right">Minimum</TableCell>
-                    <TableCell align="right">To order*</TableCell>
-                    <TableCell>Supplier</TableCell>
+                    <TableCell>{t('Product')}</TableCell>
+                    <TableCell align="right">{t('In stock')}</TableCell>
+                    <TableCell align="right">{t('Minimum')}</TableCell>
+                    <TableCell align="right">{t('To order')}*</TableCell>
+                    <TableCell>{t('Supplier')}</TableCell>
                     <TableCell />
                   </TableRow>
                 </TableHead>
@@ -103,7 +104,7 @@ export function RestockPage() {
                           component={RouterLink}
                           to={`/manage/stock-in?product=${r.product_id}`}
                         >
-                          Stock IN
+                          {t('Stock IN')}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -112,18 +113,19 @@ export function RestockPage() {
               </Table>
             </TableContainer>
           ) : (
-            <EmptyState title="Nothing to reorder" text="All active products are at or above their minimum." />
+            <EmptyState title={t('Nothing to reorder')} text={t('All active products are at or above their minimum.')} />
           )}
         </QueryState>
       </Card>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-        * The amount needed to reach the minimum. Order more to have a buffer.
+        * {t('The amount needed to reach the minimum. Order more to have a buffer.')}
       </Typography>
     </>
   )
 }
 
 // ---------------- Reports with export ----------------
+// Labels, descriptions and column names are English keys, shown through t().
 type Row = Record<string, string | number | boolean>
 
 interface Column {
@@ -201,21 +203,21 @@ export function ReportsPage() {
 
   return (
     <>
-      <PageHeader title="Reports" subtitle="Every report can be downloaded as Excel or PDF." actions={<ExportButtons name={report.name} />} />
+      <PageHeader title={t('Reports')} subtitle={t('Every report can be downloaded as Excel or PDF.')} actions={<ExportButtons name={report.name} />} />
       <Card>
         <Tabs value={tab} onChange={(_, v: number) => setTab(v)} variant="scrollable" allowScrollButtonsMobile sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}>
           {REPORTS.map((r) => (
-            <Tab key={r.name} label={r.label} />
+            <Tab key={r.name} label={t(r.label)} />
           ))}
         </Tabs>
         <CardContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {report.description}
+            {t(report.description)}
           </Typography>
           <QueryState isLoading={data.isLoading} error={data.error}>
             {report.name === 'reconciliation' && rows.length > 0 && (
               <Alert severity={problems ? 'error' : 'success'} sx={{ mb: 2 }}>
-                {problems ? `${problems} product(s) do not match their history!` : 'Stock matches the movement history for all products.'}
+                {problems ? t('{0} product(s) do not match their history!', problems) : t('Stock matches the movement history for all products.')}
               </Alert>
             )}
             {rows.length ? (
@@ -225,7 +227,7 @@ export function ReportsPage() {
                     <TableRow>
                       {report.columns.map((c) => (
                         <TableCell key={c.key} align={c.align}>
-                          {c.label}
+                          {t(c.label)}
                         </TableCell>
                       ))}
                     </TableRow>
@@ -256,12 +258,12 @@ export function ReportsPage() {
                 </Table>
               </TableContainer>
             ) : (
-              <EmptyState title="No data yet" />
+              <EmptyState title={t('No data yet')} />
             )}
             {rows.length > PAGE_LIMIT && (
               <Stack sx={{ mt: 1 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Showing {PAGE_LIMIT} of {rows.length} rows. The export contains all of them.
+                  {t('Showing {0} of {1} rows. The export contains all of them.', PAGE_LIMIT, rows.length)}
                 </Typography>
               </Stack>
             )}

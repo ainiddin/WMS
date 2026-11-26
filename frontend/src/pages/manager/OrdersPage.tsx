@@ -33,9 +33,10 @@ import { useNotify } from '@/components/Notify'
 import { formatEta, OrderItemsTable, OrderMeta, OrderProgress, WaitingNotice } from '@/components/OrderParts'
 import { formatDateTime, formatMoney } from '@/format'
 
+import { t } from '@/i18n'
 const TABS: (OrderStatus | 'ALL')[] = ['APPROVED', 'PENDING', 'SHIPPED', 'REJECTED', 'CANCELLED', 'ALL']
 const TAB_LABEL: Record<OrderStatus | 'ALL', string> = {
-  APPROVED: 'To ship',
+  APPROVED: 'To ship', // English keys, shown through t()
   PENDING: 'Waiting for stock',
   SHIPPED: 'Shipped',
   REJECTED: 'Rejected',
@@ -52,7 +53,7 @@ function WorkloadCard() {
     mutationFn: ordersApi.rebalance,
     onSuccess: (r) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
-      notify.success(r.moved ? `${r.moved} orders moved to other Workers` : 'Already balanced: nothing to move')
+      notify.success(r.moved ? t('{0} orders moved to other Workers', r.moved) : t('Already balanced: nothing to move'))
     },
     onError: notify.error,
   })
@@ -61,10 +62,10 @@ function WorkloadCard() {
 
   return (
     <Section
-      title="Worker workload (open orders)"
+      title={t('Worker workload (open orders)')}
       action={
         <Button size="small" startIcon={<ShuffleIcon />} onClick={() => rebalance.mutate()} disabled={rebalance.isPending}>
-          Rebalance
+          {t('Rebalance')}
         </Button>
       }
     >
@@ -80,14 +81,15 @@ function WorkloadCard() {
                   <Box sx={{ width: `${(r.open_units / max) * 100}%`, height: '100%', bgcolor: 'primary.main' }} />
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ width: 120, textAlign: 'right', flexShrink: 0 }}>
-                  {r.open_orders} {r.open_orders === 1 ? 'order' : 'orders'} · {r.open_units} {r.open_units === 1 ? 'unit' : 'units'}
+                  {r.open_orders === 1 ? t('{0} order', 1) : t('{0} orders', r.open_orders)} ·{' '}
+                  {r.open_units === 1 ? t('{0} unit', 1) : t('{0} units', r.open_units)}
                 </Typography>
               </Stack>
             ))}
           </Stack>
         ) : (
           <Typography variant="body2" color="text.secondary">
-            No active Workers: approved orders wait in a common queue until a Worker is approved.
+            {t('No active Workers: approved orders wait in a common queue until a Worker is approved.')}
           </Typography>
         )}
       </QueryState>
@@ -98,10 +100,10 @@ function WorkloadCard() {
 function useOrderAction() {
   const queryClient = useQueryClient()
   const notify = useNotify()
-  return (fn: () => Promise<Order>, done: string, after?: () => void) =>
+  return (fn: () => Promise<Order>, done: (code: string) => string, after?: () => void) =>
     fn()
       .then((o) => {
-        notify.success(`Order ${o.code} ${done}`)
+        notify.success(done(o.code))
         queryClient.invalidateQueries({ queryKey: ['orders'] })
         queryClient.invalidateQueries({ queryKey: ['dashboard'] })
         queryClient.invalidateQueries({ queryKey: ['performance'] })
@@ -119,7 +121,7 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
   const [cancelling, setCancelling] = useState(false)
   const open = order.status === 'PENDING' || order.status === 'APPROVED'
 
-  const act = (fn: () => Promise<Order>, done: string) => {
+  const act = (fn: () => Promise<Order>, done: (code: string) => string) => {
     setBusy(true)
     run(fn, done, onClose).finally(() => setBusy(false))
   }
@@ -127,7 +129,7 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        Order {order.code} <OrderStatusChip status={order.status} />
+        {t('Order {0}', order.code)} <OrderStatusChip status={order.status} />
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2.5}>
@@ -138,17 +140,17 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
               waiting={order.waiting}
               etaMin={order.eta_min_days}
               etaMax={order.eta_max_days}
-              footer="The system approves it and gives it to a Worker as soon as the goods arrive (stock IN). No action needed."
+              footer={t('The system approves it and gives it to a Worker as soon as the goods arrive (stock IN). No action needed.')}
             />
           )}
           <OrderItemsTable order={order} showStock={open} />
           {rejecting && (
             <TextField
-              label="Reason (shown to the customer)"
+              label={t('Reason (shown to the customer)')}
               autoFocus
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Not enough stock, address outside the delivery area"
+              placeholder={t('e.g. Not enough stock, address outside the delivery area')}
             />
           )}
         </Stack>
@@ -156,19 +158,19 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
       <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
         {open && (
           <Button color="error" onClick={() => setCancelling(true)} disabled={busy} sx={{ mr: 'auto' }}>
-            Cancel order
+            {t('Cancel order')}
           </Button>
         )}
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t('Close')}</Button>
         {open &&
           (rejecting ? (
-            <Button color="error" variant="contained" disabled={busy} onClick={() => act(() => ordersApi.reject(order.id, reason), 'rejected')}>
-              Confirm reject
+            <Button color="error" variant="contained" disabled={busy} onClick={() => act(() => ordersApi.reject(order.id, reason), (code) => t('Order {0} rejected', code))}>
+              {t('Confirm reject')}
             </Button>
           ) : (
             <>
               <Button color="error" variant="outlined" startIcon={<CloseIcon />} onClick={() => setRejecting(true)} disabled={busy}>
-                Reject
+                {t('Reject')}
               </Button>
               {order.status === 'PENDING' && !order.waiting && (
                 <Button
@@ -176,9 +178,9 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
                   variant="contained"
                   startIcon={<CheckIcon />}
                   disabled={busy}
-                  onClick={() => act(() => ordersApi.approve(order.id), 'approved')}
+                  onClick={() => act(() => ordersApi.approve(order.id), (code) => t('Order {0} approved', code))}
                 >
-                  Approve now
+                  {t('Approve now')}
                 </Button>
               )}
             </>
@@ -186,13 +188,13 @@ function OrderDialog({ order, onClose }: { order: Order; onClose: () => void }) 
       </DialogActions>
       <ConfirmDialog
         open={cancelling}
-        title={`Cancel order ${order.code}?`}
-        text="The order is not shipped yet, so stock is not changed. The money goes back to the customer's account."
-        confirmLabel="Cancel order"
+        title={t('Cancel order {0}?', order.code)}
+        text={t("The order is not shipped yet, so stock is not changed. The money goes back to the customer's account.")}
+        confirmLabel={t('Cancel order')}
         color="error"
         loading={busy}
         onClose={() => setCancelling(false)}
-        onConfirm={() => act(() => ordersApi.cancel(order.id), 'cancelled')}
+        onConfirm={() => act(() => ordersApi.cancel(order.id), (code) => t('Order {0} cancelled', code))}
       />
     </Dialog>
   )
@@ -213,8 +215,8 @@ export function OrdersPage() {
   return (
     <>
       <PageHeader
-        title="Orders"
-        subtitle="Orders are approved and given to the least loaded Worker automatically. You handle the exceptions."
+        title={t('Orders')}
+        subtitle={t('Orders are approved and given to the least loaded Worker automatically. You handle the exceptions.')}
       />
       <Box sx={{ mb: 3 }}>
         <WorkloadCard />
@@ -227,8 +229,8 @@ export function OrdersPage() {
           allowScrollButtonsMobile
           sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}
         >
-          {TABS.map((t) => (
-            <Tab key={t} value={t} label={TAB_LABEL[t]} />
+          {TABS.map((name) => (
+            <Tab key={name} value={name} label={t(TAB_LABEL[name])} />
           ))}
         </Tabs>
         <CardContent>
@@ -238,13 +240,13 @@ export function OrdersPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Order</TableCell>
-                      <TableCell>Created</TableCell>
-                      <TableCell>Customer</TableCell>
-                      <TableCell align="right">Lines</TableCell>
-                      <TableCell align="right">Total</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Worker</TableCell>
+                      <TableCell>{t('Order')}</TableCell>
+                      <TableCell>{t('Created')}</TableCell>
+                      <TableCell>{t('Customer')}</TableCell>
+                      <TableCell align="right">{t('Lines')}</TableCell>
+                      <TableCell align="right">{t('Total')}</TableCell>
+                      <TableCell>{t('Status')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Worker')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -278,7 +280,7 @@ export function OrdersPage() {
                 </Table>
               </TableContainer>
             ) : (
-              <EmptyState title="No orders here" />
+              <EmptyState title={t('No orders here')} />
             )}
           </QueryState>
         </CardContent>

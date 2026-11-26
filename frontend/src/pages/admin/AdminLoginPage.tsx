@@ -8,6 +8,8 @@ import { errorMessage, retryAfter, statusOf } from '@/api/client'
 import { adminAuthApi, staffAuthApi } from '@/api/endpoints'
 import type { Role, TokenPair, TwoFactorRequired, WebLoginStarted } from '@/api/types'
 import { useAuth } from '@/auth/AuthContext'
+import { ThemeToggle } from '@/components/Layout'
+import { LanguageMenu, t } from '@/i18n'
 import { formatClock, formatWait, lockMessage } from './parts'
 
 /** Seconds left until `deadline` (ms), ticking once a second. */
@@ -34,7 +36,7 @@ export const STATUS_EVERY_MS = 2000
 
 /** Where the Admin code went decides the field label (Telegram in the demo setup). */
 function codeLabel(challenge: TwoFactorRequired | null) {
-  return challenge?.sent_via === 'telegram' ? 'Code from Telegram' : 'Code from the email'
+  return challenge?.sent_via === 'telegram' ? t('Code from Telegram') : t('Code from the email')
 }
 
 /**
@@ -104,7 +106,7 @@ export function StaffLoginPage() {
   useEffect(() => {
     if (phone && phoneLeft === 0) {
       setPhone(null)
-      setError('No answer from the phone in time. Sign in again.')
+      setError(t('No answer from the phone in time. Sign in again.'))
     }
   }, [phone, phoneLeft])
 
@@ -216,6 +218,10 @@ export function StaffLoginPage() {
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default' }}>
+      <Box sx={{ position: 'fixed', top: 8, right: 8 }}>
+        <LanguageMenu />
+        <ThemeToggle />
+      </Box>
       <Card sx={{ width: '100%', maxWidth: 420 }}>
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           <Stack spacing={1} sx={{ alignItems: 'center', mb: 3, textAlign: 'center' }}>
@@ -227,16 +233,16 @@ export function StaffLoginPage() {
               <AdminPanelSettingsOutlinedIcon color="primary" sx={{ fontSize: 40 }} />
             )}
             <Typography variant="h5" component="h1">
-              {challenge ? 'Enter the code' : phone ? 'Confirm on your phone' : 'KeyFive Staff sign in'}
+              {challenge ? t('Enter the code') : phone ? t('Confirm on your phone') : t('KeyFive Staff sign in')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {challenge
                 ? challenge.sent_via === 'telegram'
-                  ? 'We sent a 6-digit code to Telegram.'
-                  : `We sent a 6-digit code to the corporate mailbox ${challenge.sent_to}.`
+                  ? t('We sent a 6-digit code to Telegram.')
+                  : t('We sent a 6-digit code to the corporate mailbox {0}.', challenge.sent_to)
                 : phone
-                  ? 'Open KeyFive Staff on your work phone and tap this number:'
-                  : 'For Admins and Managers. After the password, you confirm the sign in on your work phone.'}
+                  ? t('Open KeyFive Staff on your work phone and tap this number:')
+                  : t('For Admins and Managers. After the password, you confirm the sign in on your work phone.')}
             </Typography>
           </Stack>
 
@@ -265,19 +271,19 @@ export function StaffLoginPage() {
                 {phone.req.number}
               </Typography>
               <Typography variant="body2" color="text.secondary" role="timer">
-                Waiting for the phone · {formatClock(phoneLeft)}
+                {t('Waiting for the phone')} · {formatClock(phoneLeft)}
               </Typography>
               <Button onClick={switchToEmailCode} disabled={busy}>
-                Use the email code instead
+                {t('Use the email code instead')}
               </Button>
               <Button color="inherit" size="small" onClick={restart}>
-                Cancel
+                {t('Cancel')}
               </Button>
             </Stack>
           ) : !challenge ? (
             <Stack component="form" spacing={2} onSubmit={submitPassword}>
               <TextField
-                label="Email"
+                label={t('Email')}
                 type="email"
                 autoComplete="username"
                 required
@@ -285,7 +291,7 @@ export function StaffLoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
               />
               <TextField
-                label="Password"
+                label={t('Password')}
                 type="password"
                 autoComplete="current-password"
                 required
@@ -293,7 +299,7 @@ export function StaffLoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
               <Button type="submit" variant="contained" size="large" disabled={busy || lockLeft > 0}>
-                Continue
+                {t('Continue')}
               </Button>
             </Stack>
           ) : (
@@ -306,26 +312,26 @@ export function StaffLoginPage() {
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 slotProps={{ htmlInput: { inputMode: 'numeric', 'aria-label': codeLabel(challenge) } }}
-                helperText={codeLeft > 0 ? `The code works for ${formatWait(codeLeft)} more` : 'The code has expired: send a new one'}
+                helperText={codeLeft > 0 ? t('The code works for {0} more', formatWait(codeLeft)) : t('The code has expired: send a new one')}
               />
               <Button type="submit" variant="contained" size="large" disabled={busy || code.length !== 6}>
-                Sign in
+                {t('Sign in')}
               </Button>
               <Button onClick={resend} disabled={busy || resendIn > 0 || lockLeft > 0}>
-                {sending ? 'Sending…' : resendIn > 0 ? `Send again in ${resendIn} s` : 'Send again'}
+                {sending ? t('Sending…') : resendIn > 0 ? t('Send again in {0} s', resendIn) : t('Send again')}
               </Button>
               <Button color="inherit" size="small" onClick={restart}>
-                Use another account
+                {t('Use another account')}
               </Button>
             </Stack>
           )}
 
           <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 3, textAlign: 'center' }}>
-            A customer?{' '}
+            {t('A customer?')}{' '}
             <Link component={RouterLink} to="/login">
-              Shop sign in
+              {t('Shop sign in')}
             </Link>
-            . Workers use only the KeyFive Staff app.
+            . {t('Workers use only the KeyFive Staff app.')}
           </Typography>
         </CardContent>
       </Card>

@@ -13,6 +13,7 @@ import { useCart } from '@/cart/CartContext'
 import { useNotify } from '@/components/Notify'
 import { formatMoney } from '@/format'
 
+import { t } from '@/i18n'
 const CATEGORY_LOOK: Record<string, { icon: ReactNode; color: string }> = {
   Kitchen: { icon: <KitchenOutlinedIcon />, color: '#e07a1f' },
   Cleaning: { icon: <CleaningServicesOutlinedIcon />, color: '#1f77b4' },
@@ -64,7 +65,7 @@ export function ProductCard({ product }: { product: ProductPublic }) {
             </Typography>
             <Chip
               size="small"
-              label={product.in_stock ? 'In stock' : 'Out of stock'}
+              label={product.in_stock ? t('In stock') : t('Out of stock')}
               color={product.in_stock ? 'success' : 'default'}
               variant="outlined"
             />
@@ -79,10 +80,10 @@ export function ProductCard({ product }: { product: ProductPublic }) {
           disabled={!product.in_stock}
           onClick={() => {
             add(product)
-            notify.success(`${product.product_name} added to cart`)
+            notify.success(t('{0} added to cart', product.product_name))
           }}
         >
-          Add to cart
+          {t('Add to cart')}
         </Button>
       </CardActions>
     </Card>

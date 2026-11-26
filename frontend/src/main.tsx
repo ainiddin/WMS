@@ -8,7 +8,10 @@ import App from '@/App'
 import { AuthProvider } from '@/auth/AuthContext'
 import { CartProvider } from '@/cart/CartContext'
 import { NotifyProvider } from '@/components/Notify'
+import { getLanguage, LanguageRoot } from '@/i18n'
 import { theme } from '@/theme'
+
+document.documentElement.lang = getLanguage()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,7 +36,9 @@ createRoot(document.getElementById('root')!).render(
           <NotifyProvider>
             <AuthProvider>
               <CartProvider>
-                <App />
+                <LanguageRoot>
+                  <App />
+                </LanguageRoot>
               </CartProvider>
             </AuthProvider>
           </NotifyProvider>

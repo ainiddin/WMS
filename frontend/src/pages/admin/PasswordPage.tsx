@@ -9,8 +9,9 @@ import { useNotify } from '@/components/Notify'
 import { formatDate } from '@/format'
 import { passwordExpired } from './AdminLayout'
 import { homeOf } from './AdminLoginPage'
-import { PASSWORD_RULE, passwordHint } from '@/password'
+import { passwordHint, passwordRule } from '@/password'
 
+import { t } from '@/i18n'
 /** Change the Admin password. Required every 180 days; the new one must differ from the previous. */
 export function PasswordPage() {
   const { user, acceptTokens } = useAuth()
@@ -37,7 +38,7 @@ export function PasswordPage() {
       setCurrent('')
       setNext('')
       setRepeat('')
-      notify.success('Password changed. Other sessions were signed out.')
+      notify.success(t('Password changed. Other sessions were signed out.'))
       navigate(homeOf(pair.user.role) ?? '/', { replace: true })
     } catch (err) {
       setError(errorMessage(err))
@@ -49,18 +50,18 @@ export function PasswordPage() {
   return (
     <>
       <PageHeader
-        title="Change password"
+        title={t('Change password')}
         subtitle={user?.password_expires_at ? `Current password valid until ${formatDate(user.password_expires_at)}` : undefined}
       />
       <Card sx={{ maxWidth: 480 }}>
         <CardContent>
           <Stack component="form" spacing={2} onSubmit={submit}>
             {expired && (
-              <Alert severity="warning">Your password has expired. Change it to continue working.</Alert>
+              <Alert severity="warning">{t('Your password has expired. Change it to continue working.')}</Alert>
             )}
             {error && <Alert severity="error">{error}</Alert>}
             <TextField
-              label="Current password"
+              label={t('Current password')}
               type="password"
               autoComplete="current-password"
               required
@@ -68,27 +69,27 @@ export function PasswordPage() {
               onChange={(e) => setCurrent(e.target.value)}
             />
             <TextField
-              label="New password"
+              label={t('New password')}
               type="password"
               autoComplete="new-password"
               required
               value={next}
               onChange={(e) => setNext(e.target.value)}
               error={!!weak || same}
-              helperText={same ? 'Must differ from the current password' : weak ?? PASSWORD_RULE}
+              helperText={same ? t('Must differ from the current password') : weak ?? passwordRule()}
             />
             <TextField
-              label="Repeat the new password"
+              label={t('Repeat the new password')}
               type="password"
               autoComplete="new-password"
               required
               value={repeat}
               onChange={(e) => setRepeat(e.target.value)}
               error={mismatch}
-              helperText={mismatch ? 'The passwords do not match' : ' '}
+              helperText={mismatch ? t('The passwords do not match') : ' '}
             />
             <Button type="submit" variant="contained" disabled={busy || !current || !next || !!passwordHint(next) || next !== repeat || same}>
-              Change password
+              {t('Change password')}
             </Button>
           </Stack>
         </CardContent>

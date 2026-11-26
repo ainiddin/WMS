@@ -7,6 +7,7 @@ import { ConfirmDialog, EmptyState, PageHeader, QueryState } from '@/components/
 import { useNotify } from '@/components/Notify'
 import { formatDateTime, roleLabel } from '@/format'
 
+import { t } from '@/i18n'
 const LABEL: Record<DeviceStatus, string> = { PENDING: 'Waiting', APPROVED: 'Approved', REVOKED: 'Blocked' }
 const COLOR = { PENDING: 'warning', APPROVED: 'success', REVOKED: 'error' } as const
 
@@ -39,14 +40,14 @@ export function DevicesPage() {
   return (
     <>
       <PageHeader
-        title="Staff phones"
-        subtitle="Staff work only on phones approved here. Approve a phone only after the employee confirms it is theirs."
+        title={t('Staff phones')}
+        subtitle={t('Staff work only on phones approved here. Approve a phone only after the employee confirms it is theirs.')}
         actions={
-          <ToggleButtonGroup size="small" exclusive value={status} onChange={(_, v) => v && setStatus(v)} aria-label="Status">
-            <ToggleButton value="PENDING">Waiting</ToggleButton>
-            <ToggleButton value="APPROVED">Approved</ToggleButton>
-            <ToggleButton value="REVOKED">Blocked</ToggleButton>
-            <ToggleButton value="ALL">All</ToggleButton>
+          <ToggleButtonGroup size="small" exclusive value={status} onChange={(_, v) => v && setStatus(v)} aria-label={t('Status')}>
+            <ToggleButton value="PENDING">{t('Waiting')}</ToggleButton>
+            <ToggleButton value="APPROVED">{t('Approved')}</ToggleButton>
+            <ToggleButton value="REVOKED">{t('Blocked')}</ToggleButton>
+            <ToggleButton value="ALL">{t('All')}</ToggleButton>
           </ToggleButtonGroup>
         }
       />
@@ -57,10 +58,10 @@ export function DevicesPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Phone</TableCell>
-                    <TableCell>Employee</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Last seen</TableCell>
+                    <TableCell>{t('Phone')}</TableCell>
+                    <TableCell>{t('Employee')}</TableCell>
+                    <TableCell>{t('Status')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Last seen')}</TableCell>
                     <TableCell align="right" />
                   </TableRow>
                 </TableHead>
@@ -70,7 +71,7 @@ export function DevicesPage() {
                       <TableCell>
                         {d.device_name}
                         <Typography variant="caption" color="text.secondary" component="div">
-                          requested {formatDateTime(d.created_at)}
+                          {t('requested {0}', formatDateTime(d.created_at))}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -81,8 +82,8 @@ export function DevicesPage() {
                       </TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={0.5}>
-                          <Chip size="small" variant="outlined" color={COLOR[d.status]} label={LABEL[d.status]} />
-                          {d.current && <Chip size="small" color="success" label="This phone" />}
+                          <Chip size="small" variant="outlined" color={COLOR[d.status]} label={t(LABEL[d.status])} />
+                          {d.current && <Chip size="small" color="success" label={t('This phone')} />}
                         </Stack>
                       </TableCell>
                       <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, whiteSpace: 'nowrap' }}>
@@ -91,13 +92,13 @@ export function DevicesPage() {
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                         {d.status !== 'APPROVED' && (
                           <Button size="small" color="success" disabled={busy}
-                            onClick={() => run(() => adminApi.approveDevice(d.id), 'Phone approved')}>
-                            Approve
+                            onClick={() => run(() => adminApi.approveDevice(d.id), t('Phone approved'))}>
+                            {t('Approve')}
                           </Button>
                         )}
                         {d.status !== 'REVOKED' && !d.current && (
                           <Button size="small" color="error" disabled={busy} onClick={() => setRevoking(d)}>
-                            Block
+                            {t('Block')}
                           </Button>
                         )}
                       </TableCell>
@@ -107,18 +108,18 @@ export function DevicesPage() {
               </Table>
             </TableContainer>
           ) : (
-            <EmptyState title="No phones here" text={status === 'PENDING' ? 'New phone requests will appear here.' : undefined} />
+            <EmptyState title={t('No phones here')} text={status === 'PENDING' ? t('New phone requests will appear here.') : undefined} />
           )}
         </QueryState>
       </Card>
       <ConfirmDialog
         open={Boolean(revoking)}
-        title="Block this phone?"
-        text={revoking ? `${revoking.device_name} of ${revoking.user_full_name} is signed out at once and cannot sign in again.` : undefined}
-        confirmLabel="Block"
+        title={t('Block this phone?')}
+        text={revoking ? t('{0} of {1} is signed out at once and cannot sign in again.', revoking.device_name, revoking.user_full_name) : undefined}
+        confirmLabel={t('Block')}
         color="error"
         loading={busy}
-        onConfirm={() => revoking && run(() => adminApi.revokeDevice(revoking.id), 'Phone blocked')}
+        onConfirm={() => revoking && run(() => adminApi.revokeDevice(revoking.id), t('Phone blocked'))}
         onClose={() => setRevoking(null)}
       />
     </>

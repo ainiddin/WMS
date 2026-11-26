@@ -23,8 +23,9 @@ import { authApi, joinApi } from "@/api/endpoints";
 import type { JoinInfo, User } from "@/api/types";
 import { useAuth } from "@/auth/AuthContext";
 import { ThemeToggle } from "@/components/Layout";
+import { LanguageMenu, t } from "@/i18n";
 import { PHONE_HINT, phoneError } from "@/format";
-import { PASSWORD_RULE, passwordHint } from "@/password";
+import { passwordHint, passwordRule } from "@/password";
 
 const RESEND_SECONDS = 60;
 
@@ -69,7 +70,7 @@ function EmailCodeField({
     <Stack spacing={1}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
         <TextField
-          label="Code from email"
+          label={t("Code from email")}
           required
           disabled={!sent}
           value={code}
@@ -80,8 +81,8 @@ function EmailCodeField({
           sx={{ flex: 1 }}
           helperText={
             sent
-              ? `Sent to ${sentTo}. Check the spam folder too.`
-              : "We email a 6-digit code to confirm the address"
+              ? t("Sent to {0}. Check the spam folder too.", sentTo)
+              : t("We email a 6-digit code to confirm the address")
           }
           slotProps={{ htmlInput: { inputMode: "numeric", maxLength: 6 } }}
         />
@@ -93,7 +94,7 @@ function EmailCodeField({
           }
           sx={{ height: 56, minWidth: 120, whiteSpace: "nowrap" }}
         >
-          {sent ? (wait > 0 ? `Resend (${wait})` : "Resend") : "Send code"}
+          {sent ? (wait > 0 ? t("Resend ({0})", wait) : t("Resend")) : t("Send code")}
         </Button>
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
@@ -111,14 +112,14 @@ function PhoneField({
   const error = phoneError(value);
   return (
     <TextField
-      label="Phone"
+      label={t("Phone")}
       type="tel"
       value={value}
       onChange={onChange}
       autoComplete="tel"
       placeholder={PHONE_HINT}
       error={!!error}
-      helperText={error ?? "Optional"}
+      helperText={error ?? t("Optional")}
     />
   );
 }
@@ -131,10 +132,10 @@ function signUpError(form: {
   confirm: string;
 }) {
   if (!/^\d{6}$/.test(form.code))
-    return "Enter the 6-digit code from the email";
+    return t("Enter the 6-digit code from the email");
   const weak = passwordHint(form.password);
-  if (weak) return `Password: ${weak.toLowerCase()}`;
-  if (form.password !== form.confirm) return "Passwords do not match";
+  if (weak) return t("Password: {0}", weak.toLowerCase());
+  if (form.password !== form.confirm) return t("Passwords do not match");
   return phoneError(form.phone);
 }
 
@@ -159,6 +160,7 @@ function AuthCard({
       }}
     >
       <Box sx={{ position: "fixed", top: 8, right: 8 }}>
+        <LanguageMenu />
         <ThemeToggle />
       </Box>
       <Box sx={{ width: "100%", maxWidth: 420 }}>
@@ -232,11 +234,11 @@ export function LoginPage() {
   };
 
   return (
-    <AuthCard title="Sign in" subtitle="Customer account of the KeyFive shop.">
+    <AuthCard title={t("Sign in")} subtitle={t("Customer account of the KeyFive shop.")}>
       <Stack component="form" spacing={2} onSubmit={submit}>
         {error && <Alert severity="error">{error}</Alert>}
         <TextField
-          label="Email"
+          label={t("Email")}
           type="email"
           autoComplete="email"
           required
@@ -246,7 +248,7 @@ export function LoginPage() {
           size="medium"
         />
         <TextField
-          label="Password"
+          label={t("Password")}
           type="password"
           autoComplete="current-password"
           required
@@ -261,12 +263,12 @@ export function LoginPage() {
           disabled={busy}
           startIcon={<LockOutlinedIcon />}
         >
-          Sign in
+          {t("Sign in")}
         </Button>
         <Typography variant="body2" sx={{ textAlign: "center" }}>
-          New customer?{" "}
+          {t("New customer?")}{" "}
           <Link component={RouterLink} to="/signup">
-            Create an account
+            {t("Create an account")}
           </Link>
         </Typography>
         <Typography
@@ -274,11 +276,11 @@ export function LoginPage() {
           color="text.secondary"
           sx={{ textAlign: "center" }}
         >
-          Admin or Manager?{" "}
+          {t("Admin or Manager?")}{" "}
           <Link component={RouterLink} to="/staff/login">
-            Staff sign in
+            {t("Staff sign in")}
           </Link>{" "}
-          (confirmed on your work phone). Workers use only the KeyFive Staff app.
+          {t("(confirmed on your work phone). Workers use only the KeyFive Staff app.")}
         </Typography>
       </Stack>
     </AuthCard>
@@ -329,20 +331,20 @@ export function SignUpPage() {
 
   return (
     <AuthCard
-      title="Create a customer account"
-      subtitle="Shop household goods and track your orders."
+      title={t("Create a customer account")}
+      subtitle={t("Shop household goods and track your orders.")}
     >
       <Stack component="form" spacing={2} onSubmit={submit}>
         {error && <Alert severity="error">{error}</Alert>}
         <TextField
-          label="Full name"
+          label={t("Full name")}
           required
           value={form.full_name}
           onChange={set("full_name")}
           autoComplete="name"
         />
         <TextField
-          label="Email"
+          label={t("Email")}
           type="email"
           required
           value={form.email}
@@ -356,24 +358,24 @@ export function SignUpPage() {
         />
         <PhoneField value={form.phone} onChange={set("phone")} />
         <TextField
-          label="Delivery address"
+          label={t("Delivery address")}
           value={form.address}
           onChange={set("address")}
           autoComplete="street-address"
-          placeholder="City, street, building, apartment"
+          placeholder={t("City, street, building, apartment")}
         />
         <TextField
-          label="Password"
+          label={t("Password")}
           type="password"
           required
           value={form.password}
           onChange={set("password")}
           autoComplete="new-password"
           error={!!form.password && !!passwordHint(form.password)}
-          helperText={(form.password && passwordHint(form.password)) || PASSWORD_RULE}
+          helperText={(form.password && passwordHint(form.password)) || passwordRule()}
         />
         <TextField
-          label="Repeat password"
+          label={t("Repeat password")}
           type="password"
           required
           value={form.confirm}
@@ -381,12 +383,12 @@ export function SignUpPage() {
           autoComplete="new-password"
         />
         <Button type="submit" variant="contained" size="large" disabled={busy}>
-          Sign up
+          {t("Sign up")}
         </Button>
         <Typography variant="body2" sx={{ textAlign: "center" }}>
-          Already have an account?{" "}
+          {t("Already have an account?")}{" "}
           <Link component={RouterLink} to="/login">
-            Sign in
+            {t("Sign in")}
           </Link>
         </Typography>
       </Stack>
@@ -416,15 +418,15 @@ export function JoinPage() {
   const weak = form.password ? passwordHint(form.password) : null;
   const problem =
     !form.first_name.trim() || !form.last_name.trim()
-      ? "Enter your first and last name"
+      ? t("Enter your first and last name")
       : !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())
-        ? "Enter your work email"
+        ? t("Enter your work email")
         : !form.phone.trim() || phoneError(form.phone)
-          ? (phoneError(form.phone) ?? "Enter your phone number")
+          ? (phoneError(form.phone) ?? t("Enter your phone number"))
           : passwordHint(form.password)
-            ? `Password: ${passwordHint(form.password)!.toLowerCase()}`
+            ? t("Password: {0}", passwordHint(form.password)!.toLowerCase())
             : form.password !== form.confirm
-              ? "The passwords do not match"
+              ? t("The passwords do not match")
               : null;
 
   const submit = async (e: FormEvent) => {
@@ -451,21 +453,24 @@ export function JoinPage() {
 
   if (gone) {
     return (
-      <AuthCard title="Invitation link">
+      <AuthCard title={t("Invitation link")}>
         <Alert severity="warning">{gone}</Alert>
       </AuthCard>
     );
   }
   if (joined) {
     return (
-      <AuthCard title={`Welcome, ${joined.full_name}!`}>
+      <AuthCard title={t("Welcome, {0}!", joined.full_name)}>
         <Stack spacing={2}>
           <Alert severity="success">
-            Your employee ID: <b>{joined.employee_code}</b>. Keep it: you may be asked for it at work.
+            {t("Your employee ID:")} <b>{joined.employee_code}</b>. {t("Keep it: you may be asked for it at work.")}
           </Alert>
           <Typography>
-            Next: install the <b>KeyFive Staff</b> app on your work phone and sign in with <b>{joined.email}</b> and
-            your password. Your Manager approves the phone, then you can work.
+            {t(
+              "Next: install the KeyFive Staff app on your work phone and sign in with {0} and your password. " +
+                "Your Manager approves the phone, then you can work.",
+              joined.email,
+            )}
           </Typography>
         </Stack>
       </AuthCard>
@@ -473,33 +478,36 @@ export function JoinPage() {
   }
   if (!info) {
     return (
-      <AuthCard title="Invitation link">
-        <Typography color="text.secondary">Checking the link…</Typography>
+      <AuthCard title={t("Invitation link")}>
+        <Typography color="text.secondary">{t("Checking the link…")}</Typography>
       </AuthCard>
     );
   }
   return (
     <AuthCard
-      title={info.role === "MANAGER" ? "Join KeyFive as a Manager" : "Join KeyFive"}
-      subtitle={`${info.invited_by} invites you${info.team_name ? ` to ${info.team_name}` : ""}. The link works once.`}
+      title={info.role === "MANAGER" ? t("Join KeyFive as a Manager") : t("Join KeyFive")}
+      subtitle={
+        (info.team_name ? t("{0} invites you to {1}.", info.invited_by, info.team_name) : t("{0} invites you.", info.invited_by)) +
+        " " + t("The link works once.")
+      }
     >
       <Stack component="form" spacing={2} onSubmit={submit} noValidate>
         {error && <Alert severity="error">{error}</Alert>}
         <Stack direction="row" spacing={2}>
-          <TextField label="First name" required fullWidth value={form.first_name} onChange={set("first_name")} autoComplete="given-name" />
-          <TextField label="Last name" required fullWidth value={form.last_name} onChange={set("last_name")} autoComplete="family-name" />
+          <TextField label={t("First name")} required fullWidth value={form.first_name} onChange={set("first_name")} autoComplete="given-name" />
+          <TextField label={t("Last name")} required fullWidth value={form.last_name} onChange={set("last_name")} autoComplete="family-name" />
         </Stack>
-        <TextField label="Work email" type="email" required value={form.email} onChange={set("email")} autoComplete="email"
-          helperText="You sign in to the KeyFive Staff app with it" />
-        <TextField label="Phone" type="tel" required value={form.phone} onChange={set("phone")} autoComplete="tel"
+        <TextField label={t("Work email")} type="email" required value={form.email} onChange={set("email")} autoComplete="email"
+          helperText={t("You sign in to the KeyFive Staff app with it")} />
+        <TextField label={t("Phone")} type="tel" required value={form.phone} onChange={set("phone")} autoComplete="tel"
           placeholder={PHONE_HINT} error={!!form.phone && !!phoneError(form.phone)} helperText={(form.phone && phoneError(form.phone)) || " "} />
-        <TextField label="Password" type="password" required value={form.password} onChange={set("password")}
-          autoComplete="new-password" error={!!weak} helperText={weak ?? PASSWORD_RULE} />
-        <TextField label="Repeat password" type="password" required value={form.confirm} onChange={set("confirm")}
+        <TextField label={t("Password")} type="password" required value={form.password} onChange={set("password")}
+          autoComplete="new-password" error={!!weak} helperText={weak ?? passwordRule()} />
+        <TextField label={t("Repeat password")} type="password" required value={form.confirm} onChange={set("confirm")}
           autoComplete="new-password" error={!!form.confirm && form.confirm !== form.password}
-          helperText={form.confirm && form.confirm !== form.password ? "The passwords do not match" : " "} />
+          helperText={form.confirm && form.confirm !== form.password ? t("The passwords do not match") : " "} />
         <Button type="submit" variant="contained" size="large" disabled={busy || !!problem}>
-          Join
+          {t("Join")}
         </Button>
       </Stack>
     </AuthCard>
@@ -508,18 +516,18 @@ export function JoinPage() {
 
 export function ErrorPage({ code }: { code: 403 | 404 }) {
   return (
-    <AuthCard title={code === 403 ? "Access denied" : "Page not found"}>
+    <AuthCard title={code === 403 ? t("Access denied") : t("Page not found")}>
       <Stack spacing={2} sx={{ alignItems: "center", textAlign: "center" }}>
         <Typography variant="h2" color="text.secondary">
           {code}
         </Typography>
         <Typography color="text.secondary">
           {code === 403
-            ? "You do not have access to this page."
-            : "This page does not exist."}
+            ? t("You do not have access to this page.")
+            : t("This page does not exist.")}
         </Typography>
         <Button component={RouterLink} to="/" variant="contained">
-          Go to start page
+          {t("Go to start page")}
         </Button>
       </Stack>
     </AuthCard>

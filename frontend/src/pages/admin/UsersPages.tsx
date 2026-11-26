@@ -40,6 +40,7 @@ import { useNotify } from '@/components/Notify'
 import { formatDateTime, roleLabel } from '@/format'
 import { formatWait, UserStatusChip } from './parts'
 
+import { t } from '@/i18n'
 function useManagers() {
   return useQuery({
     queryKey: ['admin', 'employees', 'MANAGER'],
@@ -68,10 +69,10 @@ function ManagerSelect({ value, onChange, managers, exclude }: {
       select
       required
       fullWidth
-      label="Team (Manager)"
+      label={t('Team (Manager)')}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      helperText={managers.length ? 'A Worker always belongs to one Manager’s team' : 'Approve a Manager first'}
+      helperText={managers.length ? t("A Worker always belongs to one Manager's team") : t('Approve a Manager first')}
     >
       {managers
         .filter((m) => m.id !== exclude)
@@ -99,7 +100,7 @@ function ApproveDialog({ user, onClose }: { user: AdminUser; onClose: () => void
     setError(null)
     try {
       const u = await adminApi.approve(user.id, role, role === 'WORKER' ? Number(managerId) || null : null)
-      notify.success(`${u.full_name} approved as ${roleLabel[u.role]} (${u.employee?.code})`)
+      notify.success(t('{0} approved as {1} ({2})', u.full_name, roleLabel[u.role], u.employee?.code))
       refresh()
       onClose()
     } catch (e) {
@@ -111,22 +112,22 @@ function ApproveDialog({ user, onClose }: { user: AdminUser; onClose: () => void
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Approve {user.full_name}</DialogTitle>
+      <DialogTitle>{t('Approve {0}', user.full_name)}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
           <Typography variant="body2" color="text.secondary">
-            {user.email} asked to join as <b>{user.requested_role ? roleLabel[user.requested_role] : '—'}</b>. You can change the role.
+            {t('{0} asked to join as {1}. You can change the role.', user.email, user.requested_role ? roleLabel[user.requested_role] : '—')}
           </Typography>
-          <TextField select label="Role" value={role} onChange={(e) => setRole(e.target.value as 'MANAGER' | 'WORKER')}>
-            <MenuItem value="WORKER">Worker</MenuItem>
-            <MenuItem value="MANAGER">Manager (gets own team)</MenuItem>
+          <TextField select label={t('Role')} value={role} onChange={(e) => setRole(e.target.value as 'MANAGER' | 'WORKER')}>
+            <MenuItem value="WORKER">{t('Worker')}</MenuItem>
+            <MenuItem value="MANAGER">{t('Manager (gets own team)')}</MenuItem>
           </TextField>
           {role === 'WORKER' && <ManagerSelect value={managerId} onChange={setManagerId} managers={managers.data ?? []} />}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('Cancel')}</Button>
         <Button
           variant="contained"
           color="success"
@@ -134,7 +135,7 @@ function ApproveDialog({ user, onClose }: { user: AdminUser; onClose: () => void
           disabled={busy || (role === 'WORKER' && !managerId)}
           onClick={approve}
         >
-          Approve
+          {t('Approve')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -158,10 +159,10 @@ function RoleDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
     try {
       if (onlyTeamChange && user.employee) {
         await adminApi.changeTeam(user.employee.id, Number(managerId))
-        notify.success(`${user.full_name} moved to another team`)
+        notify.success(t('{0} moved to another team', user.full_name))
       } else {
         const u = await adminApi.changeRole(user.id, role, role === 'WORKER' ? Number(managerId) || null : null)
-        notify.success(`${u.full_name} is now ${roleLabel[u.role]}`)
+        notify.success(t('{0} is now {1}', u.full_name, roleLabel[u.role]))
       }
       refresh()
       onClose()
@@ -174,27 +175,27 @@ function RoleDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Role and team · {user.full_name}</DialogTitle>
+      <DialogTitle>{t('Role and team · {0}', user.full_name)}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
-          <TextField select label="Role" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
-            <MenuItem value="WORKER">Worker</MenuItem>
-            <MenuItem value="MANAGER">Manager</MenuItem>
-            <MenuItem value="ADMIN">Admin</MenuItem>
+          <TextField select label={t('Role')} value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
+            <MenuItem value="WORKER">{t('Worker')}</MenuItem>
+            <MenuItem value="MANAGER">{t('Manager')}</MenuItem>
+            <MenuItem value="ADMIN">{t('Admin')}</MenuItem>
           </TextField>
           {role === 'WORKER' && (
             <ManagerSelect value={managerId} onChange={setManagerId} managers={managers.data ?? []} exclude={user.employee?.id} />
           )}
           {user.role === 'MANAGER' && role !== 'MANAGER' && (
-            <Alert severity="info">A Manager with Workers must have them moved to another team first.</Alert>
+            <Alert severity="info">{t('A Manager with Workers must have them moved to another team first.')}</Alert>
           )}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('Cancel')}</Button>
         <Button variant="contained" onClick={save} disabled={busy || (role === 'WORKER' && !managerId)}>
-          Save
+          {t('Save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -205,13 +206,13 @@ function RoleDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
 function LoginTimer({ user }: { user: AdminUser }) {
   if (user.login_locked_seconds > 0) {
     return (
-      <Tooltip title={`${user.login_failures} wrong password(s) or too many codes`}>
-        <Chip size="small" color="error" label={`Locked · ${formatWait(user.login_locked_seconds)}`} />
+      <Tooltip title={t('{0} wrong password(s) or too many codes', user.login_failures)}>
+        <Chip size="small" color="error" label={t('Locked · {0}', formatWait(user.login_locked_seconds))} />
       </Tooltip>
     )
   }
   if (user.login_failures > 0) {
-    return <Chip size="small" color="warning" variant="outlined" label={`${user.login_failures} wrong`} />
+    return <Chip size="small" color="warning" variant="outlined" label={t('{0} wrong', user.login_failures)} />
   }
   return (
     <Typography variant="caption" color="text.secondary">
@@ -249,7 +250,7 @@ export function UsersPage() {
     setBusy(true)
     try {
       await adminApi.clearLoginTimer(u.id)
-      notify.success(`Login timer of ${u.full_name} cleared`)
+      notify.success(t('Login timer of {0} cleared', u.full_name))
       refresh()
     } catch (e) {
       notify.error(e)
@@ -264,7 +265,7 @@ export function UsersPage() {
     try {
       if (blocking.status === 'BLOCKED') await adminApi.unblock(blocking.id)
       else await adminApi.block(blocking.id)
-      notify.success(`${blocking.full_name} ${blocking.status === 'BLOCKED' ? 'unblocked' : 'blocked'}`)
+      notify.success(blocking.status === 'BLOCKED' ? t('{0} unblocked', blocking.full_name) : t('{0} blocked', blocking.full_name))
       refresh()
       setBlocking(null)
     } catch (e) {
@@ -276,30 +277,30 @@ export function UsersPage() {
 
   return (
     <>
-      <PageHeader title="Users" subtitle="All accounts. Blocking closes access at once; the history stays." />
+      <PageHeader title={t('Users')} subtitle={t('All accounts. Blocking closes access at once; the history stays.')} />
       <Card>
         <CardContent>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
             <TextField
-              placeholder="Search by name or email"
+              placeholder={t('Search by name or email')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               sx={{ flex: 1 }}
               slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }}
             />
-            <TextField select label="Role" value={role} onChange={(e) => setRole(e.target.value as Role | '')} sx={{ minWidth: 150 }}>
-              <MenuItem value="">All roles</MenuItem>
+            <TextField select label={t('Role')} value={role} onChange={(e) => setRole(e.target.value as Role | '')} sx={{ minWidth: 150 }}>
+              <MenuItem value="">{t('All roles')}</MenuItem>
               {ROLES.map((r) => (
                 <MenuItem key={r} value={r}>
                   {roleLabel[r]}
                 </MenuItem>
               ))}
             </TextField>
-            <TextField select label="Status" value={status} onChange={(e) => setStatus(e.target.value as UserStatus | '')} sx={{ minWidth: 150 }}>
-              <MenuItem value="">All statuses</MenuItem>
+            <TextField select label={t('Status')} value={status} onChange={(e) => setStatus(e.target.value as UserStatus | '')} sx={{ minWidth: 150 }}>
+              <MenuItem value="">{t('All statuses')}</MenuItem>
               {STATUSES.map((s) => (
                 <MenuItem key={s} value={s}>
-                  {s}
+                  {t(s)}
                 </MenuItem>
               ))}
             </TextField>
@@ -310,12 +311,12 @@ export function UsersPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>User</TableCell>
-                      <TableCell>Role</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Team</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Signed up</TableCell>
-                      <TableCell>Sign in</TableCell>
+                      <TableCell>{t('User')}</TableCell>
+                      <TableCell>{t('Role')}</TableCell>
+                      <TableCell>{t('Status')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Team')}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t('Signed up')}</TableCell>
+                      <TableCell>{t('Sign in')}</TableCell>
                       <TableCell align="right" />
                     </TableRow>
                   </TableHead>
@@ -343,30 +344,30 @@ export function UsersPage() {
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                           {u.status === 'PENDING' && (
                             <Button size="small" color="success" onClick={() => setApproving(u)}>
-                              Approve
+                              {t('Approve')}
                             </Button>
                           )}
                           {u.status === 'ACTIVE' && u.employee && (
-                            <Tooltip title={u.role === 'WORKER' ? 'Change role or team' : 'Change role'}>
-                              <IconButton size="small" onClick={() => setEditing(u)} aria-label="Change role">
+                            <Tooltip title={u.role === 'WORKER' ? t('Change role or team') : t('Change role')}>
+                              <IconButton size="small" onClick={() => setEditing(u)} aria-label={t('Change role')}>
                                 {u.role === 'WORKER' ? <GroupsOutlinedIcon fontSize="small" /> : <ManageAccountsOutlinedIcon fontSize="small" />}
                               </IconButton>
                             </Tooltip>
                           )}
                           {(u.login_failures > 0 || u.login_locked_seconds > 0) && (
-                            <Tooltip title="Clear timer: let this account sign in now">
-                              <IconButton size="small" color="warning" onClick={() => clearTimer(u)} aria-label="Clear timer" disabled={busy}>
+                            <Tooltip title={t('Clear timer: let this account sign in now')}>
+                              <IconButton size="small" color="warning" onClick={() => clearTimer(u)} aria-label={t('Clear timer')} disabled={busy}>
                                 <LockResetIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                           )}
                           {(u.status === 'ACTIVE' || u.status === 'BLOCKED') && u.id !== me?.id && (
-                            <Tooltip title={u.status === 'BLOCKED' ? 'Unblock' : 'Block'}>
+                            <Tooltip title={u.status === 'BLOCKED' ? t('Unblock') : t('Block')}>
                               <IconButton
                                 size="small"
                                 color={u.status === 'BLOCKED' ? 'success' : 'error'}
                                 onClick={() => setBlocking(u)}
-                                aria-label={u.status === 'BLOCKED' ? 'Unblock' : 'Block'}
+                                aria-label={u.status === 'BLOCKED' ? t('Unblock') : t('Block')}
                               >
                                 {u.status === 'BLOCKED' ? <LockOpenIcon fontSize="small" /> : <BlockIcon fontSize="small" />}
                               </IconButton>
@@ -379,7 +380,7 @@ export function UsersPage() {
                 </Table>
               </TableContainer>
             ) : (
-              <EmptyState title="No users match" />
+              <EmptyState title={t('No users match')} />
             )}
           </QueryState>
         </CardContent>
@@ -388,13 +389,13 @@ export function UsersPage() {
       {editing && <RoleDialog user={editing} onClose={() => setEditing(null)} />}
       <ConfirmDialog
         open={Boolean(blocking)}
-        title={blocking?.status === 'BLOCKED' ? `Unblock ${blocking?.full_name}?` : `Block ${blocking?.full_name}?`}
+        title={blocking?.status === 'BLOCKED' ? t('Unblock {0}?', blocking?.full_name) : t('Block {0}?', blocking?.full_name)}
         text={
           blocking?.status === 'BLOCKED'
-            ? 'The user will be able to sign in again.'
-            : 'The user is signed out at once and cannot sign in. Orders and movements stay in the history.'
+            ? t('The user will be able to sign in again.')
+            : t('The user is signed out at once and cannot sign in. Orders and movements stay in the history.')
         }
-        confirmLabel={blocking?.status === 'BLOCKED' ? 'Unblock' : 'Block'}
+        confirmLabel={blocking?.status === 'BLOCKED' ? t('Unblock') : t('Block')}
         color={blocking?.status === 'BLOCKED' ? 'success' : 'error'}
         loading={busy}
         onConfirm={toggleBlock}

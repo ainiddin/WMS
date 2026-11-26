@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import type { TimelinePoint } from '@/api/types'
 import { formatBucket } from '@/format'
+import { t } from '@/i18n'
 import { chartColors } from '@/theme'
 
 /** Shared axis / grid / tooltip styling so every chart looks the same in light and dark mode. */
@@ -63,11 +64,11 @@ export function TimelineChart({
         <YAxis {...s.axis} allowDecimals={false} />
         <Tooltip {...s.tooltip} labelFormatter={(d) => formatBucket(String(d), bucket)} />
         <Legend {...s.legend} />
-        <Bar dataKey="orders_shipped" name="Orders shipped" stackId="a" fill={chartColors.shipped} />
+        <Bar dataKey="orders_shipped" name={t('Orders shipped')} stackId="a" fill={chartColors.shipped} />
         {showApproved && (
-          <Bar dataKey="orders_approved" name="Orders approved" stackId="a" fill={chartColors.approved} />
+          <Bar dataKey="orders_approved" name={t('Orders approved')} stackId="a" fill={chartColors.approved} />
         )}
-        <Bar dataKey="stock_in_count" name="Stock IN" stackId="a" fill={chartColors.stockIn} radius={[3, 3, 0, 0]} />
+        <Bar dataKey="stock_in_count" name={t('Stock IN')} stackId="a" fill={chartColors.stockIn} radius={[3, 3, 0, 0]} />
       </BarChart>
     </ChartBox>
   )

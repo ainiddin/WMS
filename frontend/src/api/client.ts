@@ -1,4 +1,5 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import { t } from '@/i18n'
 import type { TokenPair } from './types'
 
 const ACCESS_KEY = 'kf.access'
@@ -119,10 +120,10 @@ export function errorMessage(error: unknown): string {
         })
         .join('; ')
     }
-    if (!error.response) return 'Cannot reach the server. Is the backend running?'
-    return `Request failed (${error.response.status})`
+    if (!error.response) return t('Cannot reach the server. Is the backend running?')
+    return t('Request failed ({0})', error.response.status)
   }
-  return error instanceof Error ? error.message : 'Something went wrong'
+  return error instanceof Error ? error.message : t('Something went wrong')
 }
 
 export function statusOf(error: unknown): number | undefined {

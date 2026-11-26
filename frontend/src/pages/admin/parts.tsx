@@ -11,6 +11,7 @@ import {
 } from '@mui/material'
 import type { ReactNode } from 'react'
 import type { Period, UserStatus } from '@/api/types'
+import { t } from '@/i18n'
 
 export function StatCard({
   label,
@@ -58,14 +59,14 @@ const USER_COLORS: Record<UserStatus, ChipProps['color']> = {
 }
 
 export function UserStatusChip({ status }: { status: UserStatus }) {
-  return <Chip size="small" label={status} color={USER_COLORS[status]} variant="outlined" />
+  return <Chip size="small" label={t(status)} color={USER_COLORS[status]} variant="outlined" />
 }
 
 export const PERIOD_LABELS: Record<Period, string> = {
-  week: 'Week',
-  month: 'Month',
-  quarter: '3 months',
-  year: 'Year',
+  get week() { return t('Week') },
+  get month() { return t('Month') },
+  get quarter() { return t('3 months') },
+  get year() { return t('Year') },
 }
 
 export function PeriodToggle({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
@@ -76,7 +77,7 @@ export function PeriodToggle({ value, onChange }: { value: Period; onChange: (p:
       color="primary"
       value={value}
       onChange={(_, v: Period | null) => v && onChange(v)}
-      aria-label="Period"
+      aria-label={t('Period')}
     >
       {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
         <ToggleButton key={p} value={p} sx={{ px: 1.5 }}>
@@ -126,7 +127,7 @@ export function RankBadge({ rank }: { rank: number }) {
 
 /** "12 min" / "45 s" for lock timers. */
 export function formatWait(seconds: number): string {
-  return seconds >= 60 ? `${Math.ceil(seconds / 60)} min` : `${seconds} s`
+  return seconds >= 60 ? t('{0} min', Math.ceil(seconds / 60)) : t('{0} s', seconds)
 }
 
 /** Exact "m:ss" (or "h:mm:ss") for a countdown in whole seconds. */
@@ -144,7 +145,7 @@ export function formatClock(seconds: number): string {
  */
 export function lockMessage(detail: string, secondsLeft: number): string {
   const clock = formatClock(secondsLeft)
-  if (/^Wait \d+ s before/.test(detail)) return `A new code can be requested in ${clock}.`
-  const what = detail.replace(/\s*Try again in \d+ min\.?\s*$/, '').trim() || 'Too many attempts.'
-  return `${what} Try again in ${clock}.`
+  if (/^Wait \d+ s before/.test(detail)) return t('A new code can be requested in {0}.', clock)
+  const what = detail.replace(/\s*Try again in \d+ min\.?\s*$/, '').trim() || t('Too many attempts.')
+  return t('{0} Try again in {1}.', what, clock)
 }

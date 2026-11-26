@@ -36,6 +36,7 @@ import { formatMoney, PHONE_HINT, phoneError } from '@/format'
 import { TopUpDialog, useAccount } from './AccountPage'
 import { categoryLook, ProductCard, ProductPicture } from './ProductCard'
 
+import { t } from '@/i18n'
 function useCategories() {
   return useQuery({ queryKey: ['categories'], queryFn: () => catalogApi.categories(), staleTime: 5 * 60_000 })
 }
@@ -56,27 +57,27 @@ export function HomePage() {
       >
         <CardContent sx={{ p: { xs: 3, md: 6 } }}>
           <Typography variant="h4" component="h1" sx={{ maxWidth: 560 }}>
-            Everything for a tidy, comfortable home
+            {t('Everything for a tidy, comfortable home')}
           </Typography>
           <Typography sx={{ mt: 1.5, maxWidth: 520, opacity: 0.9 }}>
-            Kitchenware, cleaning supplies, bathroom and home textile — straight from our Almaty warehouse.
+            {t('Kitchenware, cleaning supplies, bathroom and home textile — straight from our Almaty warehouse.')}
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 3 }}>
             <Button variant="contained" color="secondary" size="large" component={RouterLink} to="/catalog">
-              Browse the catalog
+              {t('Browse the catalog')}
             </Button>
             {!user && (
               <Button variant="outlined" color="inherit" size="large" component={RouterLink} to="/signup">
-                Create an account
+                {t('Create an account')}
               </Button>
             )}
           </Stack>
           <Stack direction="row" spacing={3} sx={{ mt: 4, flexWrap: 'wrap', rowGap: 1, opacity: 0.9 }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <LocalShippingOutlinedIcon fontSize="small" /> <span>Delivery to your door</span>
+              <LocalShippingOutlinedIcon fontSize="small" /> <span>{t('Delivery to your door')}</span>
             </Stack>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <VerifiedOutlinedIcon fontSize="small" /> <span>Live stock — what you see is available</span>
+              <VerifiedOutlinedIcon fontSize="small" /> <span>{t('Live stock — what you see is available')}</span>
             </Stack>
           </Stack>
         </CardContent>
@@ -84,7 +85,7 @@ export function HomePage() {
 
       <Box>
         <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
-          Shop by category
+          {t('Shop by category')}
         </Typography>
         <QueryState isLoading={categories.isLoading} error={categories.error}>
           <Grid container spacing={2}>
@@ -108,10 +109,10 @@ export function HomePage() {
       <Box>
         <Stack direction="row" sx={{ mb: 2, alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6" component="h2">
-            Popular right now
+            {t('Popular right now')}
           </Typography>
           <Button component={RouterLink} to="/catalog">
-            See all
+            {t('See all')}
           </Button>
         </Stack>
         <QueryState isLoading={popular.isLoading} error={popular.error}>
@@ -159,14 +160,14 @@ export function CatalogPage() {
 
   return (
     <>
-      <PageHeader title="Catalog" subtitle={products.data ? `${products.data.length} products` : undefined} />
+      <PageHeader title={t('Catalog')} subtitle={products.data ? t('{0} products', products.data.length) : undefined} />
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} sx={{ alignItems: 'center' }}>
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField
                 fullWidth
-                placeholder="Search products"
+                placeholder={t('Search products')}
                 value={search}
                 onChange={(e) => {
                   const value = e.target.value
@@ -182,11 +183,11 @@ export function CatalogPage() {
               <TextField
                 select
                 fullWidth
-                label="Category"
+                label={t('Category')}
                 value={params.get('category') ?? ''}
                 onChange={(e) => update('category', e.target.value || null)}
               >
-                <MenuItem value="">All categories</MenuItem>
+                <MenuItem value="">{t('All categories')}</MenuItem>
                 {categories.data?.map((c) => (
                   <MenuItem key={c.id} value={String(c.id)}>
                     {c.name}
@@ -198,7 +199,7 @@ export function CatalogPage() {
               <TextField
                 fullWidth
                 type="number"
-                label="Min ₸"
+                label={t('Min ₸')}
                 value={params.get('min') ?? ''}
                 onChange={(e) => update('min', e.target.value || null)}
                 slotProps={{ htmlInput: { min: 0 } }}
@@ -208,23 +209,23 @@ export function CatalogPage() {
               <TextField
                 fullWidth
                 type="number"
-                label="Max ₸"
+                label={t('Max ₸')}
                 value={params.get('max') ?? ''}
                 onChange={(e) => update('max', e.target.value || null)}
                 slotProps={{ htmlInput: { min: 0 } }}
               />
             </Grid>
             <Grid size={{ xs: 6, md: 1.5 }}>
-              <TextField select fullWidth label="Sort" value={filters.sort} onChange={(e) => update('sort', e.target.value)}>
-                <MenuItem value="name">Name</MenuItem>
-                <MenuItem value="price">Price: low to high</MenuItem>
-                <MenuItem value="-price">Price: high to low</MenuItem>
+              <TextField select fullWidth label={t('Sort')} value={filters.sort} onChange={(e) => update('sort', e.target.value)}>
+                <MenuItem value="name">{t('Name')}</MenuItem>
+                <MenuItem value="price">{t('Price: low to high')}</MenuItem>
+                <MenuItem value="-price">{t('Price: high to low')}</MenuItem>
               </TextField>
             </Grid>
             <Grid size={{ xs: 6, md: 1 }}>
               <FormControlLabel
                 control={<Switch checked={params.get('stock') === '1'} onChange={(e) => update('stock', e.target.checked ? '1' : null)} />}
-                label="In stock"
+                label={t('In stock')}
               />
             </Grid>
           </Grid>
@@ -240,7 +241,7 @@ export function CatalogPage() {
             ))}
           </Grid>
         ) : (
-          <EmptyState title="Nothing found" text="Try another search or remove some filters." />
+          <EmptyState title={t('Nothing found')} text={t('Try another search or remove some filters.')} />
         )}
       </QueryState>
     </>
@@ -257,7 +258,7 @@ export function ProductDetailsPage() {
   return (
     <>
       <Button component={RouterLink} to="/catalog" startIcon={<ArrowBackIcon />} sx={{ mb: 2 }}>
-        Back to catalog
+        {t('Back to catalog')}
       </Button>
       <QueryState isLoading={product.isLoading} error={product.error}>
         {product.data && (
@@ -273,13 +274,13 @@ export function ProductDetailsPage() {
                     {product.data.product_name}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Article {product.data.code}
+                    {t('Article {0}', product.data.code)}
                   </Typography>
                   <Typography variant="h4" sx={{ my: 2 }}>
                     {formatMoney(product.data.unit_price)}
                   </Typography>
                   <Chip
-                    label={product.data.in_stock ? 'In stock' : 'Out of stock'}
+                    label={product.data.in_stock ? t('In stock') : t('Out of stock')}
                     color={product.data.in_stock ? 'success' : 'default'}
                   />
                   {product.data.description && (
@@ -290,7 +291,7 @@ export function ProductDetailsPage() {
                   <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
                     <TextField
                       type="number"
-                      label="Quantity"
+                      label={t('Quantity')}
                       value={qty}
                       onChange={(e) => setQty(Math.max(1, Math.min(MAX_LINE_QUANTITY, Number(e.target.value) || 1)))}
                       sx={{ width: 110 }}
@@ -303,10 +304,10 @@ export function ProductDetailsPage() {
                       disabled={!product.data.in_stock}
                       onClick={() => {
                         add(product.data, qty)
-                        notify.success(`Added ${qty} × ${product.data.product_name}`)
+                        notify.success(t('Added {0} × {1}', qty, product.data.product_name))
                       }}
                     >
-                      Add to cart
+                      {t('Add to cart')}
                     </Button>
                   </Stack>
                 </CardContent>
@@ -322,11 +323,11 @@ export function ProductDetailsPage() {
 function QuantityInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
     <Stack direction="row" sx={{ alignItems: 'center', border: 1, borderColor: 'divider', borderRadius: 2 }}>
-      <IconButton size="small" onClick={() => onChange(value - 1)} disabled={value <= 1} aria-label="Less">
+      <IconButton size="small" onClick={() => onChange(value - 1)} disabled={value <= 1} aria-label={t('Less')}>
         −
       </IconButton>
       <Typography sx={{ minWidth: 28, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{value}</Typography>
-      <IconButton size="small" onClick={() => onChange(value + 1)} disabled={value >= MAX_LINE_QUANTITY} aria-label="More">
+      <IconButton size="small" onClick={() => onChange(value + 1)} disabled={value >= MAX_LINE_QUANTITY} aria-label={t('More')}>
         +
       </IconButton>
     </Stack>
@@ -341,13 +342,13 @@ export function CartPage() {
   if (!lines.length)
     return (
       <>
-        <PageHeader title="Cart" />
+        <PageHeader title={t('Cart')} />
         <Card>
           <EmptyState
-            title="Your cart is empty"
+            title={t('Your cart is empty')}
             action={
               <Button variant="contained" component={RouterLink} to="/catalog" sx={{ mt: 1 }}>
-                Go to catalog
+                {t('Go to catalog')}
               </Button>
             }
           />
@@ -357,7 +358,7 @@ export function CartPage() {
 
   return (
     <>
-      <PageHeader title="Cart" />
+      <PageHeader title={t('Cart')} />
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 8 }}>
           <Card>
@@ -377,14 +378,14 @@ export function CartPage() {
                       {line.product.product_name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {formatMoney(line.product.unit_price)} each
+                      {t('{0} each', formatMoney(line.product.unit_price))}
                     </Typography>
                   </Box>
                   <QuantityInput value={line.quantity} onChange={(v) => setQuantity(line.product.id, v)} />
                   <Typography sx={{ width: 100, textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
                     {formatMoney(line.quantity * line.product.unit_price)}
                   </Typography>
-                  <IconButton onClick={() => remove(line.product.id)} aria-label="Remove">
+                  <IconButton onClick={() => remove(line.product.id)} aria-label={t('Remove')}>
                     <DeleteOutlineIcon />
                   </IconButton>
                 </Stack>
@@ -395,17 +396,17 @@ export function CartPage() {
         <Grid size={{ xs: 12, md: 4 }}>
           <Card>
             <CardContent>
-              <Typography variant="h6">Summary</Typography>
+              <Typography variant="h6">{t('Summary')}</Typography>
               <Stack direction="row" sx={{ my: 2, justifyContent: 'space-between' }}>
-                <Typography color="text.secondary">Estimated total</Typography>
+                <Typography color="text.secondary">{t('Estimated total')}</Typography>
                 <Typography variant="h6">{formatMoney(total)}</Typography>
               </Stack>
               <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 2 }}>
-                The final total is calculated by the shop when you place the order.
+                {t('The final total is calculated by the shop when you place the order.')}
               </Typography>
               {user && user.role !== 'CUSTOMER' && (
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  Staff accounts cannot place orders. Sign in as a customer.
+                  {t('Staff accounts cannot place orders. Sign in as a customer.')}
                 </Alert>
               )}
               <Button
@@ -415,7 +416,7 @@ export function CartPage() {
                 disabled={Boolean(user && user.role !== 'CUSTOMER')}
                 onClick={() => navigate(user ? '/checkout' : '/login', { state: { from: '/checkout' } })}
               >
-                {user ? 'Checkout' : 'Sign in to checkout'}
+                {user ? t('Checkout') : t('Sign in to checkout')}
               </Button>
             </CardContent>
           </Card>
@@ -460,8 +461,8 @@ export function CheckoutPage() {
       queryClient.invalidateQueries({ queryKey: ['account'] })
       notify.success(
         order.status === 'PENDING'
-          ? `Order ${order.code} paid. It waits for stock; we confirm it automatically when the goods arrive.`
-          : `Order ${order.code} placed and paid: ${formatMoney(order.total_amount)}`,
+          ? t('Order {0} paid. It waits for stock; we confirm it automatically when the goods arrive.', order.code)
+          : t('Order {0} placed and paid: {1}', order.code, formatMoney(order.total_amount)),
       )
       navigate('/my-orders', { replace: true, state: { highlight: order.id } })
     },
@@ -471,9 +472,9 @@ export function CheckoutPage() {
   if (!lines.length)
     return (
       <>
-        <PageHeader title="Checkout" />
+        <PageHeader title={t('Checkout')} />
         <Card>
-          <EmptyState title="Your cart is empty" action={<Button component={RouterLink} to="/catalog">Go to catalog</Button>} />
+          <EmptyState title={t('Your cart is empty')} action={<Button component={RouterLink} to="/catalog">{t('Go to catalog')}</Button>} />
         </Card>
       </>
     )
@@ -486,27 +487,27 @@ export function CheckoutPage() {
   return (
     <>
       <PageHeader
-        title="Checkout"
-        subtitle="Paid from your KeyFive account. If the order is rejected or cancelled, the money comes back."
+        title={t('Checkout')}
+        subtitle={t('Paid from your KeyFive account. If the order is rejected or cancelled, the money comes back.')}
       />
       <Grid container spacing={3} component="form" onSubmit={submit}>
         <Grid size={{ xs: 12, md: 7 }}>
           <Card>
             <CardContent>
               <Stack spacing={2}>
-                <Typography variant="h6">Delivery</Typography>
+                <Typography variant="h6">{t('Delivery')}</Typography>
                 <TextField
-                  label="Delivery address"
+                  label={t('Delivery address')}
                   required
                   fullWidth
                   multiline
                   minRows={2}
                   value={shownAddress}
                   onChange={(e) => setAddress(e.target.value)}
-                  helperText="City, street, building, apartment"
+                  helperText={t('City, street, building, apartment')}
                 />
                 <TextField
-                  label="Comment for the courier (optional)"
+                  label={t('Comment for the courier (optional)')}
                   fullWidth
                   multiline
                   minRows={2}
@@ -521,7 +522,7 @@ export function CheckoutPage() {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 1 }}>
-                Your order
+                {t('Your order')}
               </Typography>
               {lines.map((l) => (
                 <Stack key={l.product.id} direction="row" sx={{ py: 0.75, justifyContent: 'space-between', gap: 2 }}>
@@ -535,12 +536,12 @@ export function CheckoutPage() {
               ))}
               <Divider sx={{ my: 1.5 }} />
               <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                <Typography sx={{ fontWeight: 600 }}>Total</Typography>
+                <Typography sx={{ fontWeight: 600 }}>{t('Total')}</Typography>
                 <Typography sx={{ fontWeight: 600 }}>{formatMoney(total)}</Typography>
               </Stack>
               <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Account balance
+                  {t('Account balance')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {account.data ? formatMoney(balance) : '…'}
@@ -552,7 +553,7 @@ export function CheckoutPage() {
                     waiting={stock.data.waiting}
                     etaMin={stock.data.eta_min_days}
                     etaMax={stock.data.eta_max_days}
-                    footer="You can still order: it is confirmed as soon as the goods arrive. You can cancel any time before shipping and get the money back."
+                    footer={t('You can still order: it is confirmed as soon as the goods arrive. You can cancel any time before shipping and get the money back.')}
                   />
                 </Box>
               )}
@@ -562,11 +563,11 @@ export function CheckoutPage() {
                   sx={{ mt: 2 }}
                   action={
                     <Button color="inherit" size="small" onClick={() => setTopUpOpen(true)}>
-                      Top up
+                      {t('Top up')}
                     </Button>
                   }
                 >
-                  Not enough money: top up at least {formatMoney(missing)}.
+                  {t('Not enough money: top up at least {0}.', formatMoney(missing))}
                 </Alert>
               )}
               <Button
@@ -577,7 +578,7 @@ export function CheckoutPage() {
                 sx={{ mt: 2 }}
                 disabled={placeOrder.isPending || !account.data || missing > 0}
               >
-                Pay {formatMoney(total)} and place order
+                {t('Pay {0} and place order', formatMoney(total))}
               </Button>
             </CardContent>
           </Card>
@@ -606,7 +607,7 @@ export function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: ['customers', 'me'] })
       refreshUser()
       setForm(null)
-      notify.success('Profile saved')
+      notify.success(t('Profile saved'))
     },
     onError: notify.error,
   })
@@ -615,7 +616,7 @@ export function ProfilePage() {
 
   return (
     <>
-      <PageHeader title="Profile" subtitle={profile.data ? `${profile.data.code} · ${profile.data.email}` : undefined} />
+      <PageHeader title={t('Profile')} subtitle={profile.data ? `${profile.data.code} · ${profile.data.email}` : undefined} />
       <QueryState isLoading={profile.isLoading} error={profile.error}>
         <Card sx={{ maxWidth: 560 }}>
           <CardContent>
@@ -627,19 +628,19 @@ export function ProfilePage() {
                 save.mutate()
               }}
             >
-              <TextField label="Full name" required value={values.full_name} onChange={set('full_name')} />
+              <TextField label={t('Full name')} required value={values.full_name} onChange={set('full_name')} />
               <TextField
-                label="Phone"
+                label={t('Phone')}
                 value={values.phone}
                 onChange={set('phone')}
                 placeholder={PHONE_HINT}
                 error={!!phoneError(values.phone)}
                 helperText={phoneError(values.phone)}
               />
-              <TextField label="Default delivery address" multiline minRows={2} value={values.address} onChange={set('address')} />
+              <TextField label={t('Default delivery address')} multiline minRows={2} value={values.address} onChange={set('address')} />
               <Box>
                 <Button type="submit" variant="contained" disabled={save.isPending || !form || !!phoneError(values.phone)}>
-                  Save
+                  {t('Save')}
                 </Button>
               </Box>
             </Stack>

@@ -4,10 +4,11 @@ import { adminApi } from '@/api/endpoints'
 import type { PaymentStatus } from '@/api/types'
 import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { formatDateTime, formatMoney } from '@/format'
+import { t } from '@/i18n'
 import { StatCard } from './parts'
 
 const STATUS: Record<PaymentStatus, { label: string; color: 'success' | 'default' | 'warning' | 'info' }> = {
-  SUCCEEDED: { label: 'Paid', color: 'success' },
+  SUCCEEDED: { label: 'Paid', color: 'success' }, // labels are English keys, shown through t()
   PENDING: { label: 'Open', color: 'info' },
   FAILED: { label: 'Cancelled', color: 'warning' },
   EXPIRED: { label: 'Expired', color: 'default' },
@@ -20,37 +21,37 @@ export function PaymentsPage() {
   return (
     <>
       <PageHeader
-        title="Payments"
-        subtitle={data.data ? `Top-ups by card through ${data.data.gateway}. Read only: nobody can withdraw.` : undefined}
+        title={t('Payments')}
+        subtitle={data.data ? t('Top-ups by card through {0}. Read only: nobody can withdraw.', data.data.gateway) : undefined}
       />
       <QueryState isLoading={data.isLoading} error={data.error}>
         {data.data && (
           <>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <StatCard label="Received in total" value={formatMoney(data.data.total)} tone="success" />
+                <StatCard label={t('Received in total')} value={formatMoney(data.data.total)} tone="success" />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <StatCard label="Received today" value={formatMoney(data.data.today)} />
+                <StatCard label={t('Received today')} value={formatMoney(data.data.today)} />
               </Grid>
             </Grid>
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                  Latest payments
+                  {t('Latest payments')}
                 </Typography>
                 {data.data.payments.length ? (
                   <Box sx={{ overflowX: 'auto' }}>
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>Started</TableCell>
-                          <TableCell>Payment</TableCell>
-                          <TableCell>Customer</TableCell>
-                          <TableCell align="right">Amount</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Card</TableCell>
-                          <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Note</TableCell>
+                          <TableCell>{t('Started')}</TableCell>
+                          <TableCell>{t('Payment')}</TableCell>
+                          <TableCell>{t('Customer')}</TableCell>
+                          <TableCell align="right">{t('Amount')}</TableCell>
+                          <TableCell>{t('Status')}</TableCell>
+                          <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Card')}</TableCell>
+                          <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('Note')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -68,7 +69,7 @@ export function PaymentsPage() {
                               {formatMoney(p.amount)}
                             </TableCell>
                             <TableCell>
-                              <Chip size="small" label={STATUS[p.status].label} color={STATUS[p.status].color} />
+                              <Chip size="small" label={t(STATUS[p.status].label)} color={STATUS[p.status].color} />
                             </TableCell>
                             <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, whiteSpace: 'nowrap' }}>
                               {p.card_last4 ? `${p.card_brand} •• ${p.card_last4}` : '—'}
@@ -80,7 +81,7 @@ export function PaymentsPage() {
                     </Table>
                   </Box>
                 ) : (
-                  <EmptyState title="No payments yet" text="Customers' card top-ups appear here." />
+                  <EmptyState title={t('No payments yet')} text={t("Customers' card top-ups appear here.")} />
                 )}
               </CardContent>
             </Card>

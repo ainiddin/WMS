@@ -18,6 +18,7 @@ import { useNotify } from '@/components/Notify'
 import { OrderItemsTable, OrderMeta, OrderProgress, WaitingNotice } from '@/components/OrderParts'
 import { formatDateTime, formatMoney } from '@/format'
 
+import { t } from '@/i18n'
 export function MyOrdersPage() {
   const highlight = (useLocation().state as { highlight?: number } | null)?.highlight
   const orders = useQuery({ queryKey: ['orders', 'mine'], queryFn: () => ordersApi.list(), refetchInterval: 20_000 })
@@ -29,7 +30,7 @@ export function MyOrdersPage() {
   const cancel = useMutation({
     mutationFn: (id: number) => ordersApi.cancel(id),
     onSuccess: (o) => {
-      notify.success(`Order ${o.code} cancelled`)
+      notify.success(t('Order {0} cancelled', o.code))
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       setCancelId(null)
     },
@@ -38,7 +39,7 @@ export function MyOrdersPage() {
 
   return (
     <>
-      <PageHeader title="My orders" subtitle="Statuses update automatically." />
+      <PageHeader title={t('My orders')} subtitle={t('Statuses update automatically.')} />
       <QueryState isLoading={orders.isLoading} error={orders.error}>
         {orders.data?.length ? (
           <Box>
@@ -77,7 +78,7 @@ export function MyOrdersPage() {
                         waiting={order.waiting}
                         etaMin={order.eta_min_days}
                         etaMax={order.eta_max_days}
-                        footer="The order is confirmed automatically when the goods arrive. If you cannot wait, cancel it: the money goes back to your account at once."
+                        footer={t('The order is confirmed automatically when the goods arrive. If you cannot wait, cancel it: the money goes back to your account at once.')}
                       />
                     )}
                     <OrderProgress order={order} />
@@ -86,7 +87,7 @@ export function MyOrdersPage() {
                     {(order.status === 'PENDING' || order.status === 'APPROVED') && (
                       <Box>
                         <Button color="error" variant="outlined" onClick={() => setCancelId(order.id)}>
-                          Cancel order
+                          {t('Cancel order')}
                         </Button>
                       </Box>
                     )}
@@ -98,10 +99,10 @@ export function MyOrdersPage() {
         ) : (
           <Card>
             <EmptyState
-              title="No orders yet"
+              title={t('No orders yet')}
               action={
                 <Button variant="contained" component={RouterLink} to="/catalog" sx={{ mt: 1 }}>
-                  Start shopping
+                  {t('Start shopping')}
                 </Button>
               }
             />
@@ -110,9 +111,9 @@ export function MyOrdersPage() {
       </QueryState>
       <ConfirmDialog
         open={cancelId !== null}
-        title="Cancel this order?"
-        text="You can cancel until the order is shipped. The money goes back to your account at once."
-        confirmLabel="Cancel order"
+        title={t('Cancel this order?')}
+        text={t('You can cancel until the order is shipped. The money goes back to your account at once.')}
+        confirmLabel={t('Cancel order')}
         color="error"
         loading={cancel.isPending}
         onConfirm={() => cancelId && cancel.mutate(cancelId)}

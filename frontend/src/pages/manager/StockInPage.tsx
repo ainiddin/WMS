@@ -23,6 +23,7 @@ import { EmptyState, PageHeader, QueryState } from '@/components/common'
 import { useNotify } from '@/components/Notify'
 import { formatDateTime } from '@/format'
 
+import { t } from '@/i18n'
 const MAX_QUANTITY = 100_000
 
 /**
@@ -80,8 +81,8 @@ export function StockInPage() {
   return (
     <>
       <PageHeader
-        title="Stock IN"
-        subtitle="Goods received from a supplier. Type or scan the barcode, or pick the product from the list."
+        title={t('Stock IN')}
+        subtitle={t('Goods received from a supplier. Type or scan the barcode, or pick the product from the list.')}
       />
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 6 }}>
@@ -89,7 +90,7 @@ export function StockInPage() {
             <CardContent>
               <Stack spacing={2.5}>
                 <TextField
-                  label="Barcode"
+                  label={t('Barcode')}
                   autoFocus
                   value={barcode}
                   onChange={(e) => setBarcode(barcodeInput(e.target.value))}
@@ -99,7 +100,7 @@ export function StockInPage() {
                       findByBarcode()
                     }
                   }}
-                  helperText="Type the digits and press Enter (a USB scanner does it for you)"
+                  helperText={t('Type the digits and press Enter (a USB scanner does it for you)')}
                   slotProps={{ htmlInput: { inputMode: 'numeric', autoComplete: 'off' } }}
                 />
                 {lookupError && <Alert severity="warning">{lookupError}</Alert>}
@@ -110,7 +111,7 @@ export function StockInPage() {
                   onChange={(_, v) => setSelected(v)}
                   getOptionLabel={(p) => `${p.code} · ${p.product_name}`}
                   isOptionEqualToValue={(a, b) => a.id === b.id}
-                  renderInput={(p) => <TextField {...p} label="Product" />}
+                  renderInput={(p) => <TextField {...p} label={t('Product')} />}
                 />
                 {product && (
                   <Alert severity={product.below_min ? 'warning' : 'info'} icon={false}>
@@ -120,7 +121,7 @@ export function StockInPage() {
                 )}
                 <Stack component="form" spacing={2} onSubmit={submit} noValidate>
                   <TextField
-                    label="Quantity received"
+                    label={t('Quantity received')}
                     required
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -129,10 +130,10 @@ export function StockInPage() {
                     slotProps={{ htmlInput: { inputMode: 'numeric' } }}
                   />
                   <TextField
-                    label="Note (optional)"
+                    label={t('Note (optional)')}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="Invoice number, supplier…"
+                    placeholder={t('Invoice number, supplier…')}
                     slotProps={{ htmlInput: { maxLength: 255 } }}
                   />
                   <Button
@@ -142,7 +143,7 @@ export function StockInPage() {
                     startIcon={<MoveToInboxOutlinedIcon />}
                     disabled={!product || !qtyOk || save.isPending}
                   >
-                    Save stock IN
+                    {t('Save stock IN')}
                   </Button>
                 </Stack>
               </Stack>
@@ -153,7 +154,7 @@ export function StockInPage() {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 1 }}>
-                Latest stock IN
+                {t('Latest stock IN')}
               </Typography>
               <QueryState isLoading={recent.isLoading} error={recent.error}>
                 {recent.data?.length ? (
@@ -168,7 +169,7 @@ export function StockInPage() {
                     ))}
                   </List>
                 ) : (
-                  <EmptyState title="Nothing received yet" text="Stock IN records appear here." />
+                  <EmptyState title={t('Nothing received yet')} text={t('Stock IN records appear here.')} />
                 )}
               </QueryState>
             </CardContent>
