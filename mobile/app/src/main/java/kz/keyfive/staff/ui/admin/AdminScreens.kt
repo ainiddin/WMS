@@ -36,6 +36,7 @@ import kz.keyfive.staff.ui.ChipRow
 import kz.keyfive.staff.ui.Confirm
 import kz.keyfive.staff.ui.Empty
 import kz.keyfive.staff.ui.Green
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Hint
 import kz.keyfive.staff.ui.LoadedList
 import kz.keyfive.staff.ui.Orange
@@ -63,16 +64,16 @@ fun DevicesScreen(session: Session) {
     LoadedList(devices, header = {
         item {
             Section {
-                Hint("Staff can work only on phones approved here. Approve a phone only after the employee " +
-                    "confirms it is theirs (ask in person or by phone). An unexpected request means the password leaked.")
+                Hint(t("Staff can work only on phones approved here. Approve a phone only after the employee " +
+                    "confirms it is theirs (ask in person or by phone). An unexpected request means the password leaked."))
             }
         }
         item {
             ChipRow(listOf("PENDING", "APPROVED", "REVOKED", null), status,
-                { mapOf("PENDING" to "Waiting", "APPROVED" to "Approved", "REVOKED" to "Blocked")[it] ?: "All" }) { status = it }
+                { mapOf("PENDING" to "Waiting", "APPROVED" to "Approved", "REVOKED" to "Blocked")[it]?.let { s -> t(s) } ?: t("All") }) { status = it }
         }
     }) { list ->
-        if (list.isEmpty()) item { Empty(if (status == "PENDING") "No phones waiting" else "No phones") }
+        if (list.isEmpty()) item { Empty(if (status == "PENDING") t("No phones waiting") else t("No phones")) }
         items(list, key = { it.id }) { d ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -81,18 +82,18 @@ fun DevicesScreen(session: Session) {
                             Text(d.userFullName, fontWeight = FontWeight.SemiBold)
                             Hint("${roleLabel[d.userRole]} · ${d.userEmail}")
                         }
-                        Badge(if (d.current) "this phone" else d.status.lowercase(),
+                        Badge(if (d.current) t("this phone") else t(d.status.lowercase()),
                             if (d.current) Green else statusColor(if (d.status == "REVOKED") "BLOCKED" else d.status))
                     }
                     Text(d.deviceName)
-                    Hint("Requested ${dateTime(d.createdAt)}" + (d.lastSeenAt?.let { " · last sign in ${dateTime(it)}" } ?: ""))
+                    Hint(t("Requested {0}", dateTime(d.createdAt)) + (d.lastSeenAt?.let { " · " + t("last sign in {0}", dateTime(it)) } ?: ""))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (d.status != "APPROVED") {
-                            Button(onClick = { action.run(after = devices.reload) { session.api.approveDevice(d.id); "Phone approved" } },
-                                enabled = !action.busy, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Approve") }
+                            Button(onClick = { action.run(after = devices.reload) { session.api.approveDevice(d.id); t("Phone approved") } },
+                                enabled = !action.busy, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(t("Approve")) }
                         }
                         if (d.status != "REVOKED" && !d.current) {
-                            OutlinedButton(onClick = { revoking = d }, enabled = !action.busy) { Text("Block", color = Red) }
+                            OutlinedButton(onClick = { revoking = d }, enabled = !action.busy) { Text(t("Block"), color = Red) }
                         }
                     }
                 }
@@ -100,9 +101,9 @@ fun DevicesScreen(session: Session) {
         }
     }
     revoking?.let { d ->
-        Confirm("Block this phone?", "${d.deviceName} of ${d.userFullName} is signed out at once and cannot sign in again.",
-            "Block", action.busy,
-            onConfirm = { action.run(after = { revoking = null; devices.reload() }) { session.api.revokeDevice(d.id); "Phone blocked" } },
+        Confirm(t("Block this phone?"), t("{0} of {1} is signed out at once and cannot sign in again.", d.deviceName, d.userFullName),
+            t("Block"), action.busy,
+            onConfirm = { action.run(after = { revoking = null; devices.reload() }) { session.api.revokeDevice(d.id); t("Phone blocked") } },
             onDismiss = { revoking = null })
     }
 }
@@ -122,16 +123,16 @@ private fun RoleDialog(session: Session, user: AdminUser, approve: Boolean, onCl
 
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text(if (approve) "Approve ${user.fullName}" else "Role and team · ${user.fullName}") },
+        title = { Text(if (approve) t("Approve {0}", user.fullName) else t("Role and team · {0}", user.fullName)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (approve) Hint("${user.email} asked to join as ${roleLabel[user.requestedRole] ?: "—"}. You can change the role.")
+                if (approve) Hint(t("{0} asked to join as {1}. You can change the role.", user.email, roleLabel[user.requestedRole] ?: "—"))
                 ChipRow(roles, role, { roleLabel.getValue(it) }) { role = it }
                 if (role == "WORKER") {
-                    Picker("Team (Manager)", managers.data.orEmpty(), chosen, { "${it.teamName} — ${it.fullName}" }) { manager = it }
-                    Hint(if (managers.data?.isEmpty() == true) "Approve a Manager first" else "A Worker always belongs to one Manager's team")
+                    Picker(t("Team (Manager)"), managers.data.orEmpty(), chosen, { "${it.teamName} — ${it.fullName}" }) { manager = it }
+                    Hint(if (managers.data?.isEmpty() == true) t("Approve a Manager first") else t("A Worker always belongs to one Manager's team"))
                 }
-                if (user.role == "MANAGER" && role != "MANAGER") Hint("A Manager with Workers must have them moved to another team first.")
+                if (user.role == "MANAGER" && role != "MANAGER") Hint(t("A Manager with Workers must have them moved to another team first."))
             }
         },
         confirmButton = {
@@ -142,19 +143,19 @@ private fun RoleDialog(session: Session, user: AdminUser, approve: Boolean, onCl
                     action.run(after = onDone) {
                         when {
                             approve -> session.api.approveUser(user.id, ApproveRequest(role, managerId))
-                                .let { "${it.fullName} approved as ${roleLabel[it.role]} (${it.employee?.code})" }
+                                .let { t("{0} approved as {1} ({2})", it.fullName, roleLabel[it.role], it.employee?.code) }
                             user.role == "WORKER" && role == "WORKER" && user.employee != null -> {
                                 session.api.changeTeam(user.employee.id, TeamChangeRequest(managerId!!))
-                                "${user.fullName} moved to another team"
+                                t("{0} moved to another team", user.fullName)
                             }
                             else -> session.api.changeRole(user.id, ApproveRequest(role, managerId))
-                                .let { "${it.fullName} is now ${roleLabel[it.role]}" }
+                                .let { t("{0} is now {1}", it.fullName, roleLabel[it.role]) }
                         }
                     }
                 },
-            ) { Text(if (approve) "Approve" else "Save") }
+            ) { Text(if (approve) t("Approve") else t("Save")) }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onClose) { Text(t("Cancel")) } },
     )
 }
 
@@ -172,13 +173,13 @@ fun UsersScreen(session: Session, me: User) {
 
     LoadedList(users, header = {
         item {
-            OutlinedTextField(search, { search = it }, label = { Text("Search by name or email") }, singleLine = true,
+            OutlinedTextField(search, { search = it }, label = { Text(t("Search by name or email")) }, singleLine = true,
                 modifier = Modifier.fillMaxWidth())
         }
-        item { ChipRow(listOf(null, "ADMIN", "MANAGER", "WORKER", "CUSTOMER"), role, { roleLabel[it] ?: "All roles" }) { role = it } }
-        item { ChipRow(listOf(null, "ACTIVE", "PENDING", "BLOCKED", "REJECTED"), status, { it ?: "All statuses" }) { status = it } }
+        item { ChipRow(listOf(null, "ADMIN", "MANAGER", "WORKER", "CUSTOMER"), role, { roleLabel[it] ?: t("All roles") }) { role = it } }
+        item { ChipRow(listOf(null, "ACTIVE", "PENDING", "BLOCKED", "REJECTED"), status, { it?.let { s -> t(s.lowercase()) } ?: t("All statuses") }) { status = it } }
     }) { list ->
-        if (list.isEmpty()) item { Empty("No users match") }
+        if (list.isEmpty()) item { Empty(t("No users match")) }
         items(list, key = { it.id }) { u ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -187,32 +188,32 @@ fun UsersScreen(session: Session, me: User) {
                             Text(u.fullName, fontWeight = FontWeight.SemiBold)
                             Hint(u.email + (u.employee?.let { " · ${it.code}" } ?: ""))
                         }
-                        Badge(u.status.lowercase(), statusColor(u.status))
+                        Badge(t(u.status.lowercase()), statusColor(u.status))
                     }
                     Hint("${roleLabel[u.role]}" + (u.employee?.takeIf { it.role != "ADMIN" }?.let { " · ${it.teamName}" } ?: "") +
-                        " · signed up ${dateTime(u.createdAt)}")
+                        " · " + t("signed up {0}", dateTime(u.createdAt)))
                     if (u.loginFailures > 0) {
                         val locked = u.loginLockedSeconds > 0
                         Text(
-                            if (locked) "Login locked: ${u.loginFailures} wrong passwords, ${(u.loginLockedSeconds + 59) / 60} min left"
-                            else "${u.loginFailures} wrong password(s) in the last 15 min",
+                            if (locked) t("Login locked: {0} wrong passwords, {1} min left", u.loginFailures, (u.loginLockedSeconds + 59) / 60)
+                            else t("{0} wrong password(s) in the last 15 min", u.loginFailures),
                             style = MaterialTheme.typography.bodySmall, color = if (locked) Red else Orange,
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (u.status == "PENDING") TextButton(onClick = { approving = u }) { Text("Approve", color = Green) }
+                        if (u.status == "PENDING") TextButton(onClick = { approving = u }) { Text(t("Approve"), color = Green) }
                         if (u.status == "ACTIVE" && u.employee != null) {
-                            TextButton(onClick = { editing = u }) { Text(if (u.role == "WORKER") "Role / team" else "Role") }
+                            TextButton(onClick = { editing = u }) { Text(if (u.role == "WORKER") t("Role / team") else t("Role")) }
                         }
                         if ((u.status == "ACTIVE" || u.status == "BLOCKED") && u.id != me.id) {
                             TextButton(onClick = { blocking = u }) {
-                                Text(if (u.status == "BLOCKED") "Unblock" else "Block", color = if (u.status == "BLOCKED") Green else Red)
+                                Text(if (u.status == "BLOCKED") t("Unblock") else t("Block"), color = if (u.status == "BLOCKED") Green else Red)
                             }
                         }
                         if (u.loginFailures > 0) {
                             TextButton(onClick = {
-                                action.run(after = users.reload) { session.api.clearLoginTimer(u.id); "Login timer of ${u.fullName} cleared" }
-                            }, enabled = !action.busy) { Text("Clear timer") }
+                                action.run(after = users.reload) { session.api.clearLoginTimer(u.id); t("Login timer of {0} cleared", u.fullName) }
+                            }, enabled = !action.busy) { Text(t("Clear timer")) }
                         }
                     }
                 }
@@ -224,14 +225,14 @@ fun UsersScreen(session: Session, me: User) {
     blocking?.let { u ->
         val unblock = u.status == "BLOCKED"
         Confirm(
-            if (unblock) "Unblock ${u.fullName}?" else "Block ${u.fullName}?",
-            if (unblock) "The user will be able to sign in again."
-            else "The user is signed out at once and cannot sign in. Orders and movements stay in the history.",
-            if (unblock) "Unblock" else "Block", action.busy,
+            if (unblock) t("Unblock {0}?", u.fullName) else t("Block {0}?", u.fullName),
+            if (unblock) t("The user will be able to sign in again.")
+            else t("The user is signed out at once and cannot sign in. Orders and movements stay in the history."),
+            if (unblock) t("Unblock") else t("Block"), action.busy,
             onConfirm = {
                 action.run(after = { blocking = null; users.reload() }) {
                     if (unblock) session.api.unblockUser(u.id) else session.api.blockUser(u.id)
-                    "${u.fullName} ${if (unblock) "unblocked" else "blocked"}"
+                    if (unblock) t("{0} unblocked", u.fullName) else t("{0} blocked", u.fullName)
                 }
             },
             onDismiss = { blocking = null },

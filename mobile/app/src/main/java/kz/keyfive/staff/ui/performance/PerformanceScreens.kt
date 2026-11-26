@@ -28,6 +28,7 @@ import kz.keyfive.staff.ui.BarRow
 import kz.keyfive.staff.ui.ChipRow
 import kz.keyfive.staff.ui.Empty
 import kz.keyfive.staff.ui.Green
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Hint
 import kz.keyfive.staff.ui.LoadedList
 import kz.keyfive.staff.ui.Section
@@ -42,34 +43,34 @@ private val PERIODS = listOf("week", "month", "quarter", "year")
 private val PERIOD_LABELS = mapOf("week" to "This week", "month" to "This month", "quarter" to "This quarter", "year" to "This year")
 
 private fun LazyListScope.periodPicker(period: String, start: String?, end: String?, onChange: (String) -> Unit) {
-    item { ChipRow(PERIODS, period, { PERIOD_LABELS.getValue(it) }, onChange) }
+    item { ChipRow(PERIODS, period, { t(PERIOD_LABELS.getValue(it)) }, onChange) }
     if (start != null) item { Hint("${date(start)} – ${date(end)}") }
 }
 
 private fun LazyListScope.timeline(points: List<TimelinePoint>) = item {
-    Section("Points over time") {
+    Section(t("Points over time")) {
         val max = points.maxOfOrNull { it.points }?.toFloat() ?: 0f
-        if (points.all { it.points == 0 }) Hint("No activity in this period yet")
-        else points.forEach { BarRow(date(it.date), it.points.toFloat(), max, "${it.points} pts", Green) }
+        if (points.all { it.points == 0 }) Hint(t("No activity in this period yet"))
+        else points.forEach { BarRow(date(it.date), it.points.toFloat(), max, t("{0} pts", it.points), Green) }
     }
 }
 
 @Composable
 private fun MetricTiles(m: Metrics) {
     TileRow(
-        { StatTile("Points", num(m.points), it, color = Green) },
+        { StatTile(t("Points"), num(m.points), it, color = Green) },
         if (m.role == "MANAGER") {
-            { StatTile("Orders approved", num(m.ordersApproved), it, "${m.ordersRejected} rejected") }
+            { StatTile(t("Orders approved"), num(m.ordersApproved), it, t("{0} rejected", m.ordersRejected)) }
         } else {
-            { StatTile("Orders shipped", num(m.ordersShipped), it, "${num(m.unitsShipped)} units") }
+            { StatTile(t("Orders shipped"), num(m.ordersShipped), it, t("{0} units", num(m.unitsShipped))) }
         },
     )
     TileRow(
-        { StatTile("Stock IN received", num(m.stockInCount), it, "${num(m.unitsIn)} units") },
+        { StatTile(t("Stock IN received"), num(m.stockInCount), it, t("{0} units", num(m.unitsIn))) },
         if (m.role == "MANAGER") {
-            { StatTile("Avg time to approve", m.avgApprovalHours?.let { h -> "%.1f h".format(h) } ?: "—", it) }
+            { StatTile(t("Avg time to approve"), m.avgApprovalHours?.let { h -> t("{0} h", "%.1f".format(h)) } ?: "—", it) }
         } else {
-            { StatTile("Units shipped", num(m.unitsShipped), it) }
+            { StatTile(t("Units shipped"), num(m.unitsShipped), it) }
         },
     )
 }
@@ -80,24 +81,25 @@ private fun WorkerRow(m: Metrics) {
         Text("${m.rank ?: ""}", Modifier.width(28.dp), fontWeight = FontWeight.Bold)
         Column(Modifier.weight(1f)) {
             Text(m.fullName)
-            Hint("${roleLabel[m.role]} · shipped ${m.ordersShipped} · IN ${m.stockInCount}" +
-                if (m.role == "MANAGER") " · approved ${m.ordersApproved}" else "")
+            Hint("${roleLabel[m.role]} · " + t("shipped {0}", m.ordersShipped) + " · IN ${m.stockInCount}" +
+                if (m.role == "MANAGER") " · " + t("approved {0}", m.ordersApproved) else "")
         }
-        Text("${m.points} pts", fontWeight = FontWeight.SemiBold)
+        Text(t("{0} pts", m.points), fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
-private fun TeamRow(t: TeamSummary, highlight: Boolean = false, onClick: (() -> Unit)? = null) {
+private fun TeamRow(team: TeamSummary, highlight: Boolean = false, onClick: (() -> Unit)? = null) {
     Card(Modifier.fillMaxWidth().let { if (onClick != null) it.clickable(onClick = onClick) else it }) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("${t.rank}", Modifier.width(28.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                color = if (t.rank == 1) Green else MaterialTheme.colorScheme.onSurface)
+            Text("${team.rank}", Modifier.width(28.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                color = if (team.rank == 1) Green else MaterialTheme.colorScheme.onSurface)
             Column(Modifier.weight(1f)) {
-                Text(t.teamName + if (highlight) " (yours)" else "", fontWeight = FontWeight.SemiBold)
-                Hint("${t.managerName} · ${t.members} members · shipped ${t.ordersShipped} · IN ${t.stockInCount}")
+                Text(team.teamName + if (highlight) " " + t("(yours)") else "", fontWeight = FontWeight.SemiBold)
+                Hint("${team.managerName} · " + t("{0} members", team.members) + " · " + t("shipped {0}", team.ordersShipped) +
+                    " · IN ${team.stockInCount}")
             }
-            Text("${num(t.points)} pts", fontWeight = FontWeight.SemiBold)
+            Text(t("{0} pts", num(team.points)), fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -111,8 +113,8 @@ fun MyPerformanceScreen(session: Session) {
         d.team?.let { team ->
             item {
                 Section(team.teamName) {
-                    Text("Team place: ${team.rank}" + (d.rankInTeam?.let { " · your place in the team: $it of ${d.teamSize}" } ?: ""))
-                    Hint("${num(team.points)} team points")
+                    Text(t("Team place: {0}", team.rank) + (d.rankInTeam?.let { " · " + t("your place in the team: {0} of {1}", it, d.teamSize) } ?: ""))
+                    Hint(t("{0} team points", num(team.points)))
                 }
             }
         }
@@ -125,24 +127,24 @@ fun TeamPerformanceScreen(session: Session, managerId: Int) {
     var period by rememberSaveable { mutableStateOf("month") }
     val data = load(period, managerId) { session.api.teamPerformance(managerId, period) }
     LoadedList(data, header = { periodPicker(period, data.data?.start, data.data?.end) { period = it } }) { d ->
-        d.team?.let { t ->
+        d.team?.let { team ->
             item {
                 TileRow(
-                    { StatTile("Team place", "${t.rank}", it, "${t.members} members") },
-                    { StatTile("Team points", num(t.points), it, color = Green) },
+                    { StatTile(t("Team place"), "${team.rank}", it, t("{0} members", team.members)) },
+                    { StatTile(t("Team points"), num(team.points), it, color = Green) },
                 )
             }
             item {
                 TileRow(
-                    { StatTile("Orders shipped", num(t.ordersShipped), it, "${num(t.unitsShipped)} units") },
-                    { StatTile("Stock IN", num(t.stockInCount), it) },
+                    { StatTile(t("Orders shipped"), num(team.ordersShipped), it, t("{0} units", num(team.unitsShipped))) },
+                    { StatTile(t("Stock IN"), num(team.stockInCount), it) },
                 )
             }
         }
-        item { Section("Manager") { WorkerRow(d.manager) } }
+        item { Section(t("Manager")) { WorkerRow(d.manager) } }
         item {
-            Section("Workers ranking") {
-                if (d.workers.isEmpty()) Hint("No workers in this team yet")
+            Section(t("Workers ranking")) {
+                if (d.workers.isEmpty()) Hint(t("No workers in this team yet"))
                 d.workers.forEach { WorkerRow(it) }
             }
         }
@@ -157,19 +159,19 @@ fun AdminPerformanceScreen(session: Session, openTeam: (Int) -> Unit) {
     LoadedList(data, header = { periodPicker(period, data.data?.start, data.data?.end) { period = it } }) { d ->
         item {
             TileRow(
-                { StatTile("Orders shipped", num(d.totals.ordersShipped), it, "${num(d.totals.unitsShipped)} units") },
-                { StatTile("Orders approved", num(d.totals.ordersApproved), it) },
+                { StatTile(t("Orders shipped"), num(d.totals.ordersShipped), it, t("{0} units", num(d.totals.unitsShipped))) },
+                { StatTile(t("Orders approved"), num(d.totals.ordersApproved), it) },
             )
         }
         item {
             TileRow(
-                { StatTile("Stock IN", num(d.totals.stockInCount), it) },
-                { StatTile("Total points", num(d.totals.points), it, color = Green) },
+                { StatTile(t("Stock IN"), num(d.totals.stockInCount), it) },
+                { StatTile(t("Total points"), num(d.totals.points), it, color = Green) },
             )
         }
-        item { Hint("Tap a team to see its workers") }
-        if (d.teams.isEmpty()) item { Empty("No teams yet", "A team appears when a Manager is approved.") }
-        items(d.teams, key = { it.managerId }) { t -> TeamRow(t) { openTeam(t.managerId) } }
+        item { Hint(t("Tap a team to see its workers")) }
+        if (d.teams.isEmpty()) item { Empty(t("No teams yet"), t("A team appears when a Manager is approved.")) }
+        items(d.teams, key = { it.managerId }) { team -> TeamRow(team) { openTeam(team.managerId) } }
         timeline(d.timeline)
     }
 }
@@ -180,10 +182,10 @@ fun LeaderboardScreen(session: Session) {
     val data = load(period) { session.api.leaderboard(period) }
     val me = session.user
     LoadedList(data, header = { periodPicker(period, data.data?.start, data.data?.end) { period = it } }) { d ->
-        item { Hint("Points: ${d.pointsFormula}") }
-        if (d.teams.isEmpty()) item { Empty("No teams yet") }
-        items(d.teams, key = { it.managerId }) { t ->
-            TeamRow(t, highlight = me?.employeeId == t.managerId || me?.managerId == t.managerId)
+        item { Hint(t("Points: {0}", d.pointsFormula)) }
+        if (d.teams.isEmpty()) item { Empty(t("No teams yet")) }
+        items(d.teams, key = { it.managerId }) { team ->
+            TeamRow(team, highlight = me?.employeeId == team.managerId || me?.managerId == team.managerId)
         }
     }
 }

@@ -49,14 +49,17 @@ import kz.keyfive.staff.data.message
 import kz.keyfive.staff.data.newPasswordProblem
 import kz.keyfive.staff.data.retryAfterSeconds
 import kz.keyfive.staff.data.secondsLeft
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Hint
+import kz.keyfive.staff.ui.LanguageChips
 
 @Composable
 fun AuthScreens(session: Session) {
     Page {
         Text("KeyFive Staff", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary)
-        Hint("Warehouse app for Workers, Managers and Admins")
+        Hint(t("Warehouse app for Workers, Managers and Admins"))
+        LanguageChips()
         Login(session, "")
     }
 }
@@ -139,9 +142,9 @@ private fun Login(session: Session, initialEmail: String) {
         return
     }
 
-    OutlinedTextField(email, { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+    OutlinedTextField(email, { email = it }, label = { Text(t("Email")) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-    OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true,
+    OutlinedTextField(password, { password = it }, label = { Text(t("Password")) }, singleLine = true,
         visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
     val locked = LockBanner(lock)
@@ -167,23 +170,23 @@ private fun Login(session: Session, initialEmail: String) {
         },
         enabled = !busy && !locked && email.isNotBlank() && password.isNotBlank(),
         modifier = Modifier.fillMaxWidth(),
-    ) { Text(if (busy) "Signing in…" else "Sign in") }
+    ) { Text(if (busy) t("Signing in…") else t("Sign in")) }
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("This phone: ${session.deviceName}", style = MaterialTheme.typography.labelLarge)
-            Hint("The first sign in from a new phone must be approved (a Worker's phone by his Manager). Your password " +
-                "alone is not enough, so nobody can enter the warehouse system with it from another phone.")
+            Text(t("This phone: {0}", session.deviceName), style = MaterialTheme.typography.labelLarge)
+            Hint(t("The first sign in from a new phone must be approved (a Worker's phone by his Manager). Your password " +
+                "alone is not enough, so nobody can enter the warehouse system with it from another phone."))
         }
     }
-    Hint("New here? Open the invitation link your Manager sent you in a browser, fill in the form there, then sign " +
-        "in here with that email and password.")
+    Hint(t("New here? Open the invitation link your Manager sent you in a browser, fill in the form there, then sign " +
+        "in here with that email and password."))
 
-    TextButton(onClick = { showServer = !showServer }) { Text("Server") }
+    TextButton(onClick = { showServer = !showServer }) { Text(t("Server")) }
     if (showServer) {
-        OutlinedTextField(server, { server = it }, label = { Text("Server address") }, singleLine = true,
+        OutlinedTextField(server, { server = it }, label = { Text(t("Server address")) }, singleLine = true,
             modifier = Modifier.fillMaxWidth(), supportingText = {
-                Text(if (BuildConfig.DEBUG) "Emulator + local backend: http://10.0.2.2:8000" else "https:// only")
+                Text(if (BuildConfig.DEBUG) t("Emulator + local backend: {0}", "http://10.0.2.2:8000") else t("https:// only"))
             })
     }
 }
@@ -227,16 +230,16 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
         }
     }
 
-    Text("Enter the code", style = MaterialTheme.typography.titleLarge)
+    Text(t("Enter the code"), style = MaterialTheme.typography.titleLarge)
     Hint(codeSentHint(challenge.sentVia, challenge.sentTo))
     val locked = LockBanner(lock)
     error?.let { ErrorCard(it) }
     info?.let { Hint(it) }
     OutlinedTextField(code, { code = digitsOnly(it) }, label = { Text(codeFieldLabel(challenge.sentVia)) }, singleLine = true,
         modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        supportingText = { Text(if (codeLeft > 0) "Works for ${formatWait(codeLeft)} more" else "Expired: send a new one") })
+        supportingText = { Text(if (codeLeft > 0) t("Works for {0} more", formatWait(codeLeft)) else t("Expired: send a new one")) })
     Button(onClick = { call { session.verifyCode(challenge.challengeToken, code) } },
-        enabled = !busy && !locked && code.length == 6, modifier = Modifier.fillMaxWidth()) { Text("Sign in") }
+        enabled = !busy && !locked && code.length == 6, modifier = Modifier.fillMaxWidth()) { Text(t("Sign in")) }
     OutlinedButton(
         onClick = {
             call {
@@ -244,7 +247,7 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
                 try {
                     onChallenge(session.resendCode(challenge.challengeToken))
                     sentAt = System.currentTimeMillis()
-                    info = "A new code was sent. The previous one no longer works."
+                    info = t("A new code was sent. The previous one no longer works.")
                 } finally {
                     sending = false
                 }
@@ -252,8 +255,8 @@ private fun CodeStep(session: Session, challenge: TwoFactorChallenge, onChalleng
         },
         enabled = !busy && !locked && resendIn == 0,
         modifier = Modifier.fillMaxWidth(),
-    ) { Text(if (sending) "Sending…" else if (resendIn > 0) "Send again in $resendIn s" else "Send again") }
-    TextButton(onClick = onRestart) { Text("Use another account") }
+    ) { Text(if (sending) t("Sending…") else if (resendIn > 0) t("Send again in {0} s", resendIn) else t("Send again")) }
+    TextButton(onClick = onRestart) { Text(t("Use another account")) }
 }
 
 /** Change the password. `forced`: an Admin whose password expired cannot do anything else until it is done. */
@@ -268,14 +271,14 @@ fun ChangePasswordScreen(session: Session, forced: Boolean, onDone: () -> Unit =
     val problem = newPasswordProblem(current, new, repeat)
 
     Page {
-        Text("Change password", style = MaterialTheme.typography.titleLarge)
-        if (forced) Hint("Your password has expired. Admins change it every 180 days; the new one must differ from the old.")
-        else Hint("Other phones and the website will be signed out.")
-        OutlinedTextField(current, { current = it }, label = { Text("Current password") }, singleLine = true,
+        Text(t("Change password"), style = MaterialTheme.typography.titleLarge)
+        if (forced) Hint(t("Your password has expired. Admins change it every 180 days; the new one must differ from the old."))
+        else Hint(t("Other phones and the website will be signed out."))
+        OutlinedTextField(current, { current = it }, label = { Text(t("Current password")) }, singleLine = true,
             visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(new, { new = it }, label = { Text("New password") }, singleLine = true,
+        OutlinedTextField(new, { new = it }, label = { Text(t("New password")) }, singleLine = true,
             visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(repeat, { repeat = it }, label = { Text("Repeat the new password") }, singleLine = true,
+        OutlinedTextField(repeat, { repeat = it }, label = { Text(t("Repeat the new password")) }, singleLine = true,
             visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         if (problem != null && new.isNotEmpty()) Hint(problem)
         error?.let { ErrorCard(it) }
@@ -299,7 +302,8 @@ fun ChangePasswordScreen(session: Session, forced: Boolean, onDone: () -> Unit =
             },
             enabled = !busy && current.isNotEmpty() && problem == null,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Change password") }
-        if (forced) TextButton(onClick = { session.logout() }) { Text("Sign out") }
+        ) { Text(t("Change password")) }
+        if (forced) TextButton(onClick = { session.logout() }) { Text(t("Sign out")) }
+
     }
 }

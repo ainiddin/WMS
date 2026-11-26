@@ -30,6 +30,7 @@ import kz.keyfive.staff.data.WebLoginDecision
 import kz.keyfive.staff.data.answersWebLogins
 import kz.keyfive.staff.data.describeBrowser
 import kz.keyfive.staff.data.message
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Hint
 import kz.keyfive.staff.ui.dateTime
 import kz.keyfive.staff.ui.rememberAction
@@ -58,12 +59,12 @@ fun WebLoginRequests(session: Session, role: String) {
     val req = current ?: return
     AlertDialog(
         onDismissRequest = {}, // must be answered: Yes (a number) or No
-        title = { Text("Website sign in: is this you?") },
+        title = { Text(t("Website sign in: is this you?")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Someone is signing in to KeyFive on the website with your password.")
-                Hint("${describeBrowser(req.userAgent)} · IP ${req.ip ?: "unknown"} · ${dateTime(req.createdAt)}")
-                Text("If it is you, tap the number shown in the browser:", fontWeight = FontWeight.SemiBold)
+                Text(t("Someone is signing in to KeyFive on the website with your password."))
+                Hint("${describeBrowser(req.userAgent)} · IP ${req.ip ?: t("unknown")} · ${dateTime(req.createdAt)}")
+                Text(t("If it is you, tap the number shown in the browser:"), fontWeight = FontWeight.SemiBold)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     req.choices.forEach { n ->
                         Button(
@@ -71,8 +72,8 @@ fun WebLoginRequests(session: Session, role: String) {
                             onClick = {
                                 action.run(after = { current = null }) {
                                     val r = session.api.approveWebLogin(req.id, WebLoginDecision(n))
-                                    if (r.isSuccessful) "Signed in on the website"
-                                    else "Wrong number: that sign in was rejected. If it was you, sign in again in the browser."
+                                    if (r.isSuccessful) t("Signed in on the website")
+                                    else t("Wrong number: that sign in was rejected. If it was you, sign in again in the browser.")
                                 }
                             },
                         ) { Text("$n", fontSize = 22.sp) }
@@ -87,10 +88,11 @@ fun WebLoginRequests(session: Session, role: String) {
                 onClick = {
                     action.run(after = { current = null }) {
                         session.api.denyWebLogin(req.id)
-                        "Rejected. Someone knows your password: change it now."
+                        t("Rejected. Someone knows your password: change it now.")
                     }
                 },
-            ) { Text("No, it was not me", color = MaterialTheme.colorScheme.error) }
+            ) { Text(t("No, it was not me"), color
+ = MaterialTheme.colorScheme.error) }
         },
     )
 }

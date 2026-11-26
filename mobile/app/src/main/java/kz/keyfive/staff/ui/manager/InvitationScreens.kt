@@ -45,6 +45,7 @@ import kz.keyfive.staff.ui.ChipRow
 import kz.keyfive.staff.ui.Confirm
 import kz.keyfive.staff.ui.Empty
 import kz.keyfive.staff.ui.Green
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Hint
 import kz.keyfive.staff.ui.LoadedList
 import kz.keyfive.staff.ui.Orange
@@ -71,18 +72,18 @@ fun InvitationsScreen(session: Session) {
     LoadedList(invitations, header = {
         item {
             Section {
-                Hint("Make a link and send it to the person. They type their name, work email, phone and a password, " +
-                    "get an employee id and sign in in the KeyFive Staff app; you approve their phone.")
+                Hint(t("Make a link and send it to the person. They type their name, work email, phone and a password, " +
+                    "get an employee id and sign in in the KeyFive Staff app; you approve their phone."))
                 ChipRow(listOf("WORKER", "MANAGER"), role,
-                    { if (it == "WORKER") "Worker (joins my team)" else "Manager (gets own team)" }) { role = it }
+                    { if (it == "WORKER") t("Worker (joins my team)") else t("Manager (gets own team)") }) { role = it }
                 Button(onClick = {
                     action.run(after = invitations.reload) {
                         created = session.api.invite(InvitationCreate(role))
-                        "Invitation link created"
+                        t("Invitation link created")
                     }
                 }, enabled = !action.busy) {
                     Icon(Icons.Default.Link, null)
-                    Text("  Create invitation link")
+                    Text("  " + t("Create invitation link"))
                 }
                 created?.let { NewLink(session.server, it) }
             }
@@ -91,8 +92,8 @@ fun InvitationsScreen(session: Session) {
         invitationItems(list, action.busy, showInviter = false) { revoking = it }
     }
     revoking?.let { inv ->
-        Confirm("Revoke this invitation link?", "The link stops working at once.", "Revoke", action.busy,
-            onConfirm = { action.run(after = { revoking = null; invitations.reload() }) { session.api.revokeInvitation(inv.id); "Invitation revoked" } },
+        Confirm(t("Revoke this invitation link?"), t("The link stops working at once."), t("Revoke"), action.busy,
+            onConfirm = { action.run(after = { revoking = null; invitations.reload() }) { session.api.revokeInvitation(inv.id); t("Invitation revoked") } },
             onDismiss = { revoking = null })
     }
 }
@@ -105,26 +106,26 @@ fun NewLink(server: String, created: InvitationCreated) {
     val url = invitationUrl(server, created.link)
     Card(colors = CardDefaults.cardColors(containerColor = Green.copy(alpha = 0.10f))) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Link ready. Send it to the person (Telegram, WhatsApp…). It works once, until ${dateTime(created.expiresAt)}.",
+            Text(t("Link ready. Send it to the person (Telegram, WhatsApp…). It works once, until {0}.", dateTime(created.expiresAt)),
                 fontWeight = FontWeight.SemiBold)
             SelectionContainer { Text(url, style = MaterialTheme.typography.bodyMedium) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
                     clipboard.setText(AnnotatedString(url))
-                    context.toast("Copied")
+                    context.toast(t("Copied"))
                 }) {
                     Icon(Icons.Default.ContentCopy, null)
-                    Text("  Copy")
+                    Text("  " + t("Copy"))
                 }
                 OutlinedButton(onClick = {
                     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
-                    context.startActivity(Intent.createChooser(send, "Send the invitation link"))
+                    context.startActivity(Intent.createChooser(send, t("Send the invitation link")))
                 }) {
                     Icon(Icons.Default.Share, null)
-                    Text("  Send")
+                    Text("  " + t("Send"))
                 }
             }
-            Hint("This is the only time the link is shown. If it gets lost, revoke it and make a new one.")
+            Hint(t("This is the only time the link is shown. If it gets lost, revoke it and make a new one."))
         }
     }
 }
@@ -136,7 +137,7 @@ fun LazyListScope.invitationItems(
     showInviter: Boolean,
     onRevoke: (Invitation) -> Unit,
 ) {
-    if (list.isEmpty()) item { Empty("No invitations yet", "Make a link and send it to the person.") }
+    if (list.isEmpty()) item { Empty(t("No invitations yet"), t("Make a link and send it to the person.")) }
     items(list, key = { it.id }) { inv -> InvitationCard(inv, busy, showInviter) { onRevoke(inv) } }
 }
 
@@ -147,18 +148,18 @@ private fun InvitationCard(inv: Invitation, busy: Boolean, showInviter: Boolean,
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(roleLabel[inv.role] ?: inv.role, fontWeight = FontWeight.SemiBold)
-                    Hint("Made ${dateTime(inv.createdAt)}" + (inv.teamName?.let { " · $it" } ?: ""))
+                    Hint(t("Made {0}", dateTime(inv.createdAt)) + (inv.teamName?.let { " · $it" } ?: ""))
                 }
-                Badge(inv.status, inviteColor[inv.status] ?: Color.Gray)
+                Badge(t(inv.status.lowercase()), inviteColor[inv.status] ?: Color.Gray)
             }
-            if (showInviter) Hint("By ${inv.invitedByEmail}")
+            if (showInviter) Hint(t("By {0}", inv.invitedByEmail))
             when (inv.status) {
                 "ACCEPTED" -> Text("${inv.joinedName ?: "—"} · ${inv.joinedEmployeeCode ?: ""}" +
                     (inv.joinedEmail?.let { "\n$it" } ?: ""))
-                "PENDING" -> Hint("Valid until ${dateTime(inv.expiresAt)}")
+                "PENDING" -> Hint(t("Valid until {0}", dateTime(inv.expiresAt)))
             }
             if (canRevokeInvitation(inv.status)) {
-                TextButton(onClick = onRevoke, enabled = !busy) { Text("Revoke", color = Red) }
+                TextButton(onClick = onRevoke, enabled = !busy) { Text(t("Revoke"), color = Red) }
             }
         }
     }

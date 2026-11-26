@@ -37,6 +37,7 @@ import kz.keyfive.staff.ui.Confirm
 import kz.keyfive.staff.ui.Empty
 import kz.keyfive.staff.ui.ErrorBox
 import kz.keyfive.staff.ui.Green
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Hint
 import kz.keyfive.staff.ui.LoadedList
 import kz.keyfive.staff.ui.Orange
@@ -67,35 +68,35 @@ fun AdminInvitationsScreen(session: Session) {
     var revoking by remember { mutableStateOf<Invitation?>(null) }
 
     LoadedList(invitations, header = {
-        item { Hint("Staff join only by a one-time link from a Manager: a Worker into his team, a Manager with a team of his own.") }
+        item { Hint(t("Staff join only by a one-time link from a Manager: a Worker into his team, a Manager with a team of his own.")) }
         if (noManager.data == true || created != null) {
             item {
-                Section("No Manager yet") {
-                    Hint("The company has no active Manager, so nobody can invite staff. Make a link for the first Manager.")
+                Section(t("No Manager yet")) {
+                    Hint(t("The company has no active Manager, so nobody can invite staff. Make a link for the first Manager."))
                     Button(onClick = {
-                        action.run(after = invitations.reload) { created = session.api.inviteFirstManager(); "Invitation link created" }
+                        action.run(after = invitations.reload) { created = session.api.inviteFirstManager(); t("Invitation link created") }
                     }, enabled = !action.busy) {
                         Icon(Icons.Default.Link, null)
-                        Text("  Invite the first Manager")
+                        Text("  " + t("Invite the first Manager"))
                     }
                     created?.let { NewLink(session.server, it) }
                 }
             }
         }
         item {
-            ChipRow(listOf(null, "PENDING", "ACCEPTED", "EXPIRED", "REVOKED"), status, { it ?: "All" }) { status = it }
+            ChipRow(listOf(null, "PENDING", "ACCEPTED", "EXPIRED", "REVOKED"), status, { it?.let { s -> t(s.lowercase()) } ?: t("All") }) { status = it }
         }
     }) { list ->
         invitationItems(list, action.busy, showInviter = true) { revoking = it }
     }
     revoking?.let { inv ->
-        Confirm("Revoke this invitation link?", "The link stops working at once.", "Revoke", action.busy,
-            onConfirm = { action.run(after = { revoking = null; invitations.reload() }) { session.api.adminRevokeInvitation(inv.id); "Invitation revoked" } },
+        Confirm(t("Revoke this invitation link?"), t("The link stops working at once."), t("Revoke"), action.busy,
+            onConfirm = { action.run(after = { revoking = null; invitations.reload() }) { session.api.adminRevokeInvitation(inv.id); t("Invitation revoked") } },
             onDismiss = { revoking = null })
     }
 }
 
-// ---------------- Payments ----------------
+// ---------------- Payments (labels in English, shown through t()) ----------------
 private val paymentStatus = mapOf(
     "SUCCEEDED" to ("Paid" to Green), "PENDING" to ("Open" to Blue),
     "FAILED" to ("Cancelled" to Orange), "EXPIRED" to ("Expired" to Color.Gray),
@@ -107,14 +108,14 @@ fun PaymentsScreen(session: Session) {
     val data = load { session.api.payments() }
 
     LoadedList(data) { summary ->
-        item { Hint("Top-ups by card through ${summary.gateway}. Read only: nobody can withdraw.") }
+        item { Hint(t("Top-ups by card through {0}. Read only: nobody can withdraw.", summary.gateway)) }
         item {
             TileRow(
-                { StatTile("Received in total", money(summary.total), it, color = Green) },
-                { StatTile("Received today", money(summary.today), it) },
+                { StatTile(t("Received in total"), money(summary.total), it, color = Green) },
+                { StatTile(t("Received today"), money(summary.today), it) },
             )
         }
-        if (summary.payments.isEmpty()) item { Empty("No payments yet", "Customers' card top-ups appear here.") }
+        if (summary.payments.isEmpty()) item { Empty(t("No payments yet"), t("Customers' card top-ups appear here.")) }
         items(summary.payments, key = { it.code }) { p ->
             val (label, color) = paymentStatus[p.status] ?: (p.status to Color.Gray)
             Card(Modifier.fillMaxWidth()) {
@@ -127,7 +128,7 @@ fun PaymentsScreen(session: Session) {
                         Text(money(p.amount), fontWeight = FontWeight.SemiBold)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Badge(label, color)
+                        Badge(t(label), color)
                         Hint(dateTime(p.createdAt) + (p.cardLast4?.let { " · ${p.cardBrand} •• $it" } ?: ""))
                     }
                     p.failureReason?.let { Hint(it) }
@@ -137,7 +138,7 @@ fun PaymentsScreen(session: Session) {
     }
 }
 
-// ---------------- Audit log ----------------
+// ---------------- Audit log (labels in English, shown through t()) ----------------
 val auditActionLabel = mapOf(
     "USER_APPROVED" to "Account approved",
     "USER_REJECTED" to "Account rejected",
@@ -175,30 +176,30 @@ fun AuditScreen(session: Session) {
     }
 
     LoadedList(rows, header = {
-        item { Hint("Every admin action and Admin sign in. Rows cannot be changed or deleted.") }
+        item { Hint(t("Every admin action and Admin sign in. Rows cannot be changed or deleted.")) }
         item {
-            Picker("Action", listOf<String?>(null) + auditActionLabel.keys, action,
-                { it?.let { a -> auditActionLabel[a] } ?: "All actions" }) { action = it; page = 0 }
+            Picker(t("Action"), listOf<String?>(null) + auditActionLabel.keys, action,
+                { it?.let { a -> t(auditActionLabel.getValue(a)) } ?: t("All actions") }) { action = it; page = 0 }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(from, { from = it; page = 0 }, label = { Text("From") }, placeholder = { Text("YYYY-MM-DD") },
+                OutlinedTextField(from, { from = it; page = 0 }, label = { Text(t("From")) }, placeholder = { Text("YYYY-MM-DD") },
                     singleLine = true, modifier = Modifier.weight(1f))
-                OutlinedTextField(to, { to = it; page = 0 }, label = { Text("To") }, placeholder = { Text("YYYY-MM-DD") },
+                OutlinedTextField(to, { to = it; page = 0 }, label = { Text(t("To")) }, placeholder = { Text("YYYY-MM-DD") },
                     singleLine = true, modifier = Modifier.weight(1f), isError = rangeError != null)
             }
         }
         rangeError?.let { item { ErrorBox(it) } }
     }) { list ->
-        if (rangeError == null && list.isEmpty()) item { Empty("Nothing logged for these filters") }
+        if (rangeError == null && list.isEmpty()) item { Empty(t("Nothing logged for these filters")) }
         items(list, key = { it.id }) { r ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Badge(auditActionLabel[r.action] ?: r.action, if (r.action in auditDanger) Red else Color.Gray)
+                        Badge(auditActionLabel[r.action]?.let { t(it) } ?: r.action, if (r.action in auditDanger) Red else Color.Gray)
                         Text("  " + dateTime(r.createdAt), modifier = Modifier.weight(1f))
                     }
-                    Text("${r.actorEmail ?: "system"} → ${r.targetEmail ?: "—"}")
+                    Text("${r.actorEmail ?: t("system")} → ${r.targetEmail ?: "—"}")
                     Hint("IP ${r.ip ?: "—"}")
                     if (r.details.isNotEmpty()) Hint(auditDetailsText(r.details))
                 }
@@ -206,9 +207,9 @@ fun AuditScreen(session: Session) {
         }
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                Hint("Page ${page + 1}")
-                TextButton(onClick = { page-- }, enabled = page > 0) { Text("Newer") }
-                TextButton(onClick = { page++ }, enabled = list.size >= AUDIT_PAGE) { Text("Older") }
+                Hint(t("Page {0}", page + 1))
+                TextButton(onClick = { page-- }, enabled = page > 0) { Text(t("Newer")) }
+                TextButton(onClick = { page++ }, enabled = list.size >= AUDIT_PAGE) { Text(t("Older")) }
             }
         }
     }

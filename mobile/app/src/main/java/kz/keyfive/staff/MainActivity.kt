@@ -17,6 +17,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import kz.keyfive.staff.data.Session
+import kz.keyfive.staff.i18n.I18n
+import java.util.Locale
+
 import kz.keyfive.staff.ui.KeyFiveTheme
 import kz.keyfive.staff.ui.StaffApp
 import kz.keyfive.staff.ui.auth.AuthScreens
@@ -30,6 +33,7 @@ class MainActivity : ComponentActivity() {
         if (!BuildConfig.DEBUG) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
         val session = Session(applicationContext)
+        I18n.load(applicationContext, Locale.getDefault().language)
         setContent {
             KeyFiveTheme {
                 Surface(Modifier.fillMaxSize()) {

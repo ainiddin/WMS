@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.MoveToInbox
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.TrendingUp
@@ -61,6 +62,7 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 import kz.keyfive.staff.data.Session
 import kz.keyfive.staff.data.User
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.admin.AdminInvitationsScreen
 import kz.keyfive.staff.ui.admin.AuditScreen
 import kz.keyfive.staff.ui.admin.DevicesScreen
@@ -90,7 +92,7 @@ import kz.keyfive.staff.ui.warehouse.ToShipScreen
 private val STAFF = setOf("ADMIN", "MANAGER", "WORKER")
 private val MANAGERS = setOf("ADMIN", "MANAGER")
 
-/** A menu entry. The server checks the role on every request too; hiding entries is only for convenience. */
+/** A menu entry (title and group in English, shown through t()). The server checks the role on every request too. */
 private class Screen(val route: String, val title: String, val icon: ImageVector, val roles: Set<String>, val group: String)
 
 private val SCREENS = listOf(
@@ -118,6 +120,7 @@ private val SCREENS = listOf(
     Screen("payments", "Payments", Icons.Default.Payments, setOf("ADMIN"), "Admin"),
     Screen("audit", "Audit log", Icons.AutoMirrored.Filled.ReceiptLong, setOf("ADMIN"), "Admin"),
     Screen("password", "Change password", Icons.Default.Key, STAFF, "Account"),
+    Screen("settings", "Settings", Icons.Default.Settings, STAFF, "Account"),
 )
 
 private fun home(role: String) = when (role) {
@@ -135,7 +138,7 @@ fun StaffApp(session: Session, user: User) {
     val screens = SCREENS.filter { user.role in it.roles }
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
-    val title = screens.firstOrNull { it.route == route }?.title ?: if (route?.startsWith("team/") == true) "Team" else ""
+    val title = screens.firstOrNull { it.route == route }?.title?.let { t(it) } ?: if (route?.startsWith("team/") == true) t("Team") else ""
 
     WebLoginRequests(session, user.role) // "Is this you?" for website sign ins (Admin, Manager)
 
@@ -159,11 +162,11 @@ fun StaffApp(session: Session, user: User) {
                         if (screen.group != group) {
                             group = screen.group
                             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                            Text(group, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+                            Text(t(group), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         NavigationDrawerItem(
-                            label = { Text(screen.title) },
+                            label = { Text(t(screen.title)) },
                             icon = { Icon(screen.icon, null) },
                             badge = if (screen.route == "restock" && restockCount > 0) {
                                 { Badge { Text(if (restockCount > 99) "99+" else "$restockCount") } }
@@ -177,7 +180,7 @@ fun StaffApp(session: Session, user: User) {
                     }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     NavigationDrawerItem(
-                        label = { Text("Sign out") },
+                        label = { Text(t("Sign out")) },
                         icon = { Icon(Icons.AutoMirrored.Filled.Logout, null) },
                         selected = false,
                         onClick = { session.logout() },
@@ -191,7 +194,7 @@ fun StaffApp(session: Session, user: User) {
                 TopAppBar(
                     title = { Text(title) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Default.Menu, "Menu") }
+                        IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Default.Menu, t("Menu")) }
                     },
                 )
             },
@@ -221,6 +224,7 @@ fun StaffApp(session: Session, user: User) {
                 composable("invitations") { AdminInvitationsScreen(session) }
                 composable("payments") { PaymentsScreen(session) }
                 composable("audit") { AuditScreen(session) }
+                composable("settings") { SettingsScreen() }
                 composable("team-invitations") { InvitationsScreen(session) }
             }
         }

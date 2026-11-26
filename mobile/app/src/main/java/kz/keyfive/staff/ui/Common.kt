@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import kz.keyfive.staff.data.CameraMode
 import kz.keyfive.staff.data.barcodeInput
 import kz.keyfive.staff.data.cameraMode
+import kz.keyfive.staff.i18n.t
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -117,11 +118,13 @@ fun date(iso: String?): String = iso?.let {
 
 fun eta(min: Int?, max: Int?): String? = when {
     min == null || max == null -> null
-    min == max -> "~$min days"
-    else -> "$min–$max days"
+    min == max -> t("~{0} days", min)
+    else -> t("{0}–{1} days", min, max)
 }
 
-val roleLabel = mapOf("ADMIN" to "Admin", "MANAGER" to "Manager", "WORKER" to "Worker", "CUSTOMER" to "Customer")
+/** Read on every use, so it follows the chosen language. */
+val roleLabel: Map<String, String>
+    get() = mapOf("ADMIN" to t("Admin"), "MANAGER" to t("Manager"), "WORKER" to t("Worker"), "CUSTOMER" to t("Customer"))
 
 fun Context.toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
 
@@ -160,7 +163,7 @@ class Action(private val scope: CoroutineScope, private val context: Context) {
         scope.launch {
             try {
                 val result = block()
-                context.toast(done ?: (result as? String) ?: "Done")
+                context.toast(done ?: (result as? String) ?: t("Done"))
                 after()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -210,7 +213,7 @@ fun ErrorBox(text: String, retry: (() -> Unit)? = null) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
         Column(Modifier.padding(16.dp)) {
             Text(text, color = MaterialTheme.colorScheme.onErrorContainer)
-            if (retry != null) TextButton(onClick = retry) { Text("Try again") }
+            if (retry != null) TextButton(onClick = retry) { Text(t("Try again")) }
         }
     }
 }
@@ -260,10 +263,11 @@ fun statusColor(status: String) = when (status) {
     else -> Red
 }
 
-val orderStatusLabel = mapOf(
-    "PENDING" to "Waiting for stock", "APPROVED" to "To ship", "SHIPPED" to "Shipped",
-    "REJECTED" to "Rejected", "CANCELLED" to "Cancelled",
-)
+val orderStatusLabel: Map<String, String>
+    get() = mapOf(
+        "PENDING" to t("Waiting for stock"), "APPROVED" to t("To ship"), "SHIPPED" to t("Shipped"),
+        "REJECTED" to t("Rejected"), "CANCELLED" to t("Cancelled"),
+    )
 
 @Composable
 fun StatTile(label: String, value: String, modifier: Modifier = Modifier, hint: String? = null, color: Color? = null) {
@@ -347,7 +351,7 @@ fun Confirm(title: String, text: String, confirm: String, busy: Boolean, onConfi
         title = { Text(title) },
         text = { Text(text) },
         confirmButton = { Button(onClick = onConfirm, enabled = !busy) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } },
     )
 }
 
@@ -361,7 +365,7 @@ fun scanBarcode(context: Context, onCode: (String) -> Unit) {
         .build()
     GmsBarcodeScanning.getClient(context, options).startScan()
         .addOnSuccessListener { barcode -> barcode.rawValue?.let(onCode) }
-        .addOnFailureListener { context.toast("Scanner is not available: ${it.localizedMessage}. Type the code instead.") }
+        .addOnFailureListener { context.toast(t("Scanner is not available: {0}. Type the code instead.", it.localizedMessage)) }
 }
 
 /**
@@ -370,7 +374,7 @@ fun scanBarcode(context: Context, onCode: (String) -> Unit) {
  * the code is simply typed (the camera button is hidden when there is no camera).
  */
 @Composable
-fun BarcodeField(label: String = "Barcode", onSubmit: (String) -> Unit) {
+fun BarcodeField(label: String = t("Barcode"), onSubmit: (String) -> Unit) {
     val context = LocalContext.current
     var code by remember { mutableStateOf("") }
     val hasCamera = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
@@ -380,7 +384,7 @@ fun BarcodeField(label: String = "Barcode", onSubmit: (String) -> Unit) {
     val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         granted = ok
         if (ok) scanBarcode(context) { onSubmit(it) }
-        else context.toast("No camera access: type the barcode and press Enter or the send button.")
+        else context.toast(t("No camera access: type the barcode and press Enter or the send button."))
     }
     fun submit() {
         if (code.isNotBlank()) onSubmit(code).also { code = "" }
@@ -401,23 +405,23 @@ fun BarcodeField(label: String = "Barcode", onSubmit: (String) -> Unit) {
         supportingText = {
             Text(
                 when (mode) {
-                    CameraMode.NONE -> "No camera on this device: type the barcode and press Enter or the send button"
-                    CameraMode.ASK -> "Type the barcode, or tap the camera (the app will ask for access)"
-                    CameraMode.READY -> "Type the barcode, or tap the camera to scan"
+                    CameraMode.NONE -> t("No camera on this device: type the barcode and press Enter or the send button")
+                    CameraMode.ASK -> t("Type the barcode, or tap the camera (the app will ask for access)")
+                    CameraMode.READY -> t("Type the barcode, or tap the camera to scan")
                 },
             )
         },
         trailingIcon = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (code.isNotBlank()) {
-                    IconButton(onClick = { submit() }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enter the typed code") }
+                    IconButton(onClick = { submit() }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = t("Enter the typed code")) }
                 }
                 if (mode != CameraMode.NONE) {
                     IconButton(onClick = {
                         if (mode == CameraMode.READY) scanBarcode(context) { onSubmit(it) }
                         else askCamera.launch(Manifest.permission.CAMERA)
                     }) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan with camera")
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = t("Scan with camera"))
                     }
                 }
             }

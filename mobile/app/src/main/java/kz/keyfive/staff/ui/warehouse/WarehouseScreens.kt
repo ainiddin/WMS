@@ -58,6 +58,7 @@ import kz.keyfive.staff.data.User
 import kz.keyfive.staff.data.message
 import kz.keyfive.staff.data.pickScan
 import kz.keyfive.staff.data.teamOrders
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Badge
 import kz.keyfive.staff.ui.BarcodeField
 import kz.keyfive.staff.ui.ChipRow
@@ -84,13 +85,13 @@ fun StockScreen(session: Session) {
 
     LoadedList(products, header = {
         item {
-            OutlinedTextField(search, { search = it }, label = { Text("Search by name, code or barcode") },
+            OutlinedTextField(search, { search = it }, label = { Text(t("Search by name, code or barcode")) },
                 singleLine = true, modifier = Modifier.fillMaxWidth())
         }
         item {
             val low = products.data?.count { it.belowMin } ?: 0
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = lowOnly, onClick = { lowOnly = !lowOnly }, label = { Text("Below minimum ($low)") })
+                FilterChip(selected = lowOnly, onClick = { lowOnly = !lowOnly }, label = { Text(t("Below minimum ({0})", low)) })
                 BarcodeScanChip { search = it }
             }
         }
@@ -100,7 +101,7 @@ fun StockScreen(session: Session) {
             (q.isEmpty() || q in it.name.lowercase() || q in it.code.lowercase() || it.barcode?.contains(q) == true) &&
                 (!lowOnly || it.belowMin)
         }
-        if (rows.isEmpty()) item { Empty("No products match") }
+        if (rows.isEmpty()) item { Empty(t("No products match")) }
         items(rows, key = { it.id }) { ProductStockCard(it) }
     }
 }
@@ -108,7 +109,7 @@ fun StockScreen(session: Session) {
 @Composable
 private fun BarcodeScanChip(onCode: (String) -> Unit) {
     val context = LocalContext.current
-    FilterChip(selected = false, onClick = { kz.keyfive.staff.ui.scanBarcode(context, onCode) }, label = { Text("Scan") })
+    FilterChip(selected = false, onClick = { kz.keyfive.staff.ui.scanBarcode(context, onCode) }, label = { Text(t("Scan")) })
 }
 
 @Composable
@@ -129,10 +130,10 @@ fun ProductStockCard(p: Product) {
                 modifier = Modifier.fillMaxWidth(), color = color, trackColor = color.copy(alpha = 0.15f), drawStopIndicator = {},
             )
             Row {
-                Hint("Minimum ${p.minQuantity} · updated ${dateTime(p.lastUpdated)}")
+                Hint(t("Minimum {0} · updated {1}", p.minQuantity, dateTime(p.lastUpdated)))
                 if (p.belowMin) {
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
-                        Badge(if (p.quantity == 0) "Out of stock" else "Below min", color)
+                        Badge(if (p.quantity == 0) t("Out of stock") else t("Below min"), color)
                     }
                 }
             }
@@ -155,7 +156,7 @@ fun StockInScreen(session: Session) {
     LoadedList(recent, header = {
         item {
             Section {
-                Hint("Register goods received from a supplier. Scan the barcode or pick the product.")
+                Hint(t("Register goods received from a supplier. Scan the barcode or pick the product."))
                 BarcodeField { code ->
                     lookupError = null
                     scope.launch {
@@ -167,16 +168,16 @@ fun StockInScreen(session: Session) {
                     }
                 }
                 lookupError?.let { Text(it, color = Orange) }
-                Picker("Product", products.data?.filter { it.isActive }.orEmpty(), selected,
+                Picker(t("Product"), products.data?.filter { it.isActive }.orEmpty(), selected,
                     { "${it.code} · ${it.name}" }) { selected = it }
                 selected?.let {
-                    Text("${it.name} — now in stock: ${it.quantity} (minimum ${it.minQuantity})",
+                    Text(t("{0} — now in stock: {1} (minimum {2})", it.name, it.quantity, it.minQuantity),
                         color = if (it.belowMin) Orange else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                OutlinedTextField(quantity, { quantity = it.filter(Char::isDigit).take(6) }, label = { Text("Quantity received") },
+                OutlinedTextField(quantity, { quantity = it.filter(Char::isDigit).take(6) }, label = { Text(t("Quantity received")) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                OutlinedTextField(note, { note = it }, label = { Text("Note (invoice number, supplier…)") },
+                OutlinedTextField(note, { note = it }, label = { Text(t("Note (invoice number, supplier…)")) },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 Button(
                     onClick = {
@@ -191,10 +192,10 @@ fun StockInScreen(session: Session) {
                     },
                     enabled = selected != null && (quantity.toIntOrNull() ?: 0) > 0 && !action.busy,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Save stock IN") }
+                ) { Text(t("Save stock IN")) }
             }
         }
-        item { Text("Latest stock IN", style = MaterialTheme.typography.titleMedium) }
+        item { Text(t("Latest stock IN"), style = MaterialTheme.typography.titleMedium) }
     }) { list ->
         items(list, key = { it.id }) { m ->
             Column {
@@ -227,22 +228,22 @@ fun ToShipScreen(session: Session, user: User) {
         val others = list - mine.toSet()
         if (isWorker) {
             item {
-                Text("Assigned to you · ${mine.size} orders, ${mine.sumOf { o -> o.items.sumOf { it.quantity } }} units",
+                Text(t("Assigned to you · {0} orders, {1} units", mine.size, mine.sumOf { o -> o.items.sumOf { it.quantity } }),
                     style = MaterialTheme.typography.titleMedium)
             }
-            if (mine.isEmpty()) item { Empty("Nothing assigned to you", "New orders appear here automatically.") }
+            if (mine.isEmpty()) item { Empty(t("Nothing assigned to you"), t("New orders appear here automatically.")) }
             items(mine, key = { it.id }) { ShipCard(it, mine = true) { picking = it } }
         }
         if (!isWorker || others.isNotEmpty()) {
             item {
                 Text(when {
-                    isWorker -> "Other Workers' orders (take over if a colleague is away)"
-                    team != null -> "Approved orders of your team, oldest first"
-                    else -> "All approved orders"
+                    isWorker -> t("Other Workers' orders (take over if a colleague is away)")
+                    team != null -> t("Approved orders of your team, oldest first")
+                    else -> t("All approved orders")
                 },
                     style = MaterialTheme.typography.titleMedium)
             }
-            if (others.isEmpty()) item { Empty("Nothing to ship", if (team != null) "Approved orders of your team appear here." else "Approved orders will appear here.") }
+            if (others.isEmpty()) item { Empty(t("Nothing to ship"), if (team != null) t("Approved orders of your team appear here.") else t("Approved orders will appear here.")) }
             items(others, key = { it.id }) { ShipCard(it, mine = !isWorker) { picking = it } }
         }
     }
@@ -255,19 +256,19 @@ private fun ShipCard(order: Order, mine: Boolean, onShip: () -> Unit) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(order.code, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Hint("approved ${dateTime(order.approvedAt)}")
+                Hint(t("approved {0}", dateTime(order.approvedAt)))
             }
             OrderMeta(order)
             order.items.forEach { item ->
                 Row {
                     Text("${item.quantity} × ${item.productName}", modifier = Modifier.weight(1f))
-                    item.available?.let { Hint("in stock $it") }
+                    item.available?.let { Hint(t("in stock {0}", it)) }
                 }
             }
             if (mine) {
-                Button(onClick = onShip, modifier = Modifier.fillMaxWidth()) { Text("Pick & ship") }
+                Button(onClick = onShip, modifier = Modifier.fillMaxWidth()) { Text(t("Pick & ship")) }
             } else {
-                OutlinedButton(onClick = onShip, modifier = Modifier.fillMaxWidth()) { Text("Take over & ship") }
+                OutlinedButton(onClick = onShip, modifier = Modifier.fillMaxWidth()) { Text(t("Take over & ship")) }
             }
         }
     }
@@ -278,8 +279,8 @@ fun OrderMeta(order: Order) {
     Column {
         Text("${order.customer.fullName} · ${money(order.total)}")
         Hint(order.deliveryAddress)
-        order.comment?.let { Hint("Comment: $it") }
-        order.assignedTo?.let { Hint("Worker: ${it.fullName}") }
+        order.comment?.let { Hint(t("Comment: {0}", it)) }
+        order.assignedTo?.let { Hint(t("Worker: {0}", it.fullName)) }
     }
 }
 
@@ -305,12 +306,12 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
     // Camera and typed codes both come here: one check (pickScan in Flows.kt, unit-tested).
     fun onScan(code: String) {
         message = when (val result = pickScan(code, order.items, picked)) {
-            is PickScan.WrongProduct -> false to "Barcode ${result.code} is not in this order — wrong product"
+            is PickScan.WrongProduct -> false to t("Barcode {0} is not in this order — wrong product", result.code)
             is PickScan.AlreadyComplete ->
-                false to "All ${result.item.quantity} × ${result.item.productName} are already picked — put this one back"
+                false to t("All {0} × {1} are already picked — put this one back", result.item.quantity, result.item.productName)
             is PickScan.Counted -> {
                 picked[result.item.id] = result.picked
-                true to "${result.item.productName}: ${result.picked} of ${result.item.quantity}"
+                true to t("{0}: {1} of {2}", result.item.productName, result.picked, result.item.quantity)
             }
         }
     }
@@ -322,9 +323,9 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(Modifier.fillMaxSize().systemBarsPadding().imePadding().padding(8.dp)) {
             LazyColumn(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                item { Text("Ship order ${order.code}", style = MaterialTheme.typography.titleLarge) }
+                item { Text(t("Ship order {0}", order.code), style = MaterialTheme.typography.titleLarge) }
                 item { OrderMeta(order) }
-                item { BarcodeField("Scan or type the barcode", ::onScan) }
+                item { BarcodeField(t("Scan or type the barcode"), ::onScan) }
                 message?.let { (ok, text) ->
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = (if (ok) Green else Red).copy(alpha = 0.12f))) {
@@ -333,7 +334,7 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
                     }
                 }
                 item {
-                    Row { Hint("Picked"); Text("$done of $total units", Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold) }
+                    Row { Hint(t("Picked")); Text(t("{0} of {1} units", done, total), Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold) }
                     LinearProgressIndicator(progress = { done / total.toFloat() }, modifier = Modifier.fillMaxWidth(),
                         color = if (allPicked) Green else MaterialTheme.colorScheme.primary, drawStopIndicator = {})
                 }
@@ -346,14 +347,14 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
                         Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                             Text("${item.quantity} × ${item.productName}")
                             Text(
-                                if (item.barcode != null) "${item.productCode} · ${item.barcode}${if (open) "" else " · scan or type it first"}"
-                                else "${item.productCode} · no barcode: count by hand",
+                                if (item.barcode != null) "${item.productCode} · ${item.barcode}${if (open) "" else " · " + t("scan or type it first")}"
+                                else "${item.productCode} · " + t("no barcode: count by hand"),
                                 style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         IconButton(onClick = { setCount(item, n - 1) }, enabled = open && n > (if (item.barcode != null) 1 else 0)) {
-                            Icon(Icons.Default.Remove, "One less")
+                            Icon(Icons.Default.Remove, t("One less"))
                         }
                         OutlinedTextField(
                             value = n.toString(),
@@ -363,17 +364,17 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
                             textStyle = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
                         )
                         IconButton(onClick = { setCount(item, n + 1) }, enabled = open && n < item.quantity) {
-                            Icon(Icons.Default.Add, "One more")
+                            Icon(Icons.Default.Add, t("One more"))
                         }
                     }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onClose) { Text("Cancel") }
+                TextButton(onClick = onClose) { Text(t("Cancel")) }
                 Button(
-                    onClick = { action.run(after = onShipped) { "Order ${session.api.shipOrder(order.id).code} shipped" } },
+                    onClick = { action.run(after = onShipped) { t("Order {0} shipped", session.api.shipOrder(order.id).code) } },
                     enabled = allPicked && !action.busy,
-                ) { Text("Ship (OUT)") }
+                ) { Text(t("Ship (OUT)")) }
             }
         }
     }
@@ -385,9 +386,9 @@ fun HistoryScreen(session: Session) {
     var type by remember { mutableStateOf<String?>(null) }
     val movements = load(type) { session.api.movements(type = type, limit = 200) }
     LoadedList(movements, header = {
-        item { ChipRow(listOf(null, "IN", "OUT"), type, { it ?: "IN and OUT" }) { type = it } }
+        item { ChipRow(listOf(null, "IN", "OUT"), type, { it ?: t("IN and OUT") }) { type = it } }
     }) { list ->
-        if (list.isEmpty()) item { Empty("No movements") }
+        if (list.isEmpty()) item { Empty(t("No movements")) }
         items(list, key = { it.id }) { m ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -400,6 +401,6 @@ fun HistoryScreen(session: Session) {
                     color = if (m.type == "IN") Green else Red)
             }
         }
-        if (list.size == 200) item { Hint("Showing the latest 200 records.") }
+        if (list.size == 200) item { Hint(t("Showing the latest 200 records.")) }
     }
 }

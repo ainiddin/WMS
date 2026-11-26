@@ -3,6 +3,7 @@ package kz.keyfive.staff.data
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kz.keyfive.staff.i18n.t
 import retrofit2.HttpException
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -10,6 +11,7 @@ import kotlin.math.ceil
 import kotlin.math.max
 
 // Plain logic of the sign-in and team screens, kept free of Android so it is unit-tested on the JVM.
+// Texts for the screen go through t() (the chosen language); tests run in English, the default.
 
 /** What the server answered to a staff sign in. */
 sealed interface LoginStep {
@@ -34,7 +36,7 @@ fun secondsLeft(sentAtMillis: Long, periodSeconds: Int, nowMillis: Long): Int =
     max(0, ceil((sentAtMillis + periodSeconds * 1000L - nowMillis) / 1000.0).toInt())
 
 /** "12 min" / "45 s" for lock and code timers. */
-fun formatWait(seconds: Int): String = if (seconds >= 60) "${(seconds + 59) / 60} min" else "$seconds s"
+fun formatWait(seconds: Int): String = if (seconds >= 60) t("{0} min", (seconds + 59) / 60) else t("{0} s", seconds)
 
 /** True if the ISO time is in the past (an expired Admin password). Unreadable or missing = not expired. */
 fun isPast(iso: String?, nowMillis: Long): Boolean =
@@ -52,8 +54,8 @@ fun retryAfterSeconds(error: Throwable): Int? =
 /** What is wrong with a new password before it is sent, or null. The server checks the same and more. */
 fun newPasswordProblem(current: String, new: String, repeat: String): String? = when {
     passwordHint(new) != null -> passwordHint(new)
-    new == current -> "Must differ from the current password"
-    repeat != new -> "The passwords do not match"
+    new == current -> t("Must differ from the current password")
+    repeat != new -> t("The passwords do not match")
     else -> null
 }
 
@@ -62,16 +64,16 @@ fun newPasswordProblem(current: String, new: String, repeat: String): String? = 
  * and a special character (@ _ - $ ... anything that is not a letter, a digit or a space). What is still missing.
  */
 fun passwordProblems(password: String): List<String> = buildList {
-    if (password.codePointCount(0, password.length) < 8) add("at least 8 characters")
-    if (password.none { it.isLetter() }) add("a letter")
-    if (password.none { it.isDigit() }) add("a digit")
-    if (password.none { !it.isLetterOrDigit() && !it.isWhitespace() }) add("a special character (@ _ - \$ …)")
+    if (password.codePointCount(0, password.length) < 8) add(t("at least 8 characters"))
+    if (password.none { it.isLetter() }) add(t("a letter"))
+    if (password.none { it.isDigit() }) add(t("a digit"))
+    if (password.none { !it.isLetterOrDigit() && !it.isWhitespace() }) add(t("a special character (@ _ - \$ …)"))
 }
 
 /** One line for the screen: what is missing, or null when the password follows the rule. */
 fun passwordHint(password: String): String? = when {
-    password.codePointCount(0, password.length) > 72 -> "At most 72 characters"
-    passwordProblems(password).isNotEmpty() -> "Still needed: " + passwordProblems(password).joinToString(", ")
+    password.codePointCount(0, password.length) > 72 -> t("At most 72 characters")
+    passwordProblems(password).isNotEmpty() -> t("Still needed: {0}", passwordProblems(password).joinToString(", "))
     else -> null
 }
 
@@ -93,9 +95,9 @@ private val tryAgain = Regex("\\s*Try again in \\d+ min\\.?\\s*$")
  */
 fun lockMessage(detail: String, secondsLeft: Int): String {
     val clock = formatClock(secondsLeft)
-    if (waitBefore.containsMatchIn(detail)) return "A new code can be requested in $clock."
-    val what = detail.replace(tryAgain, "").trim().ifEmpty { "Too many attempts." }
-    return "$what Try again in $clock."
+    if (waitBefore.containsMatchIn(detail)) return t("A new code can be requested in {0}.", clock)
+    val what = detail.replace(tryAgain, "").trim().ifEmpty { t("Too many attempts.") }
+    return t("{0} Try again in {1}.", what, clock)
 }
 
 /** How often the app asks for website sign ins while it is on screen (never in the background). */
@@ -124,10 +126,10 @@ fun describeBrowser(userAgent: String?): String {
         else -> null
     }
     return when {
-        browser != null && system != null -> "$browser on $system"
+        browser != null && system != null -> t("{0} on {1}", browser, system)
         browser != null -> browser
-        system != null -> "A browser on $system"
-        else -> "Unknown browser"
+        system != null -> t("A browser on {0}", system)
+        else -> t("Unknown browser")
     }
 }
 
@@ -145,11 +147,11 @@ fun barcodeInput(typed: String): String = typed.filter(Char::isDigit).take(14)
 
 /** Admin code screen: where the code went ("telegram" in the demo setup, else the corporate mailbox). */
 fun codeSentHint(sentVia: String, sentTo: String): String =
-    if (sentVia == "telegram") "We sent a 6-digit code to Telegram. It is asked once on this phone."
-    else "We sent a 6-digit code to the corporate mailbox $sentTo. It is asked once on this phone."
+    if (sentVia == "telegram") t("We sent a 6-digit code to Telegram. It is asked once on this phone.")
+    else t("We sent a 6-digit code to the corporate mailbox {0}. It is asked once on this phone.", sentTo)
 
 fun codeFieldLabel(sentVia: String): String =
-    if (sentVia == "telegram") "Code from Telegram" else "Code from the email"
+    if (sentVia == "telegram") t("Code from Telegram") else t("Code from the email")
 
 /** What one barcode means while picking an order (see pickScan). */
 sealed interface PickScan {
@@ -203,6 +205,6 @@ fun auditDetailsText(details: JsonObject): String =
 /** Audit date filter (yyyy-MM-dd): an error text, or null when the range can be asked. Empty ends mean "open". */
 fun auditRangeError(from: String, to: String): String? {
     val dates = listOf(from, to).filter { it.isNotBlank() }
-    if (dates.any { runCatching { LocalDate.parse(it) }.isFailure }) return "Dates as YYYY-MM-DD"
-    return if (from.isNotBlank() && to.isNotBlank() && from > to) "\"From\" is after \"To\"" else null
+    if (dates.any { runCatching { LocalDate.parse(it) }.isFailure }) return t("Dates as YYYY-MM-DD")
+    return if (from.isNotBlank() && to.isNotBlank() && from > to) t("\"From\" is after \"To\"") else null
 }

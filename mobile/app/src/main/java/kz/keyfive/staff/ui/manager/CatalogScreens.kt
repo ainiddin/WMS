@@ -46,6 +46,7 @@ import kz.keyfive.staff.ui.Action
 import kz.keyfive.staff.ui.Badge
 import kz.keyfive.staff.ui.Confirm
 import kz.keyfive.staff.ui.Empty
+import kz.keyfive.staff.i18n.t
 import kz.keyfive.staff.ui.Hint
 import kz.keyfive.staff.ui.LoadedList
 import kz.keyfive.staff.ui.load
@@ -67,24 +68,24 @@ private fun DeleteDialog(target: DeleteTarget?, action: Action, onDone: () -> Un
     var hasHistory by remember(target) { mutableStateOf(false) }
     target ?: return
     Confirm(
-        title = if (hasHistory) "Deactivate ${target.name}?" else "Delete ${target.name}?",
-        text = if (hasHistory) "It is used by orders or movements, so it cannot be deleted. Deactivate it: it disappears " +
-            "from the shop but the history stays." else "This cannot be undone.",
-        confirm = if (hasHistory) "Deactivate" else "Delete",
+        title = if (hasHistory) t("Deactivate {0}?", target.name) else t("Delete {0}?", target.name),
+        text = if (hasHistory) t("It is used by orders or movements, so it cannot be deleted. Deactivate it: it disappears " +
+            "from the shop but the history stays.") else t("This cannot be undone."),
+        confirm = if (hasHistory) t("Deactivate") else t("Delete"),
         busy = action.busy,
         onConfirm = {
             action.run(after = onDone) {
                 if (hasHistory) {
                     target.deactivate()
-                    "${target.name} deactivated"
+                    t("{0} deactivated", target.name)
                 } else {
                     val response = target.delete()
                     if (response.code() == 409) {
                         hasHistory = true
-                        throw IllegalStateException("${target.name} has history: deactivate it instead")
+                        throw IllegalStateException(t("{0} has history: deactivate it instead", target.name))
                     }
                     if (!response.isSuccessful) throw HttpException(response)
-                    "${target.name} deleted"
+                    t("{0} deleted", target.name)
                 }
             }
         },
@@ -99,8 +100,8 @@ private fun AddButton(text: String, onClick: () -> Unit) {
 
 @Composable
 private fun RowActions(onEdit: () -> Unit, onDelete: () -> Unit) {
-    IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Edit") }
-    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete") }
+    IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, t("Edit")) }
+    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, t("Delete")) }
 }
 
 @Composable
@@ -110,8 +111,8 @@ private fun FormDialog(title: String, busy: Boolean, canSave: Boolean, onSave: (
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() } },
-        confirmButton = { Button(onClick = onSave, enabled = canSave && !busy) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { Button(onClick = onSave, enabled = canSave && !busy) { Text(t("Save")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } },
     )
 }
 
@@ -142,25 +143,25 @@ fun ProductsScreen(session: Session) {
     var deleting by remember { mutableStateOf<DeleteTarget?>(null) }
 
     LoadedList(products, header = {
-        item { Hint("Prices, minimum stock and barcodes. Quantity changes only through Stock IN and shipments.") }
+        item { Hint(t("Prices, minimum stock and barcodes. Quantity changes only through Stock IN and shipments.")) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                AddButton("New product") { editing = null; form = ProductForm() }
-                FilterChip(showInactive, { showInactive = !showInactive }, label = { Text("Show inactive") })
+                AddButton(t("New product")) { editing = null; form = ProductForm() }
+                FilterChip(showInactive, { showInactive = !showInactive }, label = { Text(t("Show inactive")) })
             }
         }
     }) { list ->
-        if (list.isEmpty()) item { Empty("No products") }
+        if (list.isEmpty()) item { Empty(t("No products")) }
         items(list, key = { it.id }) { p ->
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(p.name, fontWeight = FontWeight.SemiBold)
-                            if (!p.isActive) Badge("inactive", Red)
+                            if (!p.isActive) Badge(t("inactive"), Red)
                         }
                         Hint("${p.code} · ${p.category.name} · ${money(p.unitPrice)}")
-                        Hint("Stock ${p.quantity} (min ${p.minQuantity})${p.barcode?.let { " · $it" } ?: ""}")
+                        Hint(t("Stock {0} (min {1})", p.quantity, p.minQuantity) + (p.barcode?.let { " · $it" } ?: ""))
                     }
                     RowActions(
                         onEdit = {
@@ -182,7 +183,7 @@ fun ProductsScreen(session: Session) {
         val price = f.price.replace(',', '.').toDoubleOrNull()
         val min = f.minQuantity.toIntOrNull()
         FormDialog(
-            title = editing?.let { "Edit ${it.code}" } ?: "New product",
+            title = editing?.let { t("Edit {0}", it.code) } ?: t("New product"),
             busy = action.busy,
             canSave = f.name.isNotBlank() && f.category != null && f.supplier != null && price != null && min != null &&
                 (f.barcode.isEmpty() || f.barcode.length == 13),
@@ -191,30 +192,30 @@ fun ProductsScreen(session: Session) {
                     price!!, min!!, f.barcode.ifEmpty { null }, f.active)
                 action.run(after = { form = null; products.reload() }) {
                     val saved = editing?.let { session.api.updateProduct(it.id, body) } ?: session.api.createProduct(body)
-                    "${saved.code} saved"
+                    t("{0} saved", saved.code)
                 }
             },
             onDismiss = { form = null },
         ) {
-            OutlinedTextField(f.name, { form = f.copy(name = it) }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(f.description, { form = f.copy(description = it) }, label = { Text("Description") },
+            OutlinedTextField(f.name, { form = f.copy(name = it) }, label = { Text(t("Name")) }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(f.description, { form = f.copy(description = it) }, label = { Text(t("Description")) },
                 modifier = Modifier.fillMaxWidth(), minLines = 2)
-            Picker("Category", categories.data.orEmpty(), f.category, { it.name + if (it.isActive) "" else " (inactive)" }) {
+            Picker(t("Category"), categories.data.orEmpty(), f.category, { it.name + if (it.isActive) "" else " (" + t("inactive") + ")" }) {
                 form = f.copy(category = it)
             }
-            Picker("Supplier", suppliers.data.orEmpty(), f.supplier, { it.supplierName }) { form = f.copy(supplier = it) }
-            OutlinedTextField(f.price, { form = f.copy(price = it) }, label = { Text("Price, ₸") }, singleLine = true,
+            Picker(t("Supplier"), suppliers.data.orEmpty(), f.supplier, { it.supplierName }) { form = f.copy(supplier = it) }
+            OutlinedTextField(f.price, { form = f.copy(price = it) }, label = { Text(t("Price, ₸")) }, singleLine = true,
                 modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-            OutlinedTextField(f.minQuantity, { form = f.copy(minQuantity = it.filter(Char::isDigit)) }, label = { Text("Minimum stock") },
+            OutlinedTextField(f.minQuantity, { form = f.copy(minQuantity = it.filter(Char::isDigit)) }, label = { Text(t("Minimum stock")) },
                 singleLine = true, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             OutlinedTextField(
-                f.barcode, { form = f.copy(barcode = it.filter(Char::isDigit).take(13)) }, label = { Text("Barcode (EAN-13)") },
+                f.barcode, { form = f.copy(barcode = it.filter(Char::isDigit).take(13)) }, label = { Text(t("Barcode (EAN-13)")) },
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                trailingIcon = { TextButton(onClick = { scanBarcode(context) { form = form?.copy(barcode = it) } }) { Text("Scan") } },
-                supportingText = { if (f.barcode.isNotEmpty() && f.barcode.length != 13) Text("13 digits", color = Orange) },
+                trailingIcon = { TextButton(onClick = { scanBarcode(context) { form = form?.copy(barcode = it) } }) { Text(t("Scan")) } },
+                supportingText = { if (f.barcode.isNotEmpty() && f.barcode.length != 13) Text(t("13 digits"), color = Orange) },
             )
-            ActiveSwitch("Active (visible in the shop)", f.active) { form = f.copy(active = it) }
+            ActiveSwitch(t("Active (visible in the shop)"), f.active) { form = f.copy(active = it) }
         }
     }
     DeleteDialog(deleting, action, onDone = { deleting = null; products.reload() }, onDismiss = { deleting = null })
@@ -230,14 +231,14 @@ fun CategoriesScreen(session: Session) {
     var deleting by remember { mutableStateOf<DeleteTarget?>(null) }
 
     LoadedList(categories, header = {
-        item { AddButton("New category") { editing = null; form = "" to true } }
+        item { AddButton(t("New category")) { editing = null; form = "" to true } }
     }) { list ->
         items(list, key = { it.id }) { c ->
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(c.name, fontWeight = FontWeight.SemiBold)
-                        Hint(c.code + if (c.isActive) "" else " · inactive")
+                        Hint(c.code + if (c.isActive) "" else " · " + t("inactive"))
                     }
                     RowActions(
                         onEdit = { editing = c; form = c.name to c.isActive },
@@ -248,17 +249,17 @@ fun CategoriesScreen(session: Session) {
         }
     }
     form?.let { (name, active) ->
-        FormDialog(if (editing == null) "New category" else "Edit category", action.busy, name.isNotBlank(),
+        FormDialog(if (editing == null) t("New category") else t("Edit category"), action.busy, name.isNotBlank(),
             onSave = {
                 val body = CategoryInput(name.trim(), active)
                 action.run(after = { form = null; categories.reload() }) {
-                    (editing?.let { session.api.updateCategory(it.id, body) } ?: session.api.createCategory(body)).name + " saved"
+                    (editing?.let { session.api.updateCategory(it.id, body) } ?: session.api.createCategory(body)).name.let { t("{0} saved", it) }
                 }
             },
             onDismiss = { form = null },
         ) {
-            OutlinedTextField(name, { form = it to active }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
-            ActiveSwitch("Active", active) { form = name to it }
+            OutlinedTextField(name, { form = it to active }, label = { Text(t("Name")) }, modifier = Modifier.fillMaxWidth())
+            ActiveSwitch(t("Active"), active) { form = name to it }
         }
     }
     DeleteDialog(deleting, action, onDone = { deleting = null; categories.reload() }, onDismiss = { deleting = null })
@@ -277,8 +278,8 @@ fun SuppliersScreen(session: Session) {
     LoadedList(suppliers, header = {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                AddButton("New supplier") { editing = null; form = SupplierInput("", "", null, true) }
-                FilterChip(showInactive, { showInactive = !showInactive }, label = { Text("Show inactive") })
+                AddButton(t("New supplier")) { editing = null; form = SupplierInput("", "", null, true) }
+                FilterChip(showInactive, { showInactive = !showInactive }, label = { Text(t("Show inactive")) })
             }
         }
     }) { list ->
@@ -287,7 +288,7 @@ fun SuppliersScreen(session: Session) {
                 Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                         Text(s.supplierName, fontWeight = FontWeight.SemiBold)
-                        Hint("${s.code} · ${s.phone}${s.email?.let { " · $it" } ?: ""}${if (s.isActive) "" else " · inactive"}")
+                        Hint("${s.code} · ${s.phone}${s.email?.let { " · $it" } ?: ""}${if (s.isActive) "" else " · " + t("inactive")}")
                     }
                     RowActions(
                         onEdit = { editing = s; form = SupplierInput(s.supplierName, s.phone, s.email, s.isActive) },
@@ -298,22 +299,22 @@ fun SuppliersScreen(session: Session) {
         }
     }
     form?.let { f ->
-        FormDialog(if (editing == null) "New supplier" else "Edit supplier", action.busy,
+        FormDialog(if (editing == null) t("New supplier") else t("Edit supplier"), action.busy,
             f.supplierName.isNotBlank() && f.phone.isNotBlank(),
             onSave = {
                 val body = f.copy(supplierName = f.supplierName.trim(), email = f.email?.trim()?.ifEmpty { null })
                 action.run(after = { form = null; suppliers.reload() }) {
-                    (editing?.let { session.api.updateSupplier(it.id, body) } ?: session.api.createSupplier(body)).supplierName + " saved"
+                    (editing?.let { session.api.updateSupplier(it.id, body) } ?: session.api.createSupplier(body)).supplierName.let { t("{0} saved", it) }
                 }
             },
             onDismiss = { form = null },
         ) {
-            OutlinedTextField(f.supplierName, { form = f.copy(supplierName = it) }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(f.phone, { form = f.copy(phone = it) }, label = { Text("Phone") }, modifier = Modifier.fillMaxWidth(),
+            OutlinedTextField(f.supplierName, { form = f.copy(supplierName = it) }, label = { Text(t("Name")) }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(f.phone, { form = f.copy(phone = it) }, label = { Text(t("Phone")) }, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-            OutlinedTextField(f.email.orEmpty(), { form = f.copy(email = it) }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(),
+            OutlinedTextField(f.email.orEmpty(), { form = f.copy(email = it) }, label = { Text(t("Email")) }, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-            ActiveSwitch("Active", f.isActive) { form = f.copy(isActive = it) }
+            ActiveSwitch(t("Active"), f.isActive) { form = f.copy(isActive = it) }
         }
     }
     DeleteDialog(deleting, action, onDone = { deleting = null; suppliers.reload() }, onDismiss = { deleting = null })
@@ -325,13 +326,13 @@ fun CustomersScreen(session: Session) {
     var search by remember { mutableStateOf("") }
     val customers = load(search) { session.api.customers(search.trim().ifEmpty { null }) }
     LoadedList(customers, header = {
-        item { Hint("Contacts are visible to Managers and Admins only.") }
+        item { Hint(t("Contacts are visible to Managers and Admins only.")) }
         item {
-            OutlinedTextField(search, { search = it }, label = { Text("Search by name, phone or email") }, singleLine = true,
+            OutlinedTextField(search, { search = it }, label = { Text(t("Search by name, phone or email")) }, singleLine = true,
                 modifier = Modifier.fillMaxWidth())
         }
     }) { list ->
-        if (list.isEmpty()) item { Empty("No customers found") }
+        if (list.isEmpty()) item { Empty(t("No customers found")) }
         items(list, key = { it.id }) { c ->
             Column {
                 Row {
