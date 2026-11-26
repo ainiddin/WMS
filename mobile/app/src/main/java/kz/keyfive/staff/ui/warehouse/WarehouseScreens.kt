@@ -98,7 +98,7 @@ fun StockScreen(session: Session) {
     }) { list ->
         val q = search.trim().lowercase()
         val rows = list.filter {
-            (q.isEmpty() || q in it.name.lowercase() || q in it.code.lowercase() || it.barcode?.contains(q) == true) &&
+            (q.isEmpty() || q in it.name.lowercase() || q in t(it.name).lowercase() || q in it.code.lowercase() || it.barcode?.contains(q) == true) &&
                 (!lowOnly || it.belowMin)
         }
         if (rows.isEmpty()) item { Empty(t("No products match")) }
@@ -118,8 +118,8 @@ fun ProductStockCard(p: Product) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(p.name, style = MaterialTheme.typography.titleSmall)
-                    Hint("${p.code} · ${p.category.name}${p.barcode?.let { " · $it" } ?: ""}")
+                    Text(t(p.name), style = MaterialTheme.typography.titleSmall)
+                    Hint("${p.code} · ${t(p.category.name)}${p.barcode?.let { " · $it" } ?: ""}")
                 }
                 Text(num(p.quantity), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
                     color = if (p.quantity == 0) Red else if (p.belowMin) Orange else MaterialTheme.colorScheme.onSurface)
@@ -169,9 +169,9 @@ fun StockInScreen(session: Session) {
                 }
                 lookupError?.let { Text(it, color = Orange) }
                 Picker(t("Product"), products.data?.filter { it.isActive }.orEmpty(), selected,
-                    { "${it.code} · ${it.name}" }) { selected = it }
+                    { "${it.code} · ${t(it.name)}" }) { selected = it }
                 selected?.let {
-                    Text(t("{0} — now in stock: {1} (minimum {2})", it.name, it.quantity, it.minQuantity),
+                    Text(t("{0} — now in stock: {1} (minimum {2})", t(it.name), it.quantity, it.minQuantity),
                         color = if (it.belowMin) Orange else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 OutlinedTextField(quantity, { quantity = it.filter(Char::isDigit).take(6) }, label = { Text(t("Quantity received")) },
@@ -187,7 +187,7 @@ fun StockInScreen(session: Session) {
                             products.reload(); recent.reload()
                         }) {
                             val m = session.api.stockIn(StockInRequest(product.id, quantity.toInt(), note.trim().ifEmpty { null }))
-                            "${m.code}: +${m.quantity} × ${m.productName}"
+                            "${m.code}: +${m.quantity} × ${t(m.productName)}"
                         }
                     },
                     enabled = selected != null && (quantity.toIntOrNull() ?: 0) > 0 && !action.busy,
@@ -199,7 +199,7 @@ fun StockInScreen(session: Session) {
     }) { list ->
         items(list, key = { it.id }) { m ->
             Column {
-                Text("+${m.quantity} × ${m.productName}")
+                Text("+${m.quantity} × ${t(m.productName)}")
                 Hint("${m.code} · ${dateTime(m.time)} · ${m.employeeName}")
             }
         }
@@ -261,7 +261,7 @@ private fun ShipCard(order: Order, mine: Boolean, onShip: () -> Unit) {
             OrderMeta(order)
             order.items.forEach { item ->
                 Row {
-                    Text("${item.quantity} × ${item.productName}", modifier = Modifier.weight(1f))
+                    Text("${item.quantity} × ${t(item.productName)}", modifier = Modifier.weight(1f))
                     item.available?.let { Hint(t("in stock {0}", it)) }
                 }
             }
@@ -308,10 +308,10 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
         message = when (val result = pickScan(code, order.items, picked)) {
             is PickScan.WrongProduct -> false to t("Barcode {0} is not in this order — wrong product", result.code)
             is PickScan.AlreadyComplete ->
-                false to t("All {0} × {1} are already picked — put this one back", result.item.quantity, result.item.productName)
+                false to t("All {0} × {1} are already picked — put this one back", result.item.quantity, t(result.item.productName))
             is PickScan.Counted -> {
                 picked[result.item.id] = result.picked
-                true to t("{0}: {1} of {2}", result.item.productName, result.picked, result.item.quantity)
+                true to t("{0}: {1} of {2}", t(result.item.productName), result.picked, result.item.quantity)
             }
         }
     }
@@ -345,7 +345,7 @@ private fun PickDialog(session: Session, order: Order, onClose: () -> Unit, onSh
                         Icon(if (n == item.quantity) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null,
                             tint = if (n == item.quantity) Green else MaterialTheme.colorScheme.outline)
                         Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                            Text("${item.quantity} × ${item.productName}")
+                            Text("${item.quantity} × ${t(item.productName)}")
                             Text(
                                 if (item.barcode != null) "${item.productCode} · ${item.barcode}${if (open) "" else " · " + t("scan or type it first")}"
                                 else "${item.productCode} · " + t("no barcode: count by hand"),
@@ -392,7 +392,7 @@ fun HistoryScreen(session: Session) {
         items(list, key = { it.id }) { m ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(m.productName)
+                    Text(t(m.productName))
                     Hint("${m.code} · ${dateTime(m.time)} · ${m.employeeName}")
                     m.customerName?.let { Hint("$it${m.orderCode?.let { c -> " · $c" } ?: ""}") }
                     m.note?.let { Hint(it) }

@@ -157,10 +157,10 @@ fun ProductsScreen(session: Session) {
                 Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(p.name, fontWeight = FontWeight.SemiBold)
+                            Text(t(p.name), fontWeight = FontWeight.SemiBold)
                             if (!p.isActive) Badge(t("inactive"), Red)
                         }
-                        Hint("${p.code} · ${p.category.name} · ${money(p.unitPrice)}")
+                        Hint("${p.code} · ${t(p.category.name)} · ${money(p.unitPrice)}")
                         Hint(t("Stock {0} (min {1})", p.quantity, p.minQuantity) + (p.barcode?.let { " · $it" } ?: ""))
                     }
                     RowActions(
@@ -200,7 +200,7 @@ fun ProductsScreen(session: Session) {
             OutlinedTextField(f.name, { form = f.copy(name = it) }, label = { Text(t("Name")) }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(f.description, { form = f.copy(description = it) }, label = { Text(t("Description")) },
                 modifier = Modifier.fillMaxWidth(), minLines = 2)
-            Picker(t("Category"), categories.data.orEmpty(), f.category, { it.name + if (it.isActive) "" else " (" + t("inactive") + ")" }) {
+            Picker(t("Category"), categories.data.orEmpty(), f.category, { t(it.name) + if (it.isActive) "" else " (" + t("inactive") + ")" }) {
                 form = f.copy(category = it)
             }
             Picker(t("Supplier"), suppliers.data.orEmpty(), f.supplier, { it.supplierName }) { form = f.copy(supplier = it) }
@@ -237,7 +237,7 @@ fun CategoriesScreen(session: Session) {
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(c.name, fontWeight = FontWeight.SemiBold)
+                        Text(t(c.name), fontWeight = FontWeight.SemiBold)
                         Hint(c.code + if (c.isActive) "" else " · " + t("inactive"))
                     }
                     RowActions(

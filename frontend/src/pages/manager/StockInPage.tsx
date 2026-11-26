@@ -62,7 +62,7 @@ export function StockInPage() {
   const save = useMutation({
     mutationFn: () => movementsApi.stockIn({ product_id: product!.id, quantity: qty, note: note.trim() || undefined }),
     onSuccess: (m) => {
-      notify.success(`${m.code}: +${m.quantity} × ${m.product_name}`)
+      notify.success(`${m.code}: +${m.quantity} × ${t(m.product_name)}`)
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['movements'] })
       queryClient.invalidateQueries({ queryKey: ['reports'] })
@@ -109,13 +109,13 @@ export function StockInPage() {
                   loading={products.isLoading}
                   value={product}
                   onChange={(_, v) => setSelected(v)}
-                  getOptionLabel={(p) => `${p.code} · ${p.product_name}`}
+                  getOptionLabel={(p) => `${p.code} · ${t(p.product_name)}`}
                   isOptionEqualToValue={(a, b) => a.id === b.id}
                   renderInput={(p) => <TextField {...p} label={t('Product')} />}
                 />
                 {product && (
                   <Alert severity={product.below_min ? 'warning' : 'info'} icon={false}>
-                    <b>{product.product_name}</b> — now in stock: <b>{product.quantity}</b> (minimum{' '}
+                    <b>{t(product.product_name)}</b> — now in stock: <b>{product.quantity}</b> (minimum{' '}
                     {product.min_quantity})
                   </Alert>
                 )}
@@ -162,7 +162,7 @@ export function StockInPage() {
                     {recent.data.map((m) => (
                       <ListItem key={m.id} disableGutters divider>
                         <ListItemText
-                          primary={`+${m.quantity} × ${m.product_name}`}
+                          primary={`+${m.quantity} × ${t(m.product_name)}`}
                           secondary={`${m.code} · ${formatDateTime(m.movement_time)} · ${m.employee_name}`}
                         />
                       </ListItem>

@@ -116,7 +116,7 @@ export function DashboardPage() {
               <Section title={t('Sales by category')}>
                 <ChartBox>
                   <PieChart>
-                    <Pie data={d.sales_by_category} dataKey="revenue" nameKey="category" innerRadius="50%" outerRadius="80%" paddingAngle={2}>
+                    <Pie data={d.sales_by_category.map((c) => ({ ...c, category: t(c.category) }))} dataKey="revenue" nameKey="category" innerRadius="50%" outerRadius="80%" paddingAngle={2}>
                       {d.sales_by_category.map((c, i) => (
                         <Cell key={c.category} fill={chartColors.palette[i % chartColors.palette.length]} />
                       ))}
@@ -161,7 +161,7 @@ export function DashboardPage() {
                       {d.restock.map((r) => (
                         <TableRow key={r.product_id}>
                           <TableCell>
-                            {r.product_name}
+                            {t(r.product_name)}
                             <Typography variant="caption" color="text.secondary" component="div">
                               {r.supplier_name} · {r.supplier_phone}
                             </Typography>
@@ -195,7 +195,10 @@ export function DashboardPage() {
                     <YAxis {...s.axis} />
                     <Tooltip
                       {...s.tooltip}
-                      labelFormatter={(code) => d.stock_by_product.find((p) => p.product_code === code)?.product_name ?? code}
+                      labelFormatter={(code) => {
+                        const name = d.stock_by_product.find((p) => p.product_code === code)?.product_name
+                        return name ? t(name) : code
+                      }}
                       formatter={(v, name) => [formatNumber(Number(v)), name]}
                     />
                     <Bar dataKey="quantity" name={t('Quantity')} radius={[3, 3, 0, 0]}>

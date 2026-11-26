@@ -54,10 +54,10 @@ export function ProductCard({ product }: { product: ProductPublic }) {
         <ProductPicture category={product.category.name} />
         <CardContent>
           <Typography variant="caption" color="text.secondary">
-            {product.category.name}
+            {t(product.category.name)}
           </Typography>
           <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3, minHeight: '2.6em' }}>
-            {product.product_name}
+            {t(product.product_name)}
           </Typography>
           <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
             <Typography variant="h6" sx={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -80,7 +80,7 @@ export function ProductCard({ product }: { product: ProductPublic }) {
           disabled={!product.in_stock}
           onClick={() => {
             add(product)
-            notify.success(t('{0} added to cart', product.product_name))
+            notify.success(t('{0} added to cart', t(product.product_name)))
           }}
         >
           {t('Add to cart')}

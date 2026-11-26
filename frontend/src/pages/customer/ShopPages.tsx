@@ -96,7 +96,7 @@ export function HomePage() {
                   <Card>
                     <CardActionArea component={RouterLink} to={`/catalog?category=${c.id}`} sx={{ p: 2.5, textAlign: 'center' }}>
                       <Box sx={{ color: look.color, '& svg': { fontSize: 40 } }}>{look.icon}</Box>
-                      <Typography sx={{ mt: 1, fontWeight: 600 }}>{c.name}</Typography>
+                      <Typography sx={{ mt: 1, fontWeight: 600 }}>{t(c.name)}</Typography>
                     </CardActionArea>
                   </Card>
                 </Grid>
@@ -190,7 +190,7 @@ export function CatalogPage() {
                 <MenuItem value="">{t('All categories')}</MenuItem>
                 {categories.data?.map((c) => (
                   <MenuItem key={c.id} value={String(c.id)}>
-                    {c.name}
+                    {t(c.name)}
                   </MenuItem>
                 ))}
               </TextField>
@@ -269,9 +269,9 @@ export function ProductDetailsPage() {
               </Grid>
               <Grid size={{ xs: 12, md: 7 }}>
                 <CardContent sx={{ p: { xs: 2.5, md: 4 } }}>
-                  <Chip label={product.data.category.name} size="small" />
+                  <Chip label={t(product.data.category.name)} size="small" />
                   <Typography variant="h5" component="h1" sx={{ mt: 1.5 }}>
-                    {product.data.product_name}
+                    {t(product.data.product_name)}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {t('Article {0}', product.data.code)}
@@ -285,7 +285,7 @@ export function ProductDetailsPage() {
                   />
                   {product.data.description && (
                     <Typography sx={{ mt: 2 }} color="text.secondary">
-                      {product.data.description}
+                      {t(product.data.description)}
                     </Typography>
                   )}
                   <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
@@ -304,7 +304,7 @@ export function ProductDetailsPage() {
                       disabled={!product.data.in_stock}
                       onClick={() => {
                         add(product.data, qty)
-                        notify.success(t('Added {0} × {1}', qty, product.data.product_name))
+                        notify.success(t('Added {0} × {1}', qty, t(product.data.product_name)))
                       }}
                     >
                       {t('Add to cart')}
@@ -375,7 +375,7 @@ export function CartPage() {
                       to={`/catalog/${line.product.id}`}
                       sx={{ fontWeight: 600, color: 'text.primary', textDecoration: 'none' }}
                     >
-                      {line.product.product_name}
+                      {t(line.product.product_name)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       {t('{0} each', formatMoney(line.product.unit_price))}
@@ -527,7 +527,7 @@ export function CheckoutPage() {
               {lines.map((l) => (
                 <Stack key={l.product.id} direction="row" sx={{ py: 0.75, justifyContent: 'space-between', gap: 2 }}>
                   <Typography variant="body2">
-                    {l.quantity} × {l.product.product_name}
+                    {l.quantity} × {t(l.product.product_name)}
                   </Typography>
                   <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
                     {formatMoney(l.quantity * l.product.unit_price)}

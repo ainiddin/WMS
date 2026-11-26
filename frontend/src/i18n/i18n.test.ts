@@ -23,6 +23,15 @@ describe('t()', () => {
     expect(t('A text nobody translated')).toBe('A text nobody translated')
   })
 
+  it('category and product names from the database are translated; a new product keeps its own name', () => {
+    setLanguage('ru')
+    expect(t('Kitchen')).toBe('Кухня')
+    expect(t('Electric kettle 1.7 L')).toBe('Электрочайник 1,7 л')
+    setLanguage('kk')
+    expect(t('Home textile')).toBe('Үй тоқыма бұйымдары')
+    expect(t('Garden hose 20 m')).toBe('Garden hose 20 m')
+  })
+
   it('the choice is remembered in the browser and set on <html lang>', () => {
     setLanguage('kk')
     expect(getLanguage()).toBe('kk')

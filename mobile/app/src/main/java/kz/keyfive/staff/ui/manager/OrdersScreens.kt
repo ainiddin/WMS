@@ -136,12 +136,12 @@ private fun OrderDialog(session: Session, order: Order, onClose: () -> Unit, onC
                 order.rejectionReason?.let { Text(t("Reason: {0}", it), color = Red) }
                 order.waiting?.let { waiting ->
                     Text(t("Waiting for stock") + (eta(order.etaMin, order.etaMax)?.let { " · " + t("ETA {0}", it) } ?: ""), color = Orange)
-                    waiting.forEach { Hint(t("{0}: {1} missing", it.productName, it.missing)) }
+                    waiting.forEach { Hint(t("{0}: {1} missing", t(it.productName), it.missing)) }
                     Hint(t("The system approves it and gives it to a Worker as soon as the goods arrive (stock IN)."))
                 }
                 order.items.forEach { item ->
                     Row {
-                        Text("${item.quantity} × ${item.productName}", Modifier.weight(1f))
+                        Text("${item.quantity} × ${t(item.productName)}", Modifier.weight(1f))
                         Text(money(item.lineTotal))
                     }
                 }
@@ -220,7 +220,7 @@ fun DashboardScreen(session: Session) {
         item {
             Section(t("Sales by category")) {
                 val max = d.salesByCategory.maxOfOrNull { it.revenue }?.toFloat() ?: 0f
-                d.salesByCategory.forEach { BarRow(it.category, it.revenue.toFloat(), max, money(it.revenue)) }
+                d.salesByCategory.forEach { BarRow(t(it.category), it.revenue.toFloat(), max, money(it.revenue)) }
             }
         }
         item {
@@ -235,7 +235,7 @@ fun DashboardScreen(session: Session) {
             Section(t("Restock now")) {
                 if (d.restock.isEmpty()) Hint(t("Nothing to reorder"))
                 d.restock.forEach {
-                    Row { Text(it.productName, Modifier.weight(1f)); Text("${it.quantity} / ${it.minQuantity}", color = Orange) }
+                    Row { Text(t(it.productName), Modifier.weight(1f)); Text("${it.quantity} / ${it.minQuantity}", color = Orange) }
                 }
             }
         }
@@ -255,7 +255,7 @@ fun RestockScreen(session: Session, openStockIn: () -> Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row {
-                        Text(r.productName, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        Text(t(r.productName), Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                         Text(t("short {0}", r.shortage), color = if (r.quantity == 0) Red else Orange)
                     }
                     Hint("${r.productCode} · " + t("in stock {0} of minimum {1}", r.quantity, r.minQuantity))
@@ -332,6 +332,7 @@ fun ReportsScreen(session: Session) {
                     v.content == "null" -> "—"
                     key.contains("amount") -> v.content.toDoubleOrNull()?.let(::money) ?: v.content
                     key == "ok" -> if (v.content == "true") "OK" else "MISMATCH"
+                    key == "product_name" -> t(v.content)
                     else -> v.content
                 }
             }

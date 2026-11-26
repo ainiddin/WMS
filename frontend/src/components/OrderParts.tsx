@@ -44,7 +44,7 @@ export function OrderItemsTable({ order, showStock = false }: { order: Order; sh
             return (
             <TableRow key={item.id}>
               <TableCell>
-                <Typography variant="body2">{item.product_name}</Typography>
+                <Typography variant="body2">{t(item.product_name)}</Typography>
                 <Typography variant="caption" color="text.secondary">
                   {item.product_code}
                   {item.barcode ? ` · ${item.barcode}` : ""}
@@ -110,7 +110,7 @@ export function WaitingNotice({
       </AlertTitle>
       {waiting.map((w) => (
         <Typography key={w.product_id} variant="body2">
-          {t("{0}: {1} more needed", w.product_name, w.missing)}
+          {t("{0}: {1} more needed", t(w.product_name), w.missing)}
         </Typography>
       ))}
       {footer && (

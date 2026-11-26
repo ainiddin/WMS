@@ -225,7 +225,7 @@ export function ProductsPage() {
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
     return (products.data ?? []).filter(
-      (p) => !q || p.product_name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || p.barcode?.includes(q),
+      (p) => !q || p.product_name.toLowerCase().includes(q) || t(p.product_name).toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || p.barcode?.includes(q),
     )
   }, [products.data, search])
 
@@ -282,10 +282,10 @@ export function ProductsPage() {
                       <TableRow key={p.id} hover sx={{ opacity: p.is_active ? 1 : 0.55 }}>
                         <TableCell>{p.code}</TableCell>
                         <TableCell>
-                          {p.product_name}
+                          {t(p.product_name)}
                           <ActiveChip active={p.is_active} />
                         </TableCell>
-                        <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{p.category.name}</TableCell>
+                        <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t(p.category.name)}</TableCell>
                         <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{p.supplier.supplier_name}</TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                           {formatMoney(p.unit_price)}
@@ -347,7 +347,7 @@ export function ProductsPage() {
             >
               {categories.data?.map((c) => (
                 <MenuItem key={c.id} value={c.id} disabled={!c.is_active}>
-                  {c.name}
+                  {t(c.name)}
                 </MenuItem>
               ))}
             </TextField>
@@ -480,7 +480,7 @@ export function CategoriesPage() {
                 <TableRow key={c.id} hover sx={{ opacity: c.is_active ? 1 : 0.55 }}>
                   <TableCell>{c.code}</TableCell>
                   <TableCell>
-                    {c.name}
+                    {t(c.name)}
                     <ActiveChip active={c.is_active} />
                   </TableCell>
                   <TableCell align="right">

@@ -78,7 +78,7 @@ export function RestockPage() {
                   {rows.data.map((r) => (
                     <TableRow key={r.product_id} hover>
                       <TableCell>
-                        {r.product_name}
+                        {t(r.product_name)}
                         <Typography variant="caption" color="text.secondary" component="div">
                           {r.product_code}
                         </Typography>
@@ -143,7 +143,7 @@ const REPORTS: { name: ReportName; label: string; description: string; columns: 
     columns: [
       { key: 'month', label: 'Month', format: (v) => formatMonth(String(v)) },
       { key: 'product_code', label: 'Product' },
-      { key: 'product_name', label: 'Name' },
+      { key: 'product_name', label: 'Name', format: (v) => t(String(v)) },
       { key: 'units_out', label: 'Units out', align: 'right' },
       { key: 'movements', label: 'Movements', align: 'right' },
     ],
@@ -166,7 +166,7 @@ const REPORTS: { name: ReportName; label: string; description: string; columns: 
     description: 'Stock in the products table vs SUM(IN) − SUM(OUT) from the movement history. Every row should be OK.',
     columns: [
       { key: 'product_code', label: 'Product' },
-      { key: 'product_name', label: 'Name' },
+      { key: 'product_name', label: 'Name', format: (v) => t(String(v)) },
       { key: 'quantity', label: 'Qty in table', align: 'right' },
       { key: 'total_in', label: 'Sum IN', align: 'right' },
       { key: 'total_out', label: 'Sum OUT', align: 'right' },

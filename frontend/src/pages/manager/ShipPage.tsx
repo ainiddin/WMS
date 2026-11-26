@@ -78,11 +78,11 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
     } else if (result.kind === 'already-complete') {
       setMessage({
         ok: false,
-        text: t('All {0} × {1} are already picked — put this one back', result.item.quantity, result.item.product_name),
+        text: t('All {0} × {1} are already picked — put this one back', result.item.quantity, t(result.item.product_name)),
       })
     } else {
       setPicked((prev) => ({ ...prev, [result.item.id]: result.picked }))
-      setMessage({ ok: true, text: t('{0}: {1} of {2}', result.item.product_name, result.picked, result.item.quantity) })
+      setMessage({ ok: true, text: t('{0}: {1} of {2}', t(result.item.product_name), result.picked, result.item.quantity) })
     }
     setCode('')
   }
@@ -144,7 +144,7 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
                   </ListItemIcon>
                   <ListItemText
                     sx={{ flex: '1 1 180px' }}
-                    primary={`${item.quantity} × ${item.product_name}`}
+                    primary={`${item.quantity} × ${t(item.product_name)}`}
                     secondary={
                       item.barcode
                         ? `${item.product_code} · ${item.barcode}${open ? '' : ' · ' + t('type or scan it first')}`
@@ -154,7 +154,7 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
                   <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
                     <IconButton
                       size="small"
-                      aria-label={t('One less {0}', item.product_name)}
+                      aria-label={t('One less {0}', t(item.product_name))}
                       disabled={!open || n <= (item.barcode ? 1 : 0)}
                       onClick={() => setCount(item, n - 1)}
                     >
@@ -169,14 +169,14 @@ export function ShipDialog({ order, onClose }: { order: Order; onClose: () => vo
                       slotProps={{
                         htmlInput: {
                           inputMode: 'numeric',
-                          'aria-label': t('Picked {0}', item.product_name),
+                          'aria-label': t('Picked {0}', t(item.product_name)),
                           style: { textAlign: 'center' },
                         },
                       }}
                     />
                     <IconButton
                       size="small"
-                      aria-label={t('One more {0}', item.product_name)}
+                      aria-label={t('One more {0}', t(item.product_name))}
                       disabled={!open || complete}
                       onClick={() => setCount(item, n + 1)}
                     >
